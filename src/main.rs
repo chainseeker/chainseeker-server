@@ -22,7 +22,14 @@ impl Syncer {
         Syncer{
             addr_index_db,
             utxo_db: match synced_height {
-                Some(h) => UtxoDB::load(h),
+                Some(h) => {
+                    print!("Loading UTXO database...");
+                    std::io::stdout().flush().expect("Failed to flush to stdout.");
+                    let begin = Instant::now();
+                    let db = UtxoDB::load(h);
+                    println!(" {}ms.", begin.elapsed().as_millis());
+                    db
+                },
                 None => UtxoDB::new(),
             },
             rest: get_rest(),
@@ -31,13 +38,17 @@ impl Syncer {
     }
     async fn process_block(&mut self, height: u32, save: bool) {
         let begin = Instant::now();
-        print!("Syncing at block height = {:6}", height);
+        print!("Height={:6}", height);
         let blockid = self.rest.blockhashbyheight(height).await
             .expect(&format!("Failed to fetch block at height = {}.", height));
         let block = self.rest.block(blockid).await.expect(&format!("Failed to fetch a block with blockid = {}", blockid));
-        print!(", txs = {:5}", block.txdata.len());
+        print!(", #txs={:4}", block.txdata.len());
+        let begin_utxo = Instant::now();
         let previous_pubkeys = self.utxo_db.process_block(&block);
+        let utxo_elapsed = begin_utxo.elapsed();
+        let begin_addr_index = Instant::now();
         self.addr_index_db.process_block(&block, previous_pubkeys);
+        let addr_index_elapsed = begin_addr_index.elapsed();
         let mut vins: usize = 0;
         let mut vouts: usize = 0;
         for tx in block.txdata.iter() {
@@ -45,14 +56,15 @@ impl Syncer {
             vouts += tx.output.len();
         }
         println!(
-            ", #vins = {:5}, #vouts = {:5}, #utxos = {:9} ({:4}ms)",
-            vins, vouts, self.utxo_db.len(), begin.elapsed().as_millis());
+            ", #vins={:4}, #vouts={:4}, #utxos={:9} (utxo:{:3}ms, addr:{:3}ms, total:{:3}ms)",
+            vins, vouts, self.utxo_db.len(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
         if save {
             let begin = Instant::now();
             print!("Saving...");
             std::io::stdout().flush().expect("Failed to flush to stdout.");
             self.utxo_db.save(height);
             self.addr_index_db.put_synced_height(height);
+            self.addr_index_db.flush();
             self.synced_height = Some(height);
             UtxoDB::delete_older_than(height - UTXO_DELETE_THRESHOLD);
             println!(" ({:4}ms)", begin.elapsed().as_millis());
@@ -66,7 +78,7 @@ impl Syncer {
         let chaininfo = self.rest.chaininfo().await.expect("Failed to fetch chaininfo.");
         let target_height = chaininfo.blocks;
         for height in start_height..(target_height + 1) {
-            let save = (height - start_height) % utxo_save_interval == 0;
+            let save = (height - start_height) % utxo_save_interval == utxo_save_interval - 1;
             self.process_block(height, save).await;
         }
         target_height - start_height + 1

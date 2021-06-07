@@ -17,7 +17,11 @@ pub struct AddressIndexDB {
 impl AddressIndexDB {
     pub fn new() -> Self {
         let path = get_data_dir_path().expect("Failed to get the data directory path.") + "/address_index";
-        let db = DB::open_default(path).expect("Failed to open the database.");
+        let mut db_options = rocksdb::Options::default();
+        db_options.create_if_missing(true);
+        db_options.increase_parallelism(num_cpus::get() as i32);
+        db_options.set_db_write_buffer_size(128 * 1024 * 1024);
+        let db = DB::open(&db_options, path).expect("Failed to open the database.");
         AddressIndexDB {
             db,
         }
@@ -52,22 +56,28 @@ impl AddressIndexDB {
         for i in 0..txids.len() {
             txids[i].consensus_encode(&mut txids_ser[(i * 32)..((i + 1) * 32)]).expect("Failed to encode a txid.");
         }
+        //println!("{}", txid);
         self.db.put(script.as_bytes(), txids_ser).expect("Failed to put a database element.");
+    }
+    pub fn flush(&self) {
+        self.db.flush().expect("Failed to flush to address index DB.");
     }
     pub fn process_block(&self, block: &Block, previous_pubkeys: Vec<Script>) {
         let mut previous_pubkey_index = 0;
+        // Process vins.
         for tx in block.txdata.iter() {
             let txid = tx.txid();
-            // Process vins.
             for vin in tx.input.iter() {
                 if vin.previous_output.is_null() {
                     continue;
                 }
-                // Fetch transaction from `previous_output`.
                 self.put(&previous_pubkeys[previous_pubkey_index], &txid);
                 previous_pubkey_index += 1;
             }
-            // Process vouts.
+        }
+        // Process vouts.
+        for tx in block.txdata.iter() {
+            let txid = tx.txid();
             for vout in tx.output.iter() {
                 self.put(&vout.script_pubkey, &txid);
             }
