@@ -64,7 +64,7 @@ impl Syncer {
             }
         }
     }
-    async fn run(&mut self, utxo_save_interval: u32) -> u32 {
+    async fn sync(&mut self, utxo_save_interval: u32) -> u32 {
         let start_height = match self.synced_height {
             Some(h) => h + 1,
             None => 0,
@@ -77,10 +77,13 @@ impl Syncer {
         }
         target_height - start_height + 1
     }
+    async fn run(&mut self) {
+        let _synced_blocks = self.sync(DEFAULT_UTXO_SAVE_INTERVAL).await;
+    }
 }
 
 #[tokio::main]
 async fn main() {
     let mut syncer = Syncer::new();
-    syncer.run(DEFAULT_UTXO_SAVE_INTERVAL).await;
+    syncer.run().await;
 }

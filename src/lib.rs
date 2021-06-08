@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use std::fs::File;
-use bitcoin::hash_types::Txid;
+use bitcoin::hash_types::{Txid, BlockHash};
 use bitcoin::blockdata::script::Script;
 use bitcoin::consensus::{Encodable, Decodable};
 
@@ -36,6 +36,16 @@ pub fn serialize_txid(txid: &Txid) -> [u8; 32] {
 
 pub fn deserialize_txid(txid_vec: &[u8]) -> Txid {
     Txid::consensus_decode(&txid_vec[..]).expect("Failed to decode txid.")
+}
+
+pub fn serialize_block_hash(block_hash: &BlockHash) -> [u8; 32] {
+    let mut block_hash_vec: [u8; 32] = [0; 32];
+    block_hash.consensus_encode(&mut block_hash_vec as &mut [u8]).expect("Failed to encode block hash.");
+    block_hash_vec
+}
+
+pub fn deserialize_block_hash(block_hash_vec: &[u8]) -> BlockHash {
+    BlockHash::consensus_decode(&block_hash_vec[..]).expect("Failed to decode block hash.")
 }
 
 pub fn write_u32(file: &mut File, n: u32) {

@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::time::Instant;
 use std::collections::HashMap;
-use bitcoin::hash_types::Txid;
+use bitcoin::hash_types::{Txid, BlockHash};
 use bitcoin::blockdata::block::Block;
 use bitcoin::blockdata::script::Script;
 
@@ -20,12 +20,14 @@ struct UtxoValue {
 
 pub struct UtxoDB {
     db: HashMap<UtxoKey, UtxoValue>,
+    block_hash: Option<BlockHash>,
 }
 
 impl UtxoDB {
     pub fn new() -> Self {
         Self{
             db: HashMap::new(),
+            block_hash: None,
         }
     }
     pub fn get_dir() -> String {
@@ -43,6 +45,8 @@ impl UtxoDB {
         let path = Self::get_path(height);
         std::fs::create_dir_all(Self::get_dir()).expect("Failed to create the UTXO data directory.");
         let mut file = File::create(&path).expect(&format!("Failed to craete a file: {}", path));
+        // Write block hash.
+        write_arr(&mut file, &serialize_block_hash(&self.block_hash.unwrap()));
         // Write the number of entries.
         write_usize(&mut file, self.db.len());
         let mut i = 0;
@@ -69,6 +73,8 @@ impl UtxoDB {
         let begin = Instant::now();
         let path = Self::get_path(height);
         let mut file = File::open(&path).expect(&format!("Failed to open a file: {}", path));
+        // Read block hash.
+        let block_hash = deserialize_block_hash(&read_vec(&mut file, 32));
         // Read the number of entries.
         let n_entries = read_usize(&mut file);
         let mut db = HashMap::new();
@@ -99,6 +105,7 @@ impl UtxoDB {
         println!(" ({}ms).", begin.elapsed().as_millis());
         UtxoDB{
             db,
+            block_hash: Some(block_hash),
         }
     }
     pub fn delete(height: u32) -> std::io::Result<()> {
@@ -146,6 +153,7 @@ impl UtxoDB {
                 previous_script_pubkeys.push(val.script_pubkey);
             }
         }
+        self.block_hash = Some(block.block_hash());
         previous_script_pubkeys
     }
 }
