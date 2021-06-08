@@ -5,7 +5,6 @@ use serde::{Serialize, Deserialize};
 use bitcoin::hash_types::Txid;
 use bitcoin::blockdata::block::Block;
 use bitcoin::blockdata::script::Script;
-use bitcoin::consensus::{Encodable, Decodable};
 
 use super::*;
 
@@ -53,11 +52,8 @@ impl UtxoDB {
         std::fs::create_dir_all(Self::get_dir()).expect("Failed to create the UTXO data directory.");
         let mut entries = Vec::with_capacity(self.utxos.len());
         for (key, value) in self.utxos.iter() {
-            let mut script_pubkey = Vec::with_capacity(value.script_pubkey.len());
-            script_pubkey.resize(value.script_pubkey.len(), 0);
-            value.script_pubkey.consensus_encode(&mut script_pubkey).expect("Failed to encode script_pubkey.");
-            let mut txid: [u8; 32] = [0; 32];
-            key.txid.consensus_encode(&mut txid as &mut [u8]).expect("Failed to encode txid.");
+            let script_pubkey = serialize_script(&value.script_pubkey);
+            let txid = serialize_txid(&key.txid);
             entries.push(UtxoEntry{
                 script_pubkey,
                 txid,
@@ -78,8 +74,8 @@ impl UtxoDB {
         let entries: Vec<UtxoEntry> = bincode::deserialize(&ser).expect("Failed to deserialize UtxoDB.");
         let mut utxos = HashMap::new();
         for entry in entries.iter() {
-            let script_pubkey = Script::consensus_decode(&entry.script_pubkey[..]).expect("Failed to decode script_pubkey.");
-            let txid = Txid::consensus_decode(&entry.txid[..]).expect("Failed to decode txid.");
+            let script_pubkey = deserialize_script(&entry.script_pubkey);
+            let txid = deserialize_txid(&entry.txid);
             utxos.insert(
                 UtxoKey{
                     txid,

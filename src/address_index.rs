@@ -1,68 +1,106 @@
+use std::fs::File;
+use std::time::Instant;
+use std::collections::{HashSet, HashMap};
 use bitcoin::hash_types::Txid;
 use bitcoin::blockdata::block::Block;
 use bitcoin::blockdata::script::Script;
-use bitcoin::consensus::{Encodable, Decodable};
 
 use super::*;
 
-type DB = rocksdb::DBWithThreadMode<rocksdb::MultiThreaded>;
-
-const SYNCED_HEIGHT_KEY: &str = "synced_height";
-
 pub struct AddressIndexDB {
-    db: DB,
+    synced_height: Option<u32>,
+    db: HashMap<Script, HashSet<Txid>>,
 }
 
 /// The database which stores (script_pubkey, txid) tuple.
 impl AddressIndexDB {
-    pub fn new() -> Self {
-        let path = get_data_dir_path().expect("Failed to get the data directory path.") + "/address_index";
-        let mut db_options = rocksdb::Options::default();
-        db_options.create_if_missing(true);
-        db_options.increase_parallelism(num_cpus::get() as i32);
-        db_options.set_db_write_buffer_size(128 * 1024 * 1024);
-        let db = DB::open(&db_options, path).expect("Failed to open the database.");
-        AddressIndexDB {
+    pub fn get_path() -> String {
+        format!("{}/address_index.bin", get_data_dir_path().expect("Failed to get the data directory path."))
+    }
+    pub fn get_path_tmp() -> String {
+        format!("{}/address_index.tmp.bin", get_data_dir_path().expect("Failed to get the data directory path."))
+    }
+    pub fn save(&self) {
+        let begin = Instant::now();
+        let path = Self::get_path_tmp();
+        std::fs::create_dir_all(get_data_dir_path().expect("Failed to get the data directory path."))
+            .expect("Failed to create the UTXO data directory.");
+        let mut file = File::create(&path).expect(&format!("Failed to craete a file: {}", path));
+        // Write synced_height.
+        write_u32(&mut file, self.synced_height.unwrap());
+        // Write the number of entries.
+        write_usize(&mut file, self.db.len());
+        let mut i = 0;
+        for (script_pubkey, txids) in self.db.iter() {
+            i += 1;
+            print!("\rSaving address index database ({} of {})...", i, self.db.len());
+            // Write the byte length of script_pubkey.
+            write_usize(&mut file, script_pubkey.len());
+            // Write script_pubkey.
+            let script_pubkey = serialize_script(&script_pubkey);
+            write_arr(&mut file, &script_pubkey);
+            // Write the number of txids.
+            write_usize(&mut file, txids.len());
+            // Write txids.
+            for txid in txids.iter() {
+                let txid_vec = serialize_txid(&txid);
+                write_arr(&mut file, &txid_vec);
+            }
+        }
+        println!(" ({}ms)", begin.elapsed().as_millis());
+        file.flush().expect("Failed to flush to binary data.");
+        std::fs::rename(Self::get_path_tmp(), Self::get_path()).expect("Failed to rename address index DB tmp file.");
+    }
+    pub fn load() -> Self {
+        let begin = Instant::now();
+        let path = Self::get_path();
+        let mut file = match File::open(&path) {
+            Ok(file) => file,
+            Err(_err) => return AddressIndexDB{
+                synced_height: None,
+                db: HashMap::new(),
+            },
+        };
+        // Read synced_height.
+        let synced_height = read_u32(&mut file);
+        // Read the number of entries.
+        let n_entries = read_usize(&mut file);
+        let mut db = HashMap::new();
+        for i in 0..n_entries {
+            print!("\rLoading address index database ({} of {})...", i + 1, n_entries);
+            // Read the byte length of script_pubkey.
+            let script_pubkey_len = read_usize(&mut file);
+            // Read script_pubkey.
+            let script_pubkey_vec = read_vec(&mut file, script_pubkey_len);
+            let script_pubkey = deserialize_script(&script_pubkey_vec);
+            // Read the number of txids.
+            let n_txids = read_usize(&mut file);
+            // Read txids.
+            let mut txids = HashSet::new();
+            for _ in 0..n_txids {
+                txids.insert(deserialize_txid(&read_vec(&mut file, 32)));
+            }
+            db.insert(script_pubkey, txids);
+        }
+        println!(" ({}ms).", begin.elapsed().as_millis());
+        AddressIndexDB{
+            synced_height: Some(synced_height),
             db,
         }
     }
-    pub fn get(&self, script: &Script) -> Vec<Txid> {
-        let txid_vec_option = self.db.get(script.as_bytes()).expect("Failed to get a database element.");
-        if let Some(txid_vec) = txid_vec_option {
-            let mut txids = Vec::new();
-            for i in 0..(txid_vec.len() / 32) {
-                let txid = Txid::consensus_decode(&txid_vec[(i * 32)..((i + 1) * 32)]).expect("Failed to decode a txid.");
-                txids.push(txid);
-            }
-            return txids;
-        }
-        Vec::new()
+    pub fn put(&mut self, script_pubkey: Script, txid: Txid) {
+        match self.db.get_mut(&script_pubkey) {
+            Some(txids) => {
+                txids.insert(txid);
+            },
+            None => {
+                let mut txids = HashSet::new();
+                txids.insert(txid);
+                self.db.insert(script_pubkey, txids);
+            },
+        };
     }
-    pub fn put(&self, script: &Script, txid: &Txid) {
-        let mut txids = self.get(&script);
-        let mut found = false;
-        for txid2 in txids.iter() {
-            if txid == txid2 {
-                found = true;
-                break;
-            }
-        }
-        if found {
-            return;
-        }
-        txids.push(*txid);
-        let mut txids_ser = Vec::with_capacity(txids.len() * 32);
-        txids_ser.resize(txids.len() * 32, 0);
-        for i in 0..txids.len() {
-            txids[i].consensus_encode(&mut txids_ser[(i * 32)..((i + 1) * 32)]).expect("Failed to encode a txid.");
-        }
-        //println!("{}", txid);
-        self.db.put(script.as_bytes(), txids_ser).expect("Failed to put a database element.");
-    }
-    pub fn flush(&self) {
-        self.db.flush().expect("Failed to flush to address index DB.");
-    }
-    pub fn process_block(&self, block: &Block, previous_pubkeys: Vec<Script>) {
+    pub fn process_block(&mut self, block: &Block, previous_pubkeys: Vec<Script>) {
         let mut previous_pubkey_index = 0;
         // Process vins.
         for tx in block.txdata.iter() {
@@ -71,7 +109,7 @@ impl AddressIndexDB {
                 if vin.previous_output.is_null() {
                     continue;
                 }
-                self.put(&previous_pubkeys[previous_pubkey_index], &txid);
+                self.put(previous_pubkeys[previous_pubkey_index].clone(), txid);
                 previous_pubkey_index += 1;
             }
         }
@@ -79,32 +117,15 @@ impl AddressIndexDB {
         for tx in block.txdata.iter() {
             let txid = tx.txid();
             for vout in tx.output.iter() {
-                self.put(&vout.script_pubkey, &txid);
+                self.put(vout.script_pubkey.clone(), txid);
             }
         }
+        self.synced_height = match self.synced_height {
+            Some(h) => Some(h + 1),
+            None => Some(0),
+        };
     }
-    pub fn get_synced_height(&self) -> Option<u32> {
-        let synced_height_vec_option = self.db.get(SYNCED_HEIGHT_KEY).expect("Failed to get the synced height.");
-        if let Some(synced_height_vec) = synced_height_vec_option {
-            if synced_height_vec.len() != 4 {
-                return None;
-            }
-            let synced_height: u32 =
-                ((synced_height_vec[0] as u32) <<  0) |
-                ((synced_height_vec[1] as u32) <<  8) |
-                ((synced_height_vec[2] as u32) << 16) |
-                ((synced_height_vec[3] as u32) << 24);
-            return Some(synced_height);
-        }
-        None
-    }
-    pub fn put_synced_height(&self, height: u32) {
-        let height_arr: [u8; 4] = [
-            ((height >>  0) & 0xff) as u8,
-            ((height >>  8) & 0xff) as u8,
-            ((height >> 16) & 0xff) as u8,
-            ((height >> 24) & 0xff) as u8,
-        ];
-        self.db.put(SYNCED_HEIGHT_KEY, height_arr).expect("Failed to put the synced height.");
+    pub fn synced_height(&self) -> Option<u32> {
+        self.synced_height
     }
 }
