@@ -1,20 +1,11 @@
-use std::io::{Read, Write};
 use std::fs::File;
+use std::time::Instant;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use bitcoin::hash_types::Txid;
 use bitcoin::blockdata::block::Block;
 use bitcoin::blockdata::script::Script;
 
 use super::*;
-
-#[derive(Serialize, Deserialize)]
-struct UtxoEntry {
-    script_pubkey: Vec<u8>,
-    txid: [u8; 32],
-    vout: u32,
-    value: u64,
-}
 
 #[derive(PartialEq, Eq, Hash)]
 struct UtxoKey {
@@ -28,13 +19,13 @@ struct UtxoValue {
 }
 
 pub struct UtxoDB {
-    utxos: HashMap<UtxoKey, UtxoValue>,
+    db: HashMap<UtxoKey, UtxoValue>,
 }
 
 impl UtxoDB {
     pub fn new() -> Self {
         Self{
-            utxos: HashMap::new(),
+            db: HashMap::new(),
         }
     }
     pub fn get_dir() -> String {
@@ -44,51 +35,70 @@ impl UtxoDB {
         format!("{}/{}.bin", Self::get_dir(), height)
     }
     pub fn len(&self) -> usize {
-        self.utxos.len()
+        self.db.len()
     }
     /// Save UTXO database to a file.
     pub fn save(&self, height: u32) {
+        let begin = Instant::now();
         let path = Self::get_path(height);
         std::fs::create_dir_all(Self::get_dir()).expect("Failed to create the UTXO data directory.");
-        let mut entries = Vec::with_capacity(self.utxos.len());
-        for (key, value) in self.utxos.iter() {
-            let script_pubkey = serialize_script(&value.script_pubkey);
-            let txid = serialize_txid(&key.txid);
-            entries.push(UtxoEntry{
-                script_pubkey,
-                txid,
-                vout: key.vout,
-                value: value.value,
-            });
-        }
-        let ser: Vec<u8> = bincode::serialize(&entries).expect("Failed to serialize UtxoDB.");
         let mut file = File::create(&path).expect(&format!("Failed to craete a file: {}", path));
-        file.write_all(&ser).expect(&format!("Failed to write to a file: {}", path));
+        // Write the number of entries.
+        write_usize(&mut file, self.db.len());
+        let mut i = 0;
+        for (key, value) in self.db.iter() {
+            i += 1;
+            print!("\rSaving UTXO database ({} of {})...", i, self.db.len());
+            let script_pubkey = serialize_script(&value.script_pubkey);
+            // Write the byte length of script_pubkey.
+            write_usize(&mut file, script_pubkey.len());
+            // Write script_pubkey.
+            write_arr(&mut file, &script_pubkey);
+            // Write txid.
+            let txid = serialize_txid(&key.txid);
+            write_arr(&mut file, &txid);
+            // Write vout.
+            write_u32(&mut file, key.vout);
+            // Write value.
+            write_u64(&mut file, value.value);
+        }
+        println!(" ({}ms)", begin.elapsed().as_millis());
     }
     /// Load UTXO database from a file.
     pub fn load(height: u32) -> Self {
+        let begin = Instant::now();
         let path = Self::get_path(height);
         let mut file = File::open(&path).expect(&format!("Failed to open a file: {}", path));
-        let mut ser = Vec::new();
-        file.read_to_end(&mut ser).expect(&format!("Failed to read from a file: {}", path));
-        let entries: Vec<UtxoEntry> = bincode::deserialize(&ser).expect("Failed to deserialize UtxoDB.");
-        let mut utxos = HashMap::new();
-        for entry in entries.iter() {
-            let script_pubkey = deserialize_script(&entry.script_pubkey);
-            let txid = deserialize_txid(&entry.txid);
-            utxos.insert(
+        // Read the number of entries.
+        let n_entries = read_usize(&mut file);
+        let mut db = HashMap::new();
+        for i in 0..n_entries {
+            print!("\rLoading UTXO database ({} of {})...", i + 1, n_entries);
+            // Read the byte length of script_pubkey.
+            let script_pubkey_len = read_usize(&mut file);
+            // Read script_pubkey.
+            let script_pubkey_vec = read_vec(&mut file, script_pubkey_len);
+            let script_pubkey = deserialize_script(&script_pubkey_vec);
+            // Read txid.
+            let txid = deserialize_txid(&read_vec(&mut file, 32));
+            // Read vout.
+            let vout = read_u32(&mut file);
+            // Read value.
+            let value = read_u64(&mut file);
+            db.insert(
                 UtxoKey{
                     txid,
-                    vout: entry.vout,
+                    vout,
                 },
                 UtxoValue{
                     script_pubkey,
-                    value: entry.value,
+                    value,
                 },
             );
         }
+        println!(" ({}ms).", begin.elapsed().as_millis());
         UtxoDB{
-            utxos,
+            db,
         }
     }
     pub fn delete(height: u32) -> std::io::Result<()> {
@@ -109,7 +119,7 @@ impl UtxoDB {
         for tx in block.txdata.iter() {
             let txid = tx.txid();
             for i in 0..tx.output.len() {
-                self.utxos.insert(
+                self.db.insert(
                     UtxoKey{
                         txid,
                         vout: i as u32,
@@ -132,7 +142,7 @@ impl UtxoDB {
                     txid: vin.previous_output.txid,
                     vout: vin.previous_output.vout,
                 };
-                let val = self.utxos.remove(&key).expect("Failed to remove UTXO.");
+                let val = self.db.remove(&key).expect("Failed to remove UTXO.");
                 previous_script_pubkeys.push(val.script_pubkey);
             }
         }

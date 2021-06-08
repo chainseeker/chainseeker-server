@@ -22,14 +22,7 @@ impl Syncer {
         Syncer{
             addr_index_db,
             utxo_db: match synced_height {
-                Some(h) => {
-                    print!("Loading UTXO database...");
-                    std::io::stdout().flush().expect("Failed to flush to stdout.");
-                    let begin = Instant::now();
-                    let db = UtxoDB::load(h);
-                    println!(" {}ms.", begin.elapsed().as_millis());
-                    db
-                },
+                Some(h) => UtxoDB::load(h),
                 None => UtxoDB::new(),
             },
             rest: get_rest(),
@@ -62,7 +55,6 @@ impl Syncer {
             vins, vouts, self.utxo_db.len(),
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
         if save {
-            let begin = Instant::now();
             std::io::stdout().flush().expect("Failed to flush to stdout.");
             self.utxo_db.save(height);
             self.addr_index_db.save();
@@ -70,7 +62,6 @@ impl Syncer {
             if height > UTXO_DELETE_THRESHOLD {
                 UtxoDB::delete_older_than(height - UTXO_DELETE_THRESHOLD);
             }
-            println!("Saved in {}ms.", begin.elapsed().as_millis());
         }
     }
     async fn run(&mut self, utxo_save_interval: u32) -> u32 {

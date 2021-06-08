@@ -48,6 +48,16 @@ pub fn read_u32(file: &mut File) -> u32 {
     u32::from_le_bytes(buf)
 }
 
+pub fn write_u64(file: &mut File, n: u64) {
+    assert_eq!(file.write(&n.to_le_bytes()).unwrap(), 8);
+}
+
+pub fn read_u64(file: &mut File) -> u64 {
+    let mut buf: [u8; 8] = [0; 8];
+    assert_eq!(file.read(&mut buf).unwrap(), 8);
+    u64::from_le_bytes(buf)
+}
+
 pub fn write_usize(file: &mut File, n: usize) {
     const BYTES: usize = std::mem::size_of::<usize>();
     assert_eq!(file.write(&n.to_le_bytes()).unwrap(), BYTES);
