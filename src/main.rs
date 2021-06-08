@@ -12,7 +12,6 @@ struct Syncer {
     addr_index_db: AddressIndexDB,
     utxo_db: UtxoDB,
     rest: bitcoin_rest::Context,
-    synced_height: Option<u32>,
 }
 
 impl Syncer {
@@ -26,8 +25,10 @@ impl Syncer {
                 None => UtxoDB::new(),
             },
             rest: get_rest(),
-            synced_height,
         }
+    }
+    pub fn synced_height(&self) -> Option<u32> {
+        self.addr_index_db.synced_height()
     }
     async fn process_block(&mut self, height: u32, save: bool) {
         let begin = Instant::now();
@@ -58,14 +59,13 @@ impl Syncer {
             std::io::stdout().flush().expect("Failed to flush to stdout.");
             self.utxo_db.save(height);
             self.addr_index_db.save();
-            self.synced_height = Some(height);
             if height > UTXO_DELETE_THRESHOLD {
                 UtxoDB::delete_older_than(height - UTXO_DELETE_THRESHOLD);
             }
         }
     }
     async fn sync(&mut self, utxo_save_interval: u32) -> u32 {
-        let start_height = match self.synced_height {
+        let start_height = match self.synced_height() {
             Some(h) => h + 1,
             None => 0,
         };
