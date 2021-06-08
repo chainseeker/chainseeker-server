@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::time::Instant;
 
 use chainseeker_syncer::*;
@@ -17,7 +16,7 @@ struct Syncer {
 impl Syncer {
     fn new() -> Self {
         let addr_index_db = AddressIndexDB::load();
-        let synced_height = addr_index_db.synced_height();
+        let synced_height = addr_index_db.synced_height;
         Syncer{
             addr_index_db,
             utxo_db: match synced_height {
@@ -28,7 +27,7 @@ impl Syncer {
         }
     }
     pub fn synced_height(&self) -> Option<u32> {
-        self.addr_index_db.synced_height()
+        self.addr_index_db.synced_height
     }
     async fn process_block(&mut self, height: u32, save: bool) {
         let begin = Instant::now();
@@ -56,15 +55,33 @@ impl Syncer {
             vins, vouts, self.utxo_db.len(),
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
         if save {
-            std::io::stdout().flush().expect("Failed to flush to stdout.");
             self.utxo_db.save(height);
             self.addr_index_db.save();
             if height > UTXO_DELETE_THRESHOLD {
-                UtxoDB::delete_older_than(height - UTXO_DELETE_THRESHOLD);
+                let deleted_cnt = UtxoDB::delete_older_than(height - UTXO_DELETE_THRESHOLD);
+                println!("Deleted {} old UTXO database(s).", deleted_cnt);
             }
         }
     }
+    async fn process_reorgs(&mut self) {
+        let mut height = match self.synced_height() {
+            Some(h) => h,
+            None => return (),
+        };
+        loop {
+            let block_hash_rest = self.rest.blockhashbyheight(height).await
+                .expect(&format!("Failed to fetch block at height = {}.", height));
+            let block_hash_me = self.utxo_db.block_hash.unwrap();
+            if block_hash_rest == block_hash_me {
+                break;
+            }
+            println!("Reorg detected at block height = {}.", height);
+            height = self.utxo_db.reorg(height);
+            self.addr_index_db.synced_height = Some(height);
+        }
+    }
     async fn sync(&mut self, utxo_save_interval: u32) -> u32 {
+        self.process_reorgs().await;
         let start_height = match self.synced_height() {
             Some(h) => h + 1,
             None => 0,

@@ -8,8 +8,8 @@ use bitcoin::blockdata::script::Script;
 use super::*;
 
 pub struct AddressIndexDB {
-    synced_height: Option<u32>,
     db: HashMap<Script, HashSet<Txid>>,
+    pub synced_height: Option<u32>,
 }
 
 /// The database which stores (script_pubkey, txid) tuple.
@@ -48,7 +48,6 @@ impl AddressIndexDB {
             }
         }
         println!(" ({}ms)", begin.elapsed().as_millis());
-        file.flush().expect("Failed to flush to binary data.");
         std::fs::rename(Self::get_path_tmp(), Self::get_path()).expect("Failed to rename address index DB tmp file.");
     }
     pub fn load() -> Self {
@@ -124,8 +123,5 @@ impl AddressIndexDB {
             Some(h) => Some(h + 1),
             None => Some(0),
         };
-    }
-    pub fn synced_height(&self) -> Option<u32> {
-        self.synced_height
     }
 }

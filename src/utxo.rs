@@ -20,7 +20,7 @@ struct UtxoValue {
 
 pub struct UtxoDB {
     db: HashMap<UtxoKey, UtxoValue>,
-    block_hash: Option<BlockHash>,
+    pub block_hash: Option<BlockHash>,
 }
 
 impl UtxoDB {
@@ -155,5 +155,15 @@ impl UtxoDB {
         }
         self.block_hash = Some(block.block_hash());
         previous_script_pubkeys
+    }
+    pub fn reorg(&mut self, height: u32) -> u32 {
+        for height in (0..height).rev() {
+            if !std::path::Path::new(&Self::get_path(height)).exists() {
+                continue;
+            }
+            *self = Self::load(height);
+            return height;
+        }
+        panic!("Failed to reorg because no older UTXO database exists.");
     }
 }
