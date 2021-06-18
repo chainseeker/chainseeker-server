@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{stdout, BufReader, BufWriter};
 use std::time::Instant;
 use std::collections::HashMap;
 use bitcoin::hash_types::{Txid, BlockHash};
@@ -54,7 +54,10 @@ impl UtxoDB {
         let mut i = 0;
         for (key, value) in self.db.iter() {
             i += 1;
-            print!("\rSaving UTXO database ({} of {})...", i, self.db.len());
+            if i % 100_000 == 0 {
+                print!("\rSaving UTXO database ({} of {})...", i, self.db.len());
+                stdout().flush().expect("Failed to flush.");
+            }
             let script_pubkey = serialize_script(&value.script_pubkey);
             // Write the byte length of script_pubkey.
             write_usize(&mut writer, script_pubkey.len());
@@ -82,7 +85,10 @@ impl UtxoDB {
         let n_entries = read_usize(&mut reader);
         let mut db = HashMap::new();
         for i in 0..n_entries {
-            print!("\rLoading UTXO database ({} of {})...", i + 1, n_entries);
+            if i % 100_000 == 0 {
+                print!("\rLoading UTXO database ({} of {})...", i + 1, n_entries);
+                stdout().flush().expect("Failed to flush.");
+            }
             // Read the byte length of script_pubkey.
             let script_pubkey_len = read_usize(&mut reader);
             // Read script_pubkey.
