@@ -1,11 +1,16 @@
 use std::time::Instant;
+use std::convert::Infallible;
+use std::net::SocketAddr;
+
+use hyper::{Body, Request, Response, Server, Method, StatusCode};
+use hyper::service::{make_service_fn, service_fn};
 
 use chainseeker_syncer::*;
 use chainseeker_syncer::address_index::*;
 use chainseeker_syncer::utxo::*;
 
 const UTXO_DELETE_THRESHOLD: u32 = 20;
-const DEFAULT_UTXO_SAVE_INTERVAL: u32 = 100;
+const DEFAULT_UTXO_SAVE_INTERVAL: u32 = 1000;
 
 struct Syncer {
     addr_index_db: AddressIndexDB,
@@ -15,8 +20,8 @@ struct Syncer {
 
 impl Syncer {
     fn new() -> Self {
-        let addr_index_db = AddressIndexDB::load();
-        let synced_height = addr_index_db.synced_height;
+        let addr_index_db = AddressIndexDB::new();
+        let synced_height = addr_index_db.get_synced_height();
         Syncer{
             addr_index_db,
             utxo_db: match synced_height {
@@ -27,7 +32,7 @@ impl Syncer {
         }
     }
     pub fn synced_height(&self) -> Option<u32> {
-        self.addr_index_db.synced_height
+        self.addr_index_db.get_synced_height()
     }
     async fn process_block(&mut self, height: u32, save: bool) {
         let begin = Instant::now();
@@ -56,11 +61,11 @@ impl Syncer {
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
         if save {
             self.utxo_db.save(height);
-            self.addr_index_db.save();
             if height > UTXO_DELETE_THRESHOLD {
                 let deleted_cnt = UtxoDB::delete_older_than(height - UTXO_DELETE_THRESHOLD);
                 println!("Deleted {} old UTXO database(s).", deleted_cnt);
             }
+            self.addr_index_db.put_synced_height(height);
         }
     }
     async fn process_reorgs(&mut self) {
@@ -77,7 +82,7 @@ impl Syncer {
             }
             println!("Reorg detected at block height = {}.", height);
             height = self.utxo_db.reorg(height);
-            self.addr_index_db.synced_height = Some(height);
+            self.addr_index_db.put_synced_height(height);
         }
     }
     async fn sync(&mut self, utxo_save_interval: u32) -> u32 {
@@ -99,8 +104,63 @@ impl Syncer {
     }
 }
 
+struct HttpServer {
+}
+
+impl HttpServer {
+    pub fn new() -> Self {
+        Self{
+        }
+    }
+    async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let not_found: Result<Response<Body>, Infallible> = {
+            let mut res: Response<Body> = Response::new("404 Not Found".into());
+            *res.status_mut() = StatusCode::NOT_FOUND;
+            Ok(res)
+        };
+        if req.method() != Method::GET {
+            return not_found;
+        }
+        let path: Vec<&str> = req.uri().path().split('/').collect();
+        if path.len() < 2 {
+            return not_found;
+        }
+        /*
+        if path[1] == "addr_index" {
+            let script = Script::from_str(path[2]);
+            let txids = addr_index
+        }
+        */
+        Ok(Response::new("Hello, world!\n".into()))
+    }
+    async fn run(&self) {
+        let addr = SocketAddr::from(([127, 0, 0, 1], 8090));
+        let make_svc = make_service_fn(|_conn| async {
+            Ok::<_, Infallible>(service_fn(Self::handle_request))
+        });
+        let server = Server::bind(&addr).serve(make_svc);
+        if let Err(e) = server.await {
+            panic!("HttpServer failed: {}", e);
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
-    let mut syncer = Syncer::new();
-    syncer.run().await;
+    tokio::join!(
+        // Run syncer.
+        async {
+            tokio::task::spawn(async {
+                let mut syncer = Syncer::new();
+                syncer.run().await;
+            }).await.unwrap();
+        },
+        // Run HTTP server.
+        async {
+            tokio::task::spawn(async {
+                let server = HttpServer::new();
+                server.run().await;
+            }).await.unwrap();
+        }
+    );
 }
