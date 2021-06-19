@@ -1,10 +1,11 @@
 use bitcoin::hash_types::Txid;
 use bitcoin::blockdata::block::Block;
 use bitcoin::blockdata::script::Script;
+use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 
 use super::*;
 
-type DB = rocksdb::DBWithThreadMode<rocksdb::MultiThreaded>;
+type DB = DBWithThreadMode<MultiThreaded>;
 
 const SYNCED_HEIGHT_KEY: &str = "synced_height";
 
@@ -19,7 +20,9 @@ impl AddressIndexDB {
     }
     pub fn new() -> Self {
         let path = Self::get_path();
-        let db = DB::open_default(path).expect("Failed to open the database.");
+        let mut opts = Options::default();
+        opts.set_max_open_files(1000);
+        let db = DB::open(&opts, path).expect("Failed to open the database.");
         AddressIndexDB {
             db,
         }
