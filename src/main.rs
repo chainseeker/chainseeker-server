@@ -1,6 +1,7 @@
 use std::time::Instant;
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use bitcoin::blockdata::block::Block;
 
 use hyper::{Body, Request, Response, Server, Method, StatusCode};
 use hyper::service::{make_service_fn, service_fn};
@@ -34,13 +35,16 @@ impl Syncer {
     pub fn synced_height(&self) -> Option<u32> {
         self.addr_index_db.get_synced_height()
     }
+    async fn fetch_block(&self, height: u32) -> Block {
+        let blockid = self.rest.blockhashbyheight(height).await
+            .expect(&format!("Failed to fetch block at height = {}.", height));
+        self.rest.block(blockid).await.expect(&format!("Failed to fetch a block with blockid = {}", blockid))
+    }
     async fn process_block(&mut self, height: u32, save: bool) {
         let begin = Instant::now();
         print!("Height={:6}", height);
         let begin_rest = Instant::now();
-        let blockid = self.rest.blockhashbyheight(height).await
-            .expect(&format!("Failed to fetch block at height = {}.", height));
-        let block = self.rest.block(blockid).await.expect(&format!("Failed to fetch a block with blockid = {}", blockid));
+        let block = self.fetch_block(height).await;
         let rest_elapsed = begin_rest.elapsed();
         print!(", #tx={:4}", block.txdata.len());
         let begin_utxo = Instant::now();
