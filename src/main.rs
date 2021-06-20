@@ -60,7 +60,7 @@ impl Syncer {
             vouts += tx.output.len();
         }
         println!(
-            ", #vin={:4}, #vout={:4}, #utxo={:9} (rest:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:3}ms)",
+            ", #vin={:5}, #vout={:5}, #utxo={:9} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
             vins, vouts, self.utxo_db.len(),
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
         if save {
