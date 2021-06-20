@@ -20,22 +20,27 @@ struct UtxoValue {
 }
 
 pub struct UtxoDB {
+    coin: String,
     db: HashMap<UtxoKey, UtxoValue>,
     pub block_hash: Option<BlockHash>,
 }
 
 impl UtxoDB {
-    pub fn new() -> Self {
+    pub fn new(coin: &str) -> Self {
         Self{
+            coin: coin.to_string(),
             db: HashMap::new(),
             block_hash: None,
         }
     }
-    pub fn get_dir() -> String {
-        format!("{}/utxo", get_data_dir_path().expect("Failed to get the data directory path."))
+    fn get_dir(coin: &str) -> String {
+        format!("{}/{}/utxo", get_data_dir_path().expect("Failed to get the data directory path."), coin)
     }
-    pub fn get_path(height: u32) -> String {
-        format!("{}/{}.bin", Self::get_dir(), height)
+    fn get_path(coin: &str, height: u32) -> String {
+        format!("{}/{}.bin", Self::get_dir(coin), height)
+    }
+    pub fn coin(&self) ->&str {
+        &self.coin
     }
     pub fn len(&self) -> usize {
         self.db.len()
@@ -43,8 +48,8 @@ impl UtxoDB {
     /// Save UTXO database to a file.
     pub fn save(&self, height: u32) {
         let begin = Instant::now();
-        let path = Self::get_path(height);
-        std::fs::create_dir_all(Self::get_dir()).expect("Failed to create the UTXO data directory.");
+        let path = Self::get_path(&self.coin, height);
+        std::fs::create_dir_all(Self::get_dir(&self.coin)).expect("Failed to create the UTXO data directory.");
         let file = File::create(&path).expect(&format!("Failed to craete a file: {}", path));
         let mut writer = BufWriter::new(file);
         // Write block hash.
@@ -74,9 +79,9 @@ impl UtxoDB {
         println!(" ({}ms)", begin.elapsed().as_millis());
     }
     /// Load UTXO database from a file.
-    pub fn load(height: u32) -> Self {
+    pub fn load(coin: &str, height: u32) -> Self {
         let begin = Instant::now();
-        let path = Self::get_path(height);
+        let path = Self::get_path(coin, height);
         let file = File::open(&path).expect(&format!("Failed to open a file: {}", path));
         let mut reader = BufReader::new(file);
         // Read block hash.
@@ -113,17 +118,18 @@ impl UtxoDB {
         }
         println!(" ({}ms).", begin.elapsed().as_millis());
         UtxoDB{
+            coin: coin.to_string(),
             db,
             block_hash: Some(block_hash),
         }
     }
-    pub fn delete(height: u32) -> std::io::Result<()> {
-        std::fs::remove_file(Self::get_path(height))
+    pub fn delete(coin: &str, height: u32) -> std::io::Result<()> {
+        std::fs::remove_file(Self::get_path(coin, height))
     }
-    pub fn delete_older_than(height: u32) -> u32 {
+    pub fn delete_older_than(coin: &str, height: u32) -> u32 {
         let mut delete_cnt = 0;
         for h in (0..height).rev() {
-            let result = Self::delete(h);
+            let result = Self::delete(coin, h);
             if result.is_ok() {
                 delete_cnt += 1;
             }
@@ -167,10 +173,10 @@ impl UtxoDB {
     }
     pub fn reorg(&mut self, height: u32) -> u32 {
         for height in (0..height).rev() {
-            if !std::path::Path::new(&Self::get_path(height)).exists() {
+            if !std::path::Path::new(&Self::get_path(&self.coin, height)).exists() {
                 continue;
             }
-            *self = Self::load(height);
+            *self = Self::load(&self.coin, height);
             return height;
         }
         panic!("Failed to reorg because no older UTXO database exists.");

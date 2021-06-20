@@ -20,16 +20,16 @@ struct Syncer {
 }
 
 impl Syncer {
-    fn new() -> Self {
-        let addr_index_db = AddressIndexDB::new();
+    fn new(coin: &str) -> Self {
+        let addr_index_db = AddressIndexDB::new(coin);
         let synced_height = addr_index_db.get_synced_height();
         Syncer{
             addr_index_db,
             utxo_db: match synced_height {
-                Some(h) => UtxoDB::load(h),
-                None => UtxoDB::new(),
+                Some(h) => UtxoDB::load(coin, h),
+                None => UtxoDB::new(coin),
             },
-            rest: get_rest(),
+            rest: get_rest(coin),
         }
     }
     pub fn synced_height(&self) -> Option<u32> {
@@ -66,7 +66,7 @@ impl Syncer {
         if save {
             self.utxo_db.save(height);
             if height > UTXO_DELETE_THRESHOLD {
-                let deleted_cnt = UtxoDB::delete_older_than(height - UTXO_DELETE_THRESHOLD);
+                let deleted_cnt = UtxoDB::delete_older_than(&self.utxo_db.coin(), height - UTXO_DELETE_THRESHOLD);
                 println!("Deleted {} old UTXO database(s).", deleted_cnt);
             }
             self.addr_index_db.put_synced_height(height);
@@ -151,11 +151,17 @@ impl HttpServer {
 
 #[tokio::main]
 async fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        println!("usage: {} COIN=(btc|tbtc)", args[0]);
+        return;
+    }
     tokio::join!(
         // Run syncer.
         async {
-            tokio::task::spawn(async {
-                let mut syncer = Syncer::new();
+            let coin = args[1].to_string();
+            tokio::task::spawn(async move {
+                let mut syncer = Syncer::new(&coin);
                 syncer.run().await;
             }).await.unwrap();
         },

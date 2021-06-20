@@ -6,11 +6,16 @@ use bitcoin::consensus::{Encodable, Decodable};
 pub mod address_index;
 pub mod utxo;
 
-const REST_ENDPOINT_ENV_NAME: &str = "BITCOIN_REST_ENDPOINT";
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
-pub fn get_rest() -> bitcoin_rest::Context {
-    let endpoint = std::env::var(REST_ENDPOINT_ENV_NAME).unwrap_or(bitcoin_rest::DEFAULT_ENDPOINT.to_string());
+pub fn get_rest(coin: &str) -> bitcoin_rest::Context {
+    let port = match coin {
+        "btc" => 8332,
+        "tbtc" => 18332,
+        _ => panic!("COIN not supported."),
+    };
+    let host = std::env::var("BITCOIN_REST_HOST").unwrap_or("localhost".to_string());
+    let endpoint = format!("http://{}:{}/rest/", host, port);
     bitcoin_rest::new(&endpoint)
 }
 

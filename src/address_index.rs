@@ -15,11 +15,11 @@ pub struct AddressIndexDB {
 
 /// The database which stores (script_pubkey, txid) tuple.
 impl AddressIndexDB {
-    pub fn get_path() -> String {
-        format!("{}/address_index", get_data_dir_path().expect("Failed to get the data directory path."))
+    pub fn get_path(coin: &str) -> String {
+        format!("{}/{}/address_index", get_data_dir_path().expect("Failed to get the data directory path."), coin)
     }
-    pub fn new() -> Self {
-        let path = Self::get_path();
+    pub fn new(coin: &str) -> Self {
+        let path = Self::get_path(coin);
         let mut opts = Options::default();
         opts.set_max_open_files(1000);
         let db = DB::open(&opts, path).expect("Failed to open the database.");
