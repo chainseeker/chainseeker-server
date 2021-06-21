@@ -23,7 +23,7 @@ impl Syncer {
     fn new(coin: &str) -> Self {
         let addr_index_db = AddressIndexDB::new(coin);
         let synced_height = addr_index_db.get_synced_height();
-        Syncer{
+        Self {
             addr_index_db,
             utxo_db: match synced_height {
                 Some(h) => UtxoDB::load(coin, h),
