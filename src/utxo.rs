@@ -20,15 +20,13 @@ struct UtxoValue {
 }
 
 pub struct UtxoDB {
-    coin: String,
     db: HashMap<UtxoKey, UtxoValue>,
     pub block_hash: Option<BlockHash>,
 }
 
 impl UtxoDB {
-    pub fn new(coin: &str) -> Self {
+    pub fn new() -> Self {
         Self{
-            coin: coin.to_string(),
             db: HashMap::new(),
             block_hash: None,
         }
@@ -39,17 +37,14 @@ impl UtxoDB {
     fn get_path(coin: &str, height: u32) -> String {
         format!("{}/{}.bin", Self::get_dir(coin), height)
     }
-    pub fn coin(&self) ->&str {
-        &self.coin
-    }
     pub fn len(&self) -> usize {
         self.db.len()
     }
     /// Save UTXO database to a file.
-    pub fn save(&self, height: u32) {
+    pub fn save(&self, coin: &str, height: u32) {
         let begin = Instant::now();
-        let path = Self::get_path(&self.coin, height);
-        std::fs::create_dir_all(Self::get_dir(&self.coin)).expect("Failed to create the UTXO data directory.");
+        let path = Self::get_path(coin, height);
+        std::fs::create_dir_all(Self::get_dir(coin)).expect("Failed to create the UTXO data directory.");
         let file = File::create(&path).expect(&format!("Failed to craete a file: {}", path));
         let mut writer = BufWriter::new(file);
         // Write block hash.
@@ -118,7 +113,6 @@ impl UtxoDB {
         }
         println!(" ({}ms).", begin.elapsed().as_millis());
         UtxoDB{
-            coin: coin.to_string(),
             db,
             block_hash: Some(block_hash),
         }
@@ -171,12 +165,12 @@ impl UtxoDB {
         self.block_hash = Some(block.block_hash());
         previous_script_pubkeys
     }
-    pub fn reorg(&mut self, height: u32) -> u32 {
+    pub fn reorg(&mut self, coin: &str, height: u32) -> u32 {
         for height in (0..height).rev() {
-            if !std::path::Path::new(&Self::get_path(&self.coin, height)).exists() {
+            if !std::path::Path::new(&Self::get_path(coin, height)).exists() {
                 continue;
             }
-            *self = Self::load(&self.coin, height);
+            *self = Self::load(coin, height);
             return height;
         }
         panic!("Failed to reorg because no older UTXO database exists.");

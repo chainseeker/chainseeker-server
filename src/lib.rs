@@ -11,8 +11,10 @@ const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CoinConfig {
-    rest_host: String,
-    rest_port: u32,
+    pub rest_host: String,
+    pub rest_port: u32,
+    pub zmq_host: String,
+    pub zmq_port: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]

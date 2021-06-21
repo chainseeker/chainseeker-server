@@ -13,6 +13,7 @@ use chainseeker_syncer::address_index::*;
 use chainseeker_syncer::utxo::*;
 
 struct Syncer {
+    coin: String,
     config: Config,
     addr_index_db: AddressIndexDB,
     utxo_db: UtxoDB,
@@ -24,14 +25,18 @@ impl Syncer {
         let addr_index_db = AddressIndexDB::new(coin);
         let synced_height = addr_index_db.get_synced_height();
         Self {
+            coin: coin.to_string(),
             config: (*config).clone(),
             addr_index_db,
             utxo_db: match synced_height {
                 Some(h) => UtxoDB::load(coin, h),
-                None => UtxoDB::new(coin),
+                None => UtxoDB::new(),
             },
             rest: get_rest(&config.coins[coin]),
         }
+    }
+    fn coin_config(&self) -> &CoinConfig {
+        &self.config.coins[&self.coin]
     }
     pub fn synced_height(&self) -> Option<u32> {
         self.addr_index_db.get_synced_height()
@@ -65,9 +70,9 @@ impl Syncer {
             vins, vouts, self.utxo_db.len(),
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
         if save {
-            self.utxo_db.save(height);
+            self.utxo_db.save(&self.coin, height);
             if height > self.config.utxo_delete_threshold {
-                let deleted_cnt = UtxoDB::delete_older_than(&self.utxo_db.coin(), height - self.config.utxo_delete_threshold);
+                let deleted_cnt = UtxoDB::delete_older_than(&self.coin, height - self.config.utxo_delete_threshold);
                 println!("Deleted {} old UTXO database(s).", deleted_cnt);
             }
             self.addr_index_db.put_synced_height(height);
@@ -86,7 +91,7 @@ impl Syncer {
                 break;
             }
             println!("Reorg detected at block height = {}.", height);
-            height = self.utxo_db.reorg(height);
+            height = self.utxo_db.reorg(&self.coin, height);
             self.addr_index_db.put_synced_height(height);
         }
     }
@@ -119,7 +124,9 @@ impl Syncer {
         // Subscribe to ZeroMQ.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
-        socket.connect("tcp://127.0.0.1:28334").expect("Failed to connect to a ZeroMQ endpoint.");
+        let coin_config = self.coin_config();
+        let zmq_endpoint = format!("tcp://{}:{}", coin_config.zmq_host, coin_config.zmq_port);
+        socket.connect(&zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         loop {
             println!("Waiting for a ZeroMQ message...");
