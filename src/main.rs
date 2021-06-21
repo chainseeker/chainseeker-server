@@ -125,8 +125,7 @@ impl Syncer {
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
         let coin_config = self.coin_config();
-        let zmq_endpoint = format!("tcp://{}:{}", coin_config.zmq_host, coin_config.zmq_port);
-        socket.connect(&zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
+        socket.connect(&coin_config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         loop {
             println!("Waiting for a ZeroMQ message...");

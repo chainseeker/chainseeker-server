@@ -11,10 +11,8 @@ const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CoinConfig {
-    pub rest_host: String,
-    pub rest_port: u32,
-    pub zmq_host: String,
-    pub zmq_port: u32,
+    pub rest_endpoint: String,
+    pub zmq_endpoint: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -25,8 +23,7 @@ pub struct Config {
 }
 
 pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
-    let endpoint = format!("http://{}:{}/rest/", config.rest_host, config.rest_port);
-    bitcoin_rest::new(&endpoint)
+    bitcoin_rest::new(&config.rest_endpoint)
 }
 
 pub fn get_data_dir_path() -> Result<String, Box<dyn std::error::Error>> {
