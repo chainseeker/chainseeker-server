@@ -105,7 +105,29 @@ impl Syncer {
         target_height - start_height + 1
     }
     async fn run(&mut self) {
-        let _synced_blocks = self.sync(self.config.default_utxo_save_interval).await;
+        // Do initial sync.
+        let begin = Instant::now();
+        let mut synced_blocks = 0;
+        loop {
+            let tmp = self.sync(self.config.default_utxo_save_interval).await;
+            synced_blocks += tmp;
+            if tmp == 0 {
+                break;
+            }
+        }
+        println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin.elapsed().as_millis());
+        // Subscribe to ZeroMQ.
+        let zmq_ctx = zmq::Context::new();
+        let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
+        socket.connect("tcp://127.0.0.1:28334").expect("Failed to connect to a ZeroMQ endpoint.");
+        socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
+        loop {
+            println!("Waiting for a ZeroMQ message...");
+            let topic = socket.recv_string(0).expect("Failed to receive a ZeroMQ topic.").unwrap();
+            let blockhash = socket.recv_bytes(0).expect("Failed to receive a blockhash from ZeroMQ.");
+            println!("Received ZeroMQ message: {}: {:02x?}", topic, blockhash);
+            self.sync(1).await;
+        }
     }
 }
 

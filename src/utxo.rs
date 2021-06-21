@@ -59,7 +59,7 @@ impl UtxoDB {
         let mut i = 0;
         for (key, value) in self.db.iter() {
             i += 1;
-            if i % 100_000 == 0 {
+            if i % 100_000 == 0 || i == self.len() {
                 print!("\rSaving UTXO database ({} of {})...", i, self.db.len());
                 stdout().flush().expect("Failed to flush.");
             }
@@ -90,7 +90,7 @@ impl UtxoDB {
         let n_entries = read_usize(&mut reader);
         let mut db = HashMap::new();
         for i in 0..n_entries {
-            if i % 100_000 == 0 {
+            if (i + 1) % 100_000 == 0 || (i + 1) == n_entries {
                 print!("\rLoading UTXO database ({} of {})...", i + 1, n_entries);
                 stdout().flush().expect("Failed to flush.");
             }

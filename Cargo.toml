@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 serde = "1.0"
 toml = "0.5"
+zmq = "0.9"
 tokio = { version = "1.6", features = ["rt-multi-thread", "macros"] }
 hyper = { version = "0.14", features = ["full"] }
 rocksdb = "0.16"
