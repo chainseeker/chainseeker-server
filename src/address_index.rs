@@ -34,6 +34,7 @@ impl AddressIndexDB {
         buf.push(txid.to_vec());
         buf.concat()
     }
+    /*
     fn deserialize_key(buf: &Vec<u8>) -> (Script, Txid) {
         let mut script_buf = buf.clone();
         let txid_buf = script_buf.split_off(buf.len() - 32);
@@ -41,6 +42,7 @@ impl AddressIndexDB {
         let txid = Txid::consensus_decode(&txid_buf[..]).expect("Failed to decode txid.");
         (script, txid)
     }
+    */
     pub fn get(&self, script: &Script, txid: &Txid) -> bool {
         let key = Self::serialize_key(script, txid);
         let val = self.db.get(key).expect("Failed to get a database element.");

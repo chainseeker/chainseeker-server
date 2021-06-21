@@ -1,6 +1,8 @@
+use std::io::Read;
 use std::time::Instant;
 use std::convert::Infallible;
 use std::net::SocketAddr;
+
 use bitcoin::blockdata::block::Block;
 
 use hyper::{Body, Request, Response, Server, Method, StatusCode};
@@ -10,26 +12,25 @@ use chainseeker_syncer::*;
 use chainseeker_syncer::address_index::*;
 use chainseeker_syncer::utxo::*;
 
-const UTXO_DELETE_THRESHOLD: u32 = 20;
-const DEFAULT_UTXO_SAVE_INTERVAL: u32 = 1000;
-
 struct Syncer {
+    config: Config,
     addr_index_db: AddressIndexDB,
     utxo_db: UtxoDB,
     rest: bitcoin_rest::Context,
 }
 
 impl Syncer {
-    fn new(coin: &str) -> Self {
+    fn new(coin: &str, config: &Config) -> Self {
         let addr_index_db = AddressIndexDB::new(coin);
         let synced_height = addr_index_db.get_synced_height();
         Self {
+            config: (*config).clone(),
             addr_index_db,
             utxo_db: match synced_height {
                 Some(h) => UtxoDB::load(coin, h),
                 None => UtxoDB::new(coin),
             },
-            rest: get_rest(coin),
+            rest: get_rest(&config.coins[coin]),
         }
     }
     pub fn synced_height(&self) -> Option<u32> {
@@ -65,8 +66,8 @@ impl Syncer {
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
         if save {
             self.utxo_db.save(height);
-            if height > UTXO_DELETE_THRESHOLD {
-                let deleted_cnt = UtxoDB::delete_older_than(&self.utxo_db.coin(), height - UTXO_DELETE_THRESHOLD);
+            if height > self.config.utxo_delete_threshold {
+                let deleted_cnt = UtxoDB::delete_older_than(&self.utxo_db.coin(), height - self.config.utxo_delete_threshold);
                 println!("Deleted {} old UTXO database(s).", deleted_cnt);
             }
             self.addr_index_db.put_synced_height(height);
@@ -104,7 +105,7 @@ impl Syncer {
         target_height - start_height + 1
     }
     async fn run(&mut self) {
-        let _synced_blocks = self.sync(DEFAULT_UTXO_SAVE_INTERVAL).await;
+        let _synced_blocks = self.sync(self.config.default_utxo_save_interval).await;
     }
 }
 
@@ -156,12 +157,18 @@ async fn main() {
         println!("usage: {} COIN=(btc|tbtc)", args[0]);
         return;
     }
+    let config_path = format!("{}/config.toml", get_data_dir_path().expect("Failed to get data directory path."));
+    let mut config_file = std::fs::File::open(&config_path)
+        .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
+    let mut config_str = String::new();
+    config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
+    let config: Config = toml::from_str(&config_str).expect("Failed to parse config file.");
     tokio::join!(
         // Run syncer.
         async {
             let coin = args[1].to_string();
             tokio::task::spawn(async move {
-                let mut syncer = Syncer::new(&coin);
+                let mut syncer = Syncer::new(&coin, &config);
                 syncer.run().await;
             }).await.unwrap();
         },

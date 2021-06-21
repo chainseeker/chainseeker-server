@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+use serde::Deserialize;
 use bitcoin::hash_types::{Txid, BlockHash};
 use bitcoin::blockdata::script::Script;
 use bitcoin::consensus::{Encodable, Decodable};
@@ -8,14 +9,21 @@ pub mod utxo;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
-pub fn get_rest(coin: &str) -> bitcoin_rest::Context {
-    let port = match coin {
-        "btc" => 8332,
-        "tbtc" => 18332,
-        _ => panic!("COIN not supported."),
-    };
-    let host = std::env::var("BITCOIN_REST_HOST").unwrap_or("localhost".to_string());
-    let endpoint = format!("http://{}:{}/rest/", host, port);
+#[derive(Debug, Clone, Deserialize)]
+pub struct CoinConfig {
+    rest_host: String,
+    rest_port: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Config {
+    pub utxo_delete_threshold: u32,
+    pub default_utxo_save_interval: u32,
+    pub coins: std::collections::HashMap<String, CoinConfig>,
+}
+
+pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
+    let endpoint = format!("http://{}:{}/rest/", config.rest_host, config.rest_port);
     bitcoin_rest::new(&endpoint)
 }
 
