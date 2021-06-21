@@ -22,6 +22,7 @@ impl AddressIndexDB {
         let path = Self::get_path(coin);
         let mut opts = Options::default();
         opts.set_max_open_files(1000);
+        opts.create_if_missing(true);
         let db = DB::open(&opts, path).expect("Failed to open the database.");
         AddressIndexDB {
             db,
