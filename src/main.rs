@@ -153,28 +153,53 @@ impl HttpServer {
             addr_index_db,
         }
     }
-    fn response(status: &StatusCode, body: String) -> Result<Response<Body>, Infallible> {
-        let res = Response::builder()
+    fn response(status: &StatusCode, body: String) -> Response<Body> {
+        Response::builder()
             .header("Content-Type", "application/json")
             .status(status)
             .body(body.into())
-            .unwrap();
-        Ok(res)
+            .unwrap()
     }
-    fn error(status: &StatusCode, msg: &str) -> Result<Response<Body>, Infallible> {
+    fn error(status: &StatusCode, msg: &str) -> Response<Body> {
         Self::response(status, format!("{{\"error\":\"{}\"}}", msg))
     }
-    fn not_found(msg: &str) -> Result<Response<Body>, Infallible> {
+    fn not_found(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::NOT_FOUND, msg)
     }
-    fn internal_error(msg: &str) -> Result<Response<Body>, Infallible> {
+    fn internal_error(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::INTERNAL_SERVER_ERROR, msg)
     }
-    fn ok(json: String) -> Result<Response<Body>, Infallible> {
+    fn ok(json: String) -> Response<Body> {
         Self::response(&StatusCode::OK, json)
     }
-    async fn handle_request(addr_index_db: Arc<RwLock<AddressIndexDB>>, req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        println!("New HTTP request: {} {}", req.method(), req.uri().path());
+    /// `/addr_index/SCRIPT` endpoint.
+    async fn addr_index(addr_index_db: &Arc<RwLock<AddressIndexDB>>, hex: &str) -> Response<Body> {
+        let script = Script::from_str(hex);
+        match script {
+            Ok(script) => {
+                let txids = addr_index_db.read().await.get(&script);
+                let mut success = true;
+                let txids: Vec<String> = txids.iter().map(|txid| {
+                    let mut buf: [u8; 32] = [0; 32];
+                    match txid.consensus_encode(&mut buf[..]) {
+                        Ok(_) => {},
+                        Err(_) => { success = false },
+                    };
+                    hex::encode(buf)
+                }).collect();
+                if !success {
+                    return Self::internal_error("Failed to encode txids.");
+                }
+                let json = serde_json::to_string(&txids);
+                match json {
+                    Ok(json) => return Self::ok(json),
+                    Err(_) => return Self::internal_error("Failed to encode to JSON."),
+                };
+            },
+            Err(_) => return Self::not_found("Failed to decode input script."),
+        }
+    }
+    async fn route(addr_index_db: &Arc<RwLock<AddressIndexDB>>, req: &Request<Body>) -> Response<Body> {
         if req.method() != Method::GET {
             return Self::not_found("Invalid HTTP method.");
         }
@@ -183,32 +208,16 @@ impl HttpServer {
             return Self::not_found("Invalid number of params.");
         }
         if path[1] == "addr_index" {
-            let script = Script::from_str(path[2]);
-            match script {
-                Ok(script) => {
-                    let txids = addr_index_db.read().await.get(&script);
-                    let mut success = true;
-                    let txids: Vec<String> = txids.iter().map(|txid| {
-                        let mut buf: [u8; 32] = [0; 32];
-                        match txid.consensus_encode(&mut buf[..]) {
-                            Ok(_) => {},
-                            Err(_) => { success = false },
-                        };
-                        hex::encode(buf)
-                    }).collect();
-                    if !success {
-                        return Self::internal_error("Failed to encode txids.");
-                    }
-                    let json = serde_json::to_string(&txids);
-                    match json {
-                        Ok(json) => return Self::ok(json),
-                        Err(_) => return Self::internal_error("Failed to encode to JSON."),
-                    };
-                },
-                Err(_) => return Self::not_found("Failed to decode input script."),
-            }
+            return Self::addr_index(addr_index_db, path[2]).await;
         }
         Self::not_found("Invalid API.")
+    }
+    async fn handle_request(addr_index_db: Arc<RwLock<AddressIndexDB>>, req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let begin = Instant::now();
+        print!("New HTTP request: {} {}", req.method(), req.uri().path());
+        let res = Self::route(&addr_index_db, &req).await;
+        println!(" {}us.", begin.elapsed().as_micros());
+        Ok(res)
     }
     async fn run(&self) {
         let addr = SocketAddr::from(([127, 0, 0, 1], 8090));
