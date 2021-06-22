@@ -261,23 +261,4 @@ async fn main() {
     });
     let server = HttpServer::new(addr_index_db);
     server.run().await;
-    /*
-    tokio::join!(
-        // Run syncer.
-        async {
-            let coin = args[1].to_string();
-            tokio::task::spawn(async move {
-                let mut syncer = Syncer::new(&coin, &config);
-                syncer.run().await;
-            }).await.unwrap();
-        },
-        // Run HTTP server.
-        async {
-            tokio::task::spawn(async {
-                let server = HttpServer::new();
-                server.run().await;
-            }).await.unwrap();
-        }
-    );
-    */
 }
