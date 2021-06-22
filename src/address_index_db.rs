@@ -26,6 +26,9 @@ impl AddressIndexDB {
     pub fn get(&self, script: &Script) -> Vec<Txid> {
         let mut ret = Vec::new();
         for (key, _val) in self.db.prefix_iterator(script.as_bytes()) {
+            if *script.as_bytes() != key[0..script.len()] {
+                break;
+            }
             if key.len() != script.len() + 32 {
                 continue;
             }
