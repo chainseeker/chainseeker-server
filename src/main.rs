@@ -8,8 +8,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use bitcoin::consensus::Encodable;
-use bitcoin::blockdata::block::Block;
-use bitcoin::blockdata::script::Script;
+use bitcoin::{Block, BlockHash, Script};
 
 use hyper::{Body, Request, Response, Server, Method, StatusCode};
 use hyper::service::{make_service_fn, service_fn};
@@ -46,36 +45,41 @@ impl Syncer {
     pub async fn synced_height(&self) -> Option<u32> {
         self.block_db.get_synced_height()
     }
-    async fn fetch_block(&self, height: u32) -> Block {
-        let blockid = self.rest.blockhashbyheight(height).await
+    async fn fetch_block(&self, height: u32) -> (BlockHash, Block) {
+        let block_hash = self.rest.blockhashbyheight(height).await
             .expect(&format!("Failed to fetch block at height = {}.", height));
-        self.rest.block(&blockid).await.expect(&format!("Failed to fetch a block with blockid = {}", blockid))
+        let block = self.rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
+        (block_hash, block)
     }
     async fn process_block(&mut self, height: u32) {
         let begin = Instant::now();
-        print!("Height={:6}", height);
+        // Fetch block from REST.
         let begin_rest = Instant::now();
-        let block = self.fetch_block(height).await;
+        let (block_hash, block) = self.fetch_block(height).await;
         let rest_elapsed = begin_rest.elapsed();
-        print!(", #tx={:4}", block.txdata.len());
+        // Process for UTXOs.
         let begin_utxo = Instant::now();
         let previous_pubkeys = self.utxo_db.process_block(&block);
         let utxo_elapsed = begin_utxo.elapsed();
+        // Process for address index.
         let begin_addr_index = Instant::now();
         self.addr_index_db.write().await.process_block(&block, previous_pubkeys);
         let addr_index_elapsed = begin_addr_index.elapsed();
+        // Count vins/vouts.
         let mut vins: usize = 0;
         let mut vouts: usize = 0;
         for tx in block.txdata.iter() {
             vins += tx.input.len();
             vouts += tx.output.len();
         }
-        self.block_db.put_block_hash(height, &block.block_hash());
+        // Put best block information.
+        self.block_db.put_block_hash(height, &block_hash);
         self.block_db.put_synced_height(height);
         println!(
-            ", #vin={:5}, #vout={:5}, #utxo={:9} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
-            vins, vouts, self.utxo_db.len(),
-            rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
+            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
+            height, block.txdata.len(), vins, vouts,
+            rest_elapsed.as_millis(), utxo_elapsed.as_millis(),
+            addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
     }
     async fn process_reorgs(&mut self) {
         let mut height = match self.synced_height().await {

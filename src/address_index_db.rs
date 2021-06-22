@@ -1,6 +1,4 @@
-use bitcoin::hash_types::Txid;
-use bitcoin::blockdata::block::Block;
-use bitcoin::blockdata::script::Script;
+use bitcoin::{Block, Txid, Script};
 
 use super::*;
 

@@ -1,9 +1,8 @@
 use std::io::{Read, Write};
 use serde::Deserialize;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
-use bitcoin::hash_types::{Txid, BlockHash};
-use bitcoin::blockdata::script::Script;
 use bitcoin::consensus::{Encodable, Decodable};
+use bitcoin::{Script, Txid, BlockHash};
 
 pub mod block_db;
 pub use block_db::*;

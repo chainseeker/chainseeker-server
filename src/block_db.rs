@@ -1,4 +1,4 @@
-use bitcoin::hash_types::BlockHash;
+use bitcoin::BlockHash;
 
 use super::*;
 
