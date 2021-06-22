@@ -144,9 +144,10 @@ impl Syncer {
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         loop {
             println!("Waiting for a ZeroMQ message...");
-            let topic = socket.recv_string(0).expect("Failed to receive a ZeroMQ topic.").unwrap();
-            let blockhash = socket.recv_bytes(0).expect("Failed to receive a blockhash from ZeroMQ.");
-            println!("Received ZeroMQ message: {}: {:02x?}", topic, blockhash);
+            let multipart = socket.recv_multipart(0).expect("Failed to receive a ZeroMQ message.");
+            assert_eq!(multipart.len(), 3);
+            let blockhash = &multipart[1];
+            println!("Received a new block from ZeroMQ: {}", hex::encode(blockhash));
             self.sync(1).await;
             self.construct_utxo_server().await;
         }
