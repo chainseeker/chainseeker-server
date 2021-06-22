@@ -1,13 +1,20 @@
 use std::io::{Read, Write};
 use serde::Deserialize;
+use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::hash_types::{Txid, BlockHash};
 use bitcoin::blockdata::script::Script;
 use bitcoin::consensus::{Encodable, Decodable};
 
-pub mod address_index;
-pub mod utxo;
+pub mod block_db;
+pub use block_db::*;
+pub mod address_index_db;
+pub use address_index_db::*;
+pub mod utxo_db;
+pub use utxo_db::*;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
+
+type RocksDB = DBWithThreadMode<MultiThreaded>;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CoinConfig {
@@ -17,13 +24,18 @@ pub struct CoinConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
-    pub utxo_delete_threshold: u32,
-    pub default_utxo_save_interval: u32,
     pub coins: std::collections::HashMap<String, CoinConfig>,
 }
 
 pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
     bitcoin_rest::new(&config.rest_endpoint)
+}
+
+pub fn rocks_db(path: &str) -> RocksDB {
+    let mut opts = Options::default();
+    opts.set_max_open_files(1000);
+    opts.create_if_missing(true);
+    RocksDB::open(&opts, path).expect("Failed to open the database.")
 }
 
 pub fn get_data_dir_path() -> Result<String, Box<dyn std::error::Error>> {
@@ -35,8 +47,8 @@ pub fn serialize_script(script: &Script) -> Vec<u8> {
     script.to_bytes()
 }
 
-pub fn deserialize_script(script_vec: &Vec<u8>) -> Script {
-    Script::from(script_vec.clone())
+pub fn deserialize_script(script_vec: &[u8]) -> Script {
+    Script::from(script_vec.to_vec())
 }
 
 pub fn serialize_txid(txid: &Txid) -> [u8; 32] {

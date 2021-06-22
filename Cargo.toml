@@ -17,4 +17,4 @@ hyper = { version = "0.14", features = ["full"] }
 rocksdb = "0.16"
 bitcoin = "0.26"
 bitcoin_hashes = "0.9"
-bitcoin-rest = "0.0.4"
+bitcoin-rest = "0.0.5"

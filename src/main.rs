@@ -15,12 +15,11 @@ use hyper::{Body, Request, Response, Server, Method, StatusCode};
 use hyper::service::{make_service_fn, service_fn};
 
 use chainseeker_syncer::*;
-use chainseeker_syncer::address_index::*;
-use chainseeker_syncer::utxo::*;
 
 struct Syncer {
     coin: String,
     config: Config,
+    block_db: BlockDB,
     addr_index_db: Arc<RwLock<AddressIndexDB>>,
     utxo_db: UtxoDB,
     utxo_server: Arc<RwLock<UtxoServer>>,
@@ -29,17 +28,13 @@ struct Syncer {
 
 impl Syncer {
     fn new(coin: &str, config: &Config) -> Self {
-        let addr_index_db = AddressIndexDB::new(coin);
-        let synced_height = addr_index_db.get_synced_height();
-        let utxo_db = match synced_height {
-            Some(h) => UtxoDB::load(coin, h),
-            None => UtxoDB::new(),
-        };
+        let utxo_db = UtxoDB::new(coin);
         let utxo_server = Arc::new(RwLock::new((&utxo_db).into()));
         Self {
             coin: coin.to_string(),
             config: (*config).clone(),
-            addr_index_db: Arc::new(RwLock::new(addr_index_db)),
+            block_db: BlockDB::new(coin),
+            addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin))),
             utxo_db,
             utxo_server,
             rest: get_rest(&config.coins[coin]),
@@ -49,14 +44,14 @@ impl Syncer {
         &self.config.coins[&self.coin]
     }
     pub async fn synced_height(&self) -> Option<u32> {
-        self.addr_index_db.read().await.get_synced_height()
+        self.block_db.get_synced_height()
     }
     async fn fetch_block(&self, height: u32) -> Block {
         let blockid = self.rest.blockhashbyheight(height).await
             .expect(&format!("Failed to fetch block at height = {}.", height));
-        self.rest.block(blockid).await.expect(&format!("Failed to fetch a block with blockid = {}", blockid))
+        self.rest.block(&blockid).await.expect(&format!("Failed to fetch a block with blockid = {}", blockid))
     }
-    async fn process_block(&mut self, height: u32, save: bool) {
+    async fn process_block(&mut self, height: u32) {
         let begin = Instant::now();
         print!("Height={:6}", height);
         let begin_rest = Instant::now();
@@ -75,19 +70,12 @@ impl Syncer {
             vins += tx.input.len();
             vouts += tx.output.len();
         }
+        self.block_db.put_block_hash(height, &block.block_hash());
+        self.block_db.put_synced_height(height);
         println!(
             ", #vin={:5}, #vout={:5}, #utxo={:9} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
             vins, vouts, self.utxo_db.len(),
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
-        if save {
-            self.utxo_db.save(&self.coin, height);
-            let delete_range =
-                (height - self.config.utxo_delete_threshold - self.config.default_utxo_save_interval)..
-                (height - self.config.utxo_delete_threshold);
-            let deleted_cnt = UtxoDB::delete_range(&self.coin, delete_range);
-            println!("Deleted {} old UTXO database(s).", deleted_cnt);
-            self.addr_index_db.write().await.put_synced_height(height);
-        }
     }
     async fn process_reorgs(&mut self) {
         let mut height = match self.synced_height().await {
@@ -97,16 +85,18 @@ impl Syncer {
         loop {
             let block_hash_rest = self.rest.blockhashbyheight(height).await
                 .expect(&format!("Failed to fetch block at height = {}.", height));
-            let block_hash_me = self.utxo_db.block_hash.unwrap();
+            let block_hash_me = self.block_db.get_block_hash(height).unwrap();
             if block_hash_rest == block_hash_me {
                 break;
             }
             println!("Reorg detected at block height = {}.", height);
-            height = self.utxo_db.reorg(&self.coin, height);
-            self.addr_index_db.write().await.put_synced_height(height);
+            let block = self.rest.block(&block_hash_me).await.expect("Failed to fetch the reorged block from REST.");
+            self.utxo_db.reorg_block(&self.rest, &block).await;
+            height -= 1;
+            self.block_db.put_synced_height(height);
         }
     }
-    async fn sync(&mut self, utxo_save_interval: u32) -> u32 {
+    async fn sync(&mut self) -> u32 {
         self.process_reorgs().await;
         let start_height = match self.synced_height().await {
             Some(h) => h + 1,
@@ -115,8 +105,7 @@ impl Syncer {
         let chaininfo = self.rest.chaininfo().await.expect("Failed to fetch chaininfo.");
         let target_height = chaininfo.blocks;
         for height in start_height..(target_height + 1) {
-            let save = ((height - start_height) % utxo_save_interval == utxo_save_interval - 1) || height == target_height;
-            self.process_block(height, save).await;
+            self.process_block(height).await;
         }
         target_height + 1 - start_height
     }
@@ -128,7 +117,7 @@ impl Syncer {
         let begin = Instant::now();
         let mut synced_blocks = 0;
         loop {
-            let tmp = self.sync(self.config.default_utxo_save_interval).await;
+            let tmp = self.sync().await;
             synced_blocks += tmp;
             if tmp == 0 {
                 break;
@@ -148,7 +137,7 @@ impl Syncer {
             assert_eq!(multipart.len(), 3);
             let blockhash = &multipart[1];
             println!("Received a new block from ZeroMQ: {}", hex::encode(blockhash));
-            self.sync(1).await;
+            self.sync().await;
             self.construct_utxo_server().await;
         }
     }
