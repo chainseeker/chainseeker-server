@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use std::io::Read;
 use std::time::Instant;
 use std::convert::Infallible;
@@ -7,6 +6,7 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
+use bitcoin_hashes::hex::FromHex;
 use bitcoin::consensus::Encodable;
 use bitcoin::{Block, BlockHash, Script};
 
@@ -180,7 +180,7 @@ impl HttpServer {
     }
     /// `/addr_index/SCRIPT` endpoint.
     async fn addr_index(addr_index_db: &Arc<RwLock<AddressIndexDB>>, hex: &str) -> Response<Body> {
-        let script = Script::from_str(hex);
+        let script = Script::from_hex(hex);
         match script {
             Ok(script) => {
                 let txids = addr_index_db.read().await.get(&script);
@@ -207,7 +207,7 @@ impl HttpServer {
     }
     /// `/utxo/SCRIPT` endpoint.
     async fn utxo(utxo_server: &Arc<RwLock<UtxoServer>>, hex: &str) -> Response<Body> {
-        let script = Script::from_str(hex);
+        let script = Script::from_hex(hex);
         match script {
             Ok(script) => {
                 let utxo_server = utxo_server.read().await;
@@ -249,8 +249,10 @@ impl HttpServer {
         println!("HTTP: {} {} {}us.", req.method(), req.uri().path(), begin.elapsed().as_micros());
         Ok(res)
     }
-    async fn run(&self) {
-        let addr = SocketAddr::from(([127, 0, 0, 1], 8090));
+    async fn run(&self, coin: &str, config: &Config) {
+        let addr = SocketAddr::from((
+            config.http_ip.parse::<std::net::IpAddr>().expect("Failed to parse HTTP IP address."),
+            config.coins[coin].http_port));
         let make_svc = make_service_fn(move |_conn| {
             let addr_index_db = self.addr_index_db.clone();
             let utxo_server = self.utxo_server.clone();
@@ -292,5 +294,5 @@ async fn main() {
         syncer.run().await;
     });
     let server = HttpServer::new(addr_index_db, utxo_server);
-    server.run().await;
+    server.run(&coin, &config).await;
 }

@@ -1,11 +1,21 @@
+http_ip = "127.0.0.1"
+
 [coins.btc]
 rest_endpoint = "http://localhost:8332/rest/"
 zmq_endpoint = "tcp://localhost:28332"
+http_port = 8080
 
 [coins.tbtc]
 rest_endpoint = "http://localhost:18332/rest/"
 zmq_endpoint = "tcp://localhost:28333"
+http_port = 8081
 
 [coins.rbtc]
 rest_endpoint = "http://localhost:18443/rest/"
 zmq_endpoint = "tcp://localhost:28334"
+http_port = 8082
+
+[coins.sbtc]
+rest_endpoint = "http://localhost:38332/rest/"
+zmq_endpoint = "tcp://localhost:28335"
+http_port = 8083

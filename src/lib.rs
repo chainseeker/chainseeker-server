@@ -19,10 +19,12 @@ type RocksDB = DBWithThreadMode<MultiThreaded>;
 pub struct CoinConfig {
     pub rest_endpoint: String,
     pub zmq_endpoint: String,
+    pub http_port: u16,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
+    pub http_ip: String,
     pub coins: std::collections::HashMap<String, CoinConfig>,
 }
 
