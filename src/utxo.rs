@@ -192,9 +192,9 @@ impl UtxoDB {
     pub fn delete(coin: &str, height: u32) -> std::io::Result<()> {
         std::fs::remove_file(Self::get_path(coin, height))
     }
-    pub fn delete_older_than(coin: &str, height: u32) -> u32 {
+    pub fn delete_range(coin: &str, height_range: core::ops::Range<u32>) -> u32 {
         let mut delete_cnt = 0;
-        for h in (0..height).rev() {
+        for h in height_range {
             let result = Self::delete(coin, h);
             if result.is_ok() {
                 delete_cnt += 1;

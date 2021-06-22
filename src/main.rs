@@ -81,10 +81,11 @@ impl Syncer {
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(), addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
         if save {
             self.utxo_db.save(&self.coin, height);
-            if height > self.config.utxo_delete_threshold {
-                let deleted_cnt = UtxoDB::delete_older_than(&self.coin, height - self.config.utxo_delete_threshold);
-                println!("Deleted {} old UTXO database(s).", deleted_cnt);
-            }
+            let delete_range =
+                (height - self.config.utxo_delete_threshold - self.config.default_utxo_save_interval)..
+                (height - self.config.utxo_delete_threshold);
+            let deleted_cnt = UtxoDB::delete_range(&self.coin, delete_range);
+            println!("Deleted {} old UTXO database(s).", deleted_cnt);
             self.addr_index_db.write().await.put_synced_height(height);
         }
     }
@@ -117,7 +118,7 @@ impl Syncer {
             let save = ((height - start_height) % utxo_save_interval == utxo_save_interval - 1) || height == target_height;
             self.process_block(height, save).await;
         }
-        target_height - start_height + 1
+        target_height + 1 - start_height
     }
     async fn construct_utxo_server(&mut self) {
         *self.utxo_server.write().await = (&self.utxo_db).into();
@@ -250,9 +251,8 @@ impl HttpServer {
         utxo_server: Arc<RwLock<UtxoServer>>,
         req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let begin = Instant::now();
-        print!("New HTTP request: {} {}", req.method(), req.uri().path());
         let res = Self::route(&addr_index_db, &utxo_server, &req).await;
-        println!(" {}us.", begin.elapsed().as_micros());
+        println!("HTTP: {} {} {}us.", req.method(), req.uri().path(), begin.elapsed().as_micros());
         Ok(res)
     }
     async fn run(&self) {
@@ -286,7 +286,7 @@ fn load_config() -> Config {
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        println!("usage: {} COIN=(btc|tbtc)", args[0]);
+        println!("usage: {} COIN", args[0]);
         return;
     }
     let config = load_config();
