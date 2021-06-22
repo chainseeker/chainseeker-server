@@ -2,11 +2,83 @@ use std::fs::File;
 use std::io::{stdout, BufReader, BufWriter};
 use std::time::Instant;
 use std::collections::HashMap;
+
+use serde::ser::{Serialize, Serializer, SerializeStruct};
+
 use bitcoin::hash_types::{Txid, BlockHash};
 use bitcoin::blockdata::block::Block;
 use bitcoin::blockdata::script::Script;
 
 use super::*;
+
+pub struct UtxoServerValue {
+    txid: Txid,
+    vout: u32,
+    value: u64,
+}
+
+impl Serialize for UtxoServerValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let mut state = serializer.serialize_struct("UtxoServerValue", 3)?;
+        let mut txid: [u8; 32] = [0; 32];
+        self.txid.consensus_encode(&mut txid[..]).expect("Failed to encode txid.");
+        state.serialize_field("txid", &hex::encode(txid))?;
+        state.serialize_field("vout", &self.vout)?;
+        state.serialize_field("value", &self.value)?;
+        state.end()
+    }
+}
+
+pub struct UtxoServer {
+    db: HashMap<Script, Vec<UtxoServerValue>>,
+}
+
+impl UtxoServer {
+    pub fn new() -> Self {
+        Self {
+            db: HashMap::new(),
+        }
+    }
+    pub fn get(&self, script_pubkey: &Script) -> Option<&Vec<UtxoServerValue>> {
+        self.db.get(script_pubkey)
+    }
+}
+
+impl From<&UtxoDB> for UtxoServer {
+    fn from(utxos: &UtxoDB) -> Self {
+        let begin = Instant::now();
+        let mut db: HashMap<Script, Vec<UtxoServerValue>> = HashMap::new();
+        let mut i = 0;
+        for (key, value) in utxos.db.iter() {
+            i += 1;
+            if i % 100_000 == 0 || i == utxos.db.len() {
+                print!("\rConstructing UTXO server ({} of {})...", i, utxos.db.len());
+                stdout().flush().expect("Failed to flush.");
+            }
+            let script_pubkey = value.script_pubkey.clone();
+            let cur = match db.get_mut(&script_pubkey) {
+                Some(cur) => cur,
+                None => {
+                    let vec = Vec::new();
+                    db.insert(script_pubkey.clone(), vec);
+                    db.get_mut(&script_pubkey).unwrap()
+                },
+            };
+            let v = UtxoServerValue {
+                txid: key.txid,
+                vout: key.vout,
+                value: value.value,
+            };
+            cur.push(v);
+        }
+        println!(" ({}ms).", begin.elapsed().as_millis());
+        Self {
+            db,
+        }
+    }
+}
 
 #[derive(PartialEq, Eq, Hash)]
 struct UtxoKey {

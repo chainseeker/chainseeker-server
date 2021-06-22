@@ -23,6 +23,7 @@ struct Syncer {
     config: Config,
     addr_index_db: Arc<RwLock<AddressIndexDB>>,
     utxo_db: UtxoDB,
+    utxo_server: Arc<RwLock<UtxoServer>>,
     rest: bitcoin_rest::Context,
 }
 
@@ -30,14 +31,17 @@ impl Syncer {
     fn new(coin: &str, config: &Config) -> Self {
         let addr_index_db = AddressIndexDB::new(coin);
         let synced_height = addr_index_db.get_synced_height();
+        let utxo_db = match synced_height {
+            Some(h) => UtxoDB::load(coin, h),
+            None => UtxoDB::new(),
+        };
+        let utxo_server = Arc::new(RwLock::new((&utxo_db).into()));
         Self {
             coin: coin.to_string(),
             config: (*config).clone(),
             addr_index_db: Arc::new(RwLock::new(addr_index_db)),
-            utxo_db: match synced_height {
-                Some(h) => UtxoDB::load(coin, h),
-                None => UtxoDB::new(),
-            },
+            utxo_db,
+            utxo_server,
             rest: get_rest(&config.coins[coin]),
         }
     }
@@ -115,6 +119,9 @@ impl Syncer {
         }
         target_height - start_height + 1
     }
+    async fn construct_utxo_server(&mut self) {
+        *self.utxo_server.write().await = (&self.utxo_db).into();
+    }
     async fn run(&mut self) {
         // Do initial sync.
         let begin = Instant::now();
@@ -127,6 +134,7 @@ impl Syncer {
             }
         }
         println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin.elapsed().as_millis());
+        self.construct_utxo_server().await;
         // Subscribe to ZeroMQ.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
@@ -139,18 +147,21 @@ impl Syncer {
             let blockhash = socket.recv_bytes(0).expect("Failed to receive a blockhash from ZeroMQ.");
             println!("Received ZeroMQ message: {}: {:02x?}", topic, blockhash);
             self.sync(1).await;
+            self.construct_utxo_server().await;
         }
     }
 }
 
 struct HttpServer {
     addr_index_db: Arc<RwLock<AddressIndexDB>>,
+    utxo_server: Arc<RwLock<UtxoServer>>,
 }
 
 impl HttpServer {
-    pub fn new(addr_index_db: Arc<RwLock<AddressIndexDB>>) -> Self {
+    pub fn new(addr_index_db: Arc<RwLock<AddressIndexDB>>, utxo_server: Arc<RwLock<UtxoServer>>) -> Self {
         Self{
             addr_index_db,
+            utxo_server,
         }
     }
     fn response(status: &StatusCode, body: String) -> Response<Body> {
@@ -199,7 +210,26 @@ impl HttpServer {
             Err(_) => return Self::not_found("Failed to decode input script."),
         }
     }
-    async fn route(addr_index_db: &Arc<RwLock<AddressIndexDB>>, req: &Request<Body>) -> Response<Body> {
+    /// `/utxo/SCRIPT` endpoint.
+    async fn utxo(utxo_server: &Arc<RwLock<UtxoServer>>, hex: &str) -> Response<Body> {
+        let script = Script::from_str(hex);
+        match script {
+            Ok(script) => {
+                let utxo_server = utxo_server.read().await;
+                let values = utxo_server.get(&script);
+                let json = serde_json::to_string(&values);
+                match json {
+                    Ok(json) => return Self::ok(json),
+                    Err(_) => return Self::internal_error("Failed to encode to JSON."),
+                };
+            },
+            Err(_) => return Self::not_found("Failed to decode input script."),
+        }
+    }
+    async fn route(
+        addr_index_db: &Arc<RwLock<AddressIndexDB>>,
+        utxo_server: &Arc<RwLock<UtxoServer>>,
+        req: &Request<Body>) -> Response<Body> {
         if req.method() != Method::GET {
             return Self::not_found("Invalid HTTP method.");
         }
@@ -210,12 +240,18 @@ impl HttpServer {
         if path[1] == "addr_index" {
             return Self::addr_index(addr_index_db, path[2]).await;
         }
+        if path[1] == "utxo" {
+            return Self::utxo(utxo_server, path[2]).await;
+        }
         Self::not_found("Invalid API.")
     }
-    async fn handle_request(addr_index_db: Arc<RwLock<AddressIndexDB>>, req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    async fn handle_request(
+        addr_index_db: Arc<RwLock<AddressIndexDB>>,
+        utxo_server: Arc<RwLock<UtxoServer>>,
+        req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let begin = Instant::now();
         print!("New HTTP request: {} {}", req.method(), req.uri().path());
-        let res = Self::route(&addr_index_db, &req).await;
+        let res = Self::route(&addr_index_db, &utxo_server, &req).await;
         println!(" {}us.", begin.elapsed().as_micros());
         Ok(res)
     }
@@ -223,9 +259,10 @@ impl HttpServer {
         let addr = SocketAddr::from(([127, 0, 0, 1], 8090));
         let make_svc = make_service_fn(move |_conn| {
             let addr_index_db = self.addr_index_db.clone();
+            let utxo_server = self.utxo_server.clone();
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
-                    Self::handle_request(addr_index_db.clone(), req)
+                    Self::handle_request(addr_index_db.clone(), utxo_server.clone(), req)
                 }))
             }
         });
@@ -256,9 +293,10 @@ async fn main() {
     let coin = args[1].to_string();
     let mut syncer = Syncer::new(&coin, &config);
     let addr_index_db = syncer.addr_index_db.clone();
+    let utxo_server = syncer.utxo_server.clone();
     tokio::spawn(async move {
         syncer.run().await;
     });
-    let server = HttpServer::new(addr_index_db);
+    let server = HttpServer::new(addr_index_db, utxo_server);
     server.run().await;
 }
