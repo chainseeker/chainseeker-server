@@ -43,13 +43,16 @@ impl AddressIndexDB {
         (script, txid)
     }
     */
-    pub fn get(&self, script: &Script, txid: &Txid) -> bool {
-        let key = Self::serialize_key(script, txid);
-        let val = self.db.get(key).expect("Failed to get a database element.");
-        match val {
-            Some(_) => true,
-            None => false,
+    pub fn get(&self, script: &Script) -> Vec<Txid> {
+        let mut ret = Vec::new();
+        for (key, _val) in self.db.prefix_iterator(script.as_bytes()) {
+            if key.len() != script.len() + 32 {
+                continue;
+            }
+            let txid = Txid::consensus_decode(&key[script.len()..]).expect("Failed to decode txid.");
+            ret.push(txid);
         }
+        ret
     }
     pub fn put(&self, script: &Script, txid: &Txid) {
         let key = Self::serialize_key(script, txid);

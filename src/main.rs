@@ -1,9 +1,15 @@
+use std::str::FromStr;
 use std::io::Read;
 use std::time::Instant;
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
+use tokio::sync::RwLock;
+
+use bitcoin::consensus::Encodable;
 use bitcoin::blockdata::block::Block;
+use bitcoin::blockdata::script::Script;
 
 use hyper::{Body, Request, Response, Server, Method, StatusCode};
 use hyper::service::{make_service_fn, service_fn};
@@ -15,7 +21,7 @@ use chainseeker_syncer::utxo::*;
 struct Syncer {
     coin: String,
     config: Config,
-    addr_index_db: AddressIndexDB,
+    addr_index_db: Arc<RwLock<AddressIndexDB>>,
     utxo_db: UtxoDB,
     rest: bitcoin_rest::Context,
 }
@@ -27,7 +33,7 @@ impl Syncer {
         Self {
             coin: coin.to_string(),
             config: (*config).clone(),
-            addr_index_db,
+            addr_index_db: Arc::new(RwLock::new(addr_index_db)),
             utxo_db: match synced_height {
                 Some(h) => UtxoDB::load(coin, h),
                 None => UtxoDB::new(),
@@ -38,8 +44,8 @@ impl Syncer {
     fn coin_config(&self) -> &CoinConfig {
         &self.config.coins[&self.coin]
     }
-    pub fn synced_height(&self) -> Option<u32> {
-        self.addr_index_db.get_synced_height()
+    pub async fn synced_height(&self) -> Option<u32> {
+        self.addr_index_db.read().await.get_synced_height()
     }
     async fn fetch_block(&self, height: u32) -> Block {
         let blockid = self.rest.blockhashbyheight(height).await
@@ -57,7 +63,7 @@ impl Syncer {
         let previous_pubkeys = self.utxo_db.process_block(&block);
         let utxo_elapsed = begin_utxo.elapsed();
         let begin_addr_index = Instant::now();
-        self.addr_index_db.process_block(&block, previous_pubkeys);
+        self.addr_index_db.write().await.process_block(&block, previous_pubkeys);
         let addr_index_elapsed = begin_addr_index.elapsed();
         let mut vins: usize = 0;
         let mut vouts: usize = 0;
@@ -75,11 +81,11 @@ impl Syncer {
                 let deleted_cnt = UtxoDB::delete_older_than(&self.coin, height - self.config.utxo_delete_threshold);
                 println!("Deleted {} old UTXO database(s).", deleted_cnt);
             }
-            self.addr_index_db.put_synced_height(height);
+            self.addr_index_db.write().await.put_synced_height(height);
         }
     }
     async fn process_reorgs(&mut self) {
-        let mut height = match self.synced_height() {
+        let mut height = match self.synced_height().await {
             Some(h) => h,
             None => return (),
         };
@@ -92,12 +98,12 @@ impl Syncer {
             }
             println!("Reorg detected at block height = {}.", height);
             height = self.utxo_db.reorg(&self.coin, height);
-            self.addr_index_db.put_synced_height(height);
+            self.addr_index_db.write().await.put_synced_height(height);
         }
     }
     async fn sync(&mut self, utxo_save_interval: u32) -> u32 {
         self.process_reorgs().await;
-        let start_height = match self.synced_height() {
+        let start_height = match self.synced_height().await {
             Some(h) => h + 1,
             None => 0,
         };
@@ -138,44 +144,96 @@ impl Syncer {
 }
 
 struct HttpServer {
+    addr_index_db: Arc<RwLock<AddressIndexDB>>,
 }
 
 impl HttpServer {
-    pub fn new() -> Self {
+    pub fn new(addr_index_db: Arc<RwLock<AddressIndexDB>>) -> Self {
         Self{
+            addr_index_db,
         }
     }
-    async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let not_found: Result<Response<Body>, Infallible> = {
-            let mut res: Response<Body> = Response::new("404 Not Found".into());
-            *res.status_mut() = StatusCode::NOT_FOUND;
-            Ok(res)
-        };
+    fn response(status: &StatusCode, body: String) -> Result<Response<Body>, Infallible> {
+        let res = Response::builder()
+            .header("Content-Type", "application/json")
+            .status(status)
+            .body(body.into())
+            .unwrap();
+        Ok(res)
+    }
+    fn error(status: &StatusCode, msg: &str) -> Result<Response<Body>, Infallible> {
+        Self::response(status, format!("{{\"error\":\"{}\"}}", msg))
+    }
+    fn not_found(msg: &str) -> Result<Response<Body>, Infallible> {
+        Self::error(&StatusCode::NOT_FOUND, msg)
+    }
+    fn internal_error(msg: &str) -> Result<Response<Body>, Infallible> {
+        Self::error(&StatusCode::INTERNAL_SERVER_ERROR, msg)
+    }
+    fn ok(json: String) -> Result<Response<Body>, Infallible> {
+        Self::response(&StatusCode::OK, json)
+    }
+    async fn handle_request(addr_index_db: Arc<RwLock<AddressIndexDB>>, req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        println!("New HTTP request: {} {}", req.method(), req.uri().path());
         if req.method() != Method::GET {
-            return not_found;
+            return Self::not_found("Invalid HTTP method.");
         }
         let path: Vec<&str> = req.uri().path().split('/').collect();
-        if path.len() < 2 {
-            return not_found;
+        if path.len() < 3 {
+            return Self::not_found("Invalid number of params.");
         }
-        /*
         if path[1] == "addr_index" {
             let script = Script::from_str(path[2]);
-            let txids = addr_index
+            match script {
+                Ok(script) => {
+                    let txids = addr_index_db.read().await.get(&script);
+                    let mut success = true;
+                    let txids: Vec<String> = txids.iter().map(|txid| {
+                        let mut buf: [u8; 32] = [0; 32];
+                        match txid.consensus_encode(&mut buf[..]) {
+                            Ok(_) => {},
+                            Err(_) => { success = false },
+                        };
+                        hex::encode(buf)
+                    }).collect();
+                    if !success {
+                        return Self::internal_error("Failed to encode txids.");
+                    }
+                    let json = serde_json::to_string(&txids);
+                    match json {
+                        Ok(json) => return Self::ok(json),
+                        Err(_) => return Self::internal_error("Failed to encode to JSON."),
+                    };
+                },
+                Err(_) => return Self::not_found("Failed to decode input script."),
+            }
         }
-        */
-        Ok(Response::new("Hello, world!\n".into()))
+        Self::not_found("Invalid API.")
     }
     async fn run(&self) {
         let addr = SocketAddr::from(([127, 0, 0, 1], 8090));
-        let make_svc = make_service_fn(|_conn| async {
-            Ok::<_, Infallible>(service_fn(Self::handle_request))
+        let make_svc = make_service_fn(move |_conn| {
+            let addr_index_db = self.addr_index_db.clone();
+            async move {
+                Ok::<_, Infallible>(service_fn(move |req| {
+                    Self::handle_request(addr_index_db.clone(), req)
+                }))
+            }
         });
         let server = Server::bind(&addr).serve(make_svc);
         if let Err(e) = server.await {
             panic!("HttpServer failed: {}", e);
         }
     }
+}
+
+fn load_config() -> Config {
+    let config_path = format!("{}/config.toml", get_data_dir_path().expect("Failed to get data directory path."));
+    let mut config_file = std::fs::File::open(&config_path)
+        .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
+    let mut config_str = String::new();
+    config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
+    toml::from_str(&config_str).expect("Failed to parse config file.")
 }
 
 #[tokio::main]
@@ -185,12 +243,16 @@ async fn main() {
         println!("usage: {} COIN=(btc|tbtc)", args[0]);
         return;
     }
-    let config_path = format!("{}/config.toml", get_data_dir_path().expect("Failed to get data directory path."));
-    let mut config_file = std::fs::File::open(&config_path)
-        .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
-    let mut config_str = String::new();
-    config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
-    let config: Config = toml::from_str(&config_str).expect("Failed to parse config file.");
+    let config = load_config();
+    let coin = args[1].to_string();
+    let mut syncer = Syncer::new(&coin, &config);
+    let addr_index_db = syncer.addr_index_db.clone();
+    tokio::spawn(async move {
+        syncer.run().await;
+    });
+    let server = HttpServer::new(addr_index_db);
+    server.run().await;
+    /*
     tokio::join!(
         // Run syncer.
         async {
@@ -208,4 +270,5 @@ async fn main() {
             }).await.unwrap();
         }
     );
+    */
 }
