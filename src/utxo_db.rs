@@ -11,9 +11,9 @@ use bitcoin::blockdata::script::Script;
 use super::*;
 
 pub struct UtxoServerValue {
-    txid: Txid,
-    vout: u32,
-    value: u64,
+    txid: Txid,  // +32 = 32
+    vout: u32,   // + 4 = 36
+    value: u64,  // + 8 = 44
 }
 
 impl Serialize for UtxoServerValue {
@@ -28,6 +28,30 @@ impl Serialize for UtxoServerValue {
         state.serialize_field("value", &self.value)?;
         state.end()
     }
+}
+
+fn serialize_value(value: &UtxoServerValue) -> Vec<u8> {
+    let mut buf: [u8; 44] = [0; 44];
+    value.txid.consensus_encode(&mut buf[0..32]).expect("Failed to encode txid.");
+    buf[32..36].copy_from_slice(&value.vout.to_le_bytes());
+    buf[36..44].copy_from_slice(&value.value.to_le_bytes());
+    buf.to_vec()
+}
+
+fn deserialize_values(buf: &[u8]) -> Vec<UtxoServerValue> {
+    let mut ret = Vec::new();
+    for i in 0..(buf.len() / 44) {
+        let buf = &buf[(44 * i)..(44 * (i + 1))];
+        let txid = deserialize_txid(&buf[0..32]);
+        let vout = bytes_to_u32(&buf[32..36]);
+        let value = bytes_to_u64(&buf[36..44]);
+        ret.push(UtxoServerValue {
+            txid,
+            vout,
+            value,
+        });
+    }
+    ret
 }
 
 pub struct UtxoServer {
@@ -81,6 +105,46 @@ impl From<&UtxoDB> for UtxoServer {
     }
 }
 
+pub struct UtxoServerInStorage {
+    db: RocksDB,
+}
+
+impl UtxoServerInStorage {
+    fn get_path(coin: &str) -> String {
+        format!("/tmp/chainseeker/{}/utxo", coin)
+    }
+    pub fn new(coin: &str) -> Self {
+        let path = Self::get_path(coin);
+        if std::path::Path::new(&path).exists() {
+            std::fs::remove_dir_all(&path).expect("Failed to remove directory.");
+        }
+        Self {
+            db: rocks_db(&path),
+        }
+    }
+    pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
+        let script_pubkey = serialize_script(script_pubkey);
+        let ser = self.db.get(script_pubkey).expect("Failed to get from UTXO server DB.");
+        match ser {
+            Some(ser) => {
+                deserialize_values(&ser[..])
+            },
+            None => Vec::new(),
+        }
+    }
+    fn push(&self, script_pubkey: &Script, value: UtxoServerValue) {
+        let script_pubkey = serialize_script(script_pubkey);
+        let values = self.db.get(script_pubkey.clone()).expect("Failed to get from UTXO server DB.");
+        match values {
+            Some(mut values) => {
+                values.append(&mut serialize_value(&value));
+                self.db.put(script_pubkey, values)
+            },
+            None => self.db.put(script_pubkey, serialize_value(&value)),
+        }.expect("Failed to put to DB.");
+    }
+}
+
 pub struct UtxoDB {
     /// Stores:
     ///     key   = txid || vout
@@ -109,9 +173,7 @@ impl UtxoDB {
     }
     fn deserialize_key(buf: &[u8]) -> (Txid, u32) {
         let txid = deserialize_txid(&buf[0..32]);
-        let mut vout_vec: [u8; 4] = [0; 4];
-        vout_vec.copy_from_slice(&buf[32..36]);
-        let vout = u32::from_le_bytes(vout_vec);
+        let vout = bytes_to_u32(&buf[32..36]);
         (txid, vout)
     }
     fn serialize_value(script_pubkey: &Script, value: u64) -> Vec<u8> {
@@ -123,9 +185,7 @@ impl UtxoDB {
     fn deserialize_value(buf: &[u8]) -> (Script, u64) {
         let script_pubkey_len = buf.len() - 8;
         let script_pubkey = deserialize_script(&buf[0..script_pubkey_len]);
-        let mut value_vec: [u8; 8] = [0; 8];
-        value_vec.copy_from_slice(&buf[script_pubkey_len..]);
-        let value = u64::from_le_bytes(value_vec);
+        let value = bytes_to_u64(&buf[script_pubkey_len..]);
         (script_pubkey, value)
     }
     pub fn process_block(&mut self, block: &Block) -> Vec<Script> {
@@ -186,5 +246,28 @@ impl UtxoDB {
                 self.db.delete(&key).expect("Failed to delete UTXO entry.");
             }
         }
+    }
+    pub fn create_server_in_storage(&self, coin: &str) -> UtxoServerInStorage {
+        let begin = Instant::now();
+        let server = UtxoServerInStorage::new(coin);
+        let len = self.len();
+        let mut i = 0;
+        for (key, value) in self.db.full_iterator(rocksdb::IteratorMode::Start) {
+            i += 1;
+            if i % 100_000 == 0 || i == len {
+                print!("\rConstructing UTXO server ({} of {})...", i, len);
+                stdout().flush().expect("Failed to flush.");
+            }
+            let (txid, vout) = UtxoDB::deserialize_key(&key);
+            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
+            let value = UtxoServerValue {
+                txid,
+                vout,
+                value,
+            };
+            server.push(&script_pubkey, value);
+        }
+        println!(" ({}ms).", begin.elapsed().as_millis());
+        server
     }
 }

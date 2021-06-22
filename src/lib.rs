@@ -71,6 +71,20 @@ pub fn deserialize_block_hash(block_hash_vec: &[u8]) -> BlockHash {
     BlockHash::consensus_decode(&block_hash_vec[..]).expect("Failed to decode block hash.")
 }
 
+pub fn bytes_to_u32(buf: &[u8]) -> u32 {
+    assert_eq!(buf.len(), 4);
+    let mut tmp: [u8; 4] = [0; 4];
+    tmp.copy_from_slice(&buf);
+    u32::from_le_bytes(tmp)
+}
+
+pub fn bytes_to_u64(buf: &[u8]) -> u64 {
+    assert_eq!(buf.len(), 8);
+    let mut tmp: [u8; 8] = [0; 8];
+    tmp.copy_from_slice(&buf);
+    u64::from_le_bytes(tmp)
+}
+
 pub fn write_u32<W>(w: &mut W, n: u32)
     where W: Write
 {
