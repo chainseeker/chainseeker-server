@@ -1,0 +1,15 @@
+utxo_delete_threshold = 20
+default_utxo_save_interval = 1000
+
+[coins.btc]
+rest_endpoint = "http://localhost:8332/rest/"
+zmq_endpoint = "tcp://localhost:28332"
+
+[coins.tbtc]
+rest_endpoint = "http://localhost:18332/rest/"
+zmq_endpoint = "tcp://localhost:28333"
+
+[coins.rbtc]
+rest_endpoint = "http://localhost:18443/rest/"
+zmq_endpoint = "tcp://localhost:28334"
+
