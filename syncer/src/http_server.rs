@@ -6,7 +6,6 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use bitcoin_hashes::hex::FromHex;
-use bitcoin::consensus::Encodable;
 use bitcoin::Script;
 
 use hyper::{Body, Request, Response, Server, Method, StatusCode};
@@ -51,18 +50,11 @@ impl HttpServer {
         match script {
             Ok(script) => {
                 let txids = addr_index_db.read().await.get(&script);
-                let mut success = true;
                 let txids: Vec<String> = txids.iter().map(|txid| {
-                    let mut buf: [u8; 32] = [0; 32];
-                    match txid.consensus_encode(&mut buf[..]) {
-                        Ok(_) => {},
-                        Err(_) => { success = false },
-                    };
-                    hex::encode(buf)
+                    let mut txid = serialize_txid(&txid);
+                    txid.reverse();
+                    hex::encode(txid)
                 }).collect();
-                if !success {
-                    return Self::internal_error("Failed to encode txids.");
-                }
                 let json = serde_json::to_string(&txids);
                 match json {
                     Ok(json) => return Self::ok(json),

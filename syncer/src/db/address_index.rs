@@ -19,20 +19,21 @@ impl AddressIndexDB {
     }
     fn serialize_key(script: &Script, txid: &Txid) -> Vec<u8> {
         let mut buf = Vec::new();
-        buf.push(script.to_bytes());
-        buf.push(txid.to_vec());
+        buf.push(serialize_script(script));
+        buf.push(serialize_txid(&txid).to_vec());
         buf.concat()
     }
     pub fn get(&self, script: &Script) -> Vec<Txid> {
         let mut ret = Vec::new();
-        for (key, _val) in self.db.prefix_iterator(script.as_bytes()) {
-            if *script.as_bytes() != key[0..script.len()] {
+        let script_vec = serialize_script(script);
+        for (key, _val) in self.db.prefix_iterator(&script_vec) {
+            if script_vec != key[0..script.len()] {
                 break;
             }
             if key.len() != script.len() + 32 {
                 continue;
             }
-            let txid = Txid::consensus_decode(&key[script.len()..]).expect("Failed to decode txid.");
+            let txid = deserialize_txid(&key[script.len()..]);
             ret.push(txid);
         }
         ret
