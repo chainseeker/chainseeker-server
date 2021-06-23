@@ -8,8 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CC: sccache cc
-  CXX: sccache c++
+  CC: /tmp/sccache/sccache cc
+  CXX: /tmp/sccache/sccache c++
 
 jobs:
   build:
