@@ -65,12 +65,9 @@ impl UtxoServer {
     pub fn get(&self, script_pubkey: &Script) -> Option<&Vec<UtxoServerValue>> {
         self.db.get(script_pubkey)
     }
-}
-
-impl From<&UtxoDB> for UtxoServer {
-    fn from(utxos: &UtxoDB) -> Self {
+    pub fn load_from_db(&mut self, utxos: &UtxoDB) {
+        self.db.clear();
         let begin = Instant::now();
-        let mut db: HashMap<Script, Vec<UtxoServerValue>> = HashMap::new();
         let len = utxos.len();
         let mut i = 0;
         for (key, value) in utxos.db.full_iterator(rocksdb::IteratorMode::Start) {
@@ -81,12 +78,12 @@ impl From<&UtxoDB> for UtxoServer {
             }
             let (txid, vout) = UtxoDB::deserialize_key(&key);
             let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
-            let cur = match db.get_mut(&script_pubkey) {
+            let cur = match self.db.get_mut(&script_pubkey) {
                 Some(cur) => cur,
                 None => {
                     let vec = Vec::new();
-                    db.insert(script_pubkey.clone(), vec);
-                    db.get_mut(&script_pubkey).unwrap()
+                    self.db.insert(script_pubkey.clone(), vec);
+                    self.db.get_mut(&script_pubkey).unwrap()
                 },
             };
             let v = UtxoServerValue {
@@ -97,9 +94,14 @@ impl From<&UtxoDB> for UtxoServer {
             cur.push(v);
         }
         println!(" ({}ms).", begin.elapsed().as_millis());
-        Self {
-            db,
-        }
+    }
+}
+
+impl From<&UtxoDB> for UtxoServer {
+    fn from(utxos: &UtxoDB) -> Self {
+        let mut ret = Self::new();
+        ret.load_from_db(utxos);
+        ret
     }
 }
 

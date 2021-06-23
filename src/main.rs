@@ -114,7 +114,7 @@ impl Syncer {
         target_height + 1 - start_height
     }
     async fn construct_utxo_server(&mut self) {
-        *self.utxo_server.write().await = (&self.utxo_db).into();
+        self.utxo_server.write().await.load_from_db(&self.utxo_db);
     }
     async fn run(&mut self) {
         // Do initial sync.
@@ -290,9 +290,15 @@ async fn main() {
     let mut syncer = Syncer::new(&coin, &config);
     let addr_index_db = syncer.addr_index_db.clone();
     let utxo_server = syncer.utxo_server.clone();
-    tokio::spawn(async move {
+    let mut handles = Vec::new();
+    handles.push(tokio::spawn(async move {
         syncer.run().await;
-    });
-    let server = HttpServer::new(addr_index_db, utxo_server);
-    server.run(&coin, &config).await;
+    }));
+    handles.push(tokio::spawn(async move {
+        let server = HttpServer::new(addr_index_db, utxo_server);
+        server.run(&coin, &config).await;
+    }));
+    for handle in handles.iter_mut() {
+        handle.await.expect("Failed to await a tokio JoinHandle.");
+    }
 }
