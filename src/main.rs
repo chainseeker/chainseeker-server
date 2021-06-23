@@ -252,9 +252,11 @@ impl HttpServer {
         Ok(res)
     }
     async fn run(&self, coin: &str, config: &Config) {
+        let ip = &config.http_ip;
+        let port = config.coins[coin].http_port;
         let addr = SocketAddr::from((
-            config.http_ip.parse::<std::net::IpAddr>().expect("Failed to parse HTTP IP address."),
-            config.coins[coin].http_port));
+            ip.parse::<std::net::IpAddr>().expect("Failed to parse HTTP IP address."),
+            port));
         let make_svc = make_service_fn(move |_conn| {
             let addr_index_db = self.addr_index_db.clone();
             let utxo_server = self.utxo_server.clone();
@@ -265,6 +267,7 @@ impl HttpServer {
             }
         });
         let server = Server::bind(&addr).serve(make_svc);
+        println!("HTTP server is listening on http://{}:{}/", ip, port);
         if let Err(e) = server.await {
             panic!("HttpServer failed: {}", e);
         }

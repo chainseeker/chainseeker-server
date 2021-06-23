@@ -68,12 +68,11 @@ impl UtxoServer {
     pub fn load_from_db(&mut self, utxos: &UtxoDB) {
         self.db.clear();
         let begin = Instant::now();
-        let len = utxos.len();
         let mut i = 0;
         for (key, value) in utxos.db.full_iterator(rocksdb::IteratorMode::Start) {
             i += 1;
-            if i % 100_000 == 0 || i == len {
-                print!("\rConstructing UTXO server ({} of {})...", i, len);
+            if i % 100_000 == 0 {
+                print!("\rConstructing UTXO server ({})...", i);
                 stdout().flush().expect("Failed to flush.");
             }
             let (txid, vout) = UtxoDB::deserialize_key(&key);
