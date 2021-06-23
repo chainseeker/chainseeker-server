@@ -20,8 +20,8 @@ impl Serialize for UtxoServerValue {
         where S: Serializer
     {
         let mut state = serializer.serialize_struct("UtxoServerValue", 3)?;
-        let mut txid: [u8; 32] = [0; 32];
-        self.txid.consensus_encode(&mut txid[..]).expect("Failed to encode txid.");
+        let mut txid = serialize_txid(&self.txid);
+        txid.reverse();
         state.serialize_field("txid", &hex::encode(txid))?;
         state.serialize_field("vout", &self.vout)?;
         state.serialize_field("value", &self.value)?;
