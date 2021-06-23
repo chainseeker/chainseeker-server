@@ -3,6 +3,7 @@ use std::time::Instant;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use tokio::sync::RwLock;
 
@@ -15,6 +16,101 @@ use hyper::service::{make_service_fn, service_fn};
 
 use chainseeker_syncer::*;
 
+pub struct BlockFetcher {
+    rest: bitcoin_rest::Context,
+    /// (height, (block_hash, block))
+    blocks: Arc<RwLock<HashMap<u32, (BlockHash, Block)>>>,
+    /// The block height that should be returned at next `get()` call.
+    current_height: u32,
+    /// The next block height the workers should fetch for.
+    next_height: Arc<RwLock<u32>>,
+    stop_height: u32,
+}
+
+impl BlockFetcher {
+    pub fn new(coin: &str, config: &Config, start_height: u32, stop_height: u32) -> Self {
+        Self {
+            rest: get_rest(&config.coins[coin]),
+            blocks: Arc::new(RwLock::new(HashMap::new())),
+            current_height: start_height,
+            next_height: Arc::new(RwLock::new(start_height)),
+            stop_height,
+        }
+    }
+    pub async fn len(&self) -> usize {
+        self.blocks.read().await.len()
+    }
+    pub async fn get(&mut self, height: u32) -> (BlockHash, Block) {
+        let mut blocks = self.blocks.write().await;
+        let block = blocks.get(&height);
+        match block {
+            Some(block) => {
+                let (block_hash, block) = block.clone();
+                // Remove unneeded blocks.
+                for h in self.current_height..(height + 1) {
+                    blocks.remove(&h);
+                }
+                self.current_height = height + 1;
+                return (block_hash, block);
+            },
+            None => {
+                // Fallback.
+                let (block_hash, block) = Self::fetch_block(&self.rest, height).await;
+                return (block_hash, block);
+            },
+        }
+    }
+    async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
+        let block_hash = rest.blockhashbyheight(height).await
+            .expect(&format!("Failed to fetch block at height = {}.", height));
+        let block = rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
+        (block_hash, block)
+    }
+    pub fn run(&self, n_threads: Option<usize>) {
+        // Register Ctrl-C handler.
+        let stop = Arc::new(RwLock::new(false));
+        {
+            let stop = stop.clone();
+            tokio::spawn(async move {
+                tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
+                println!("Ctrl-C was pressed. Exiting BlockFetcher...");
+                *stop.write().await = true;
+            });
+        }
+        let n_threads = n_threads.unwrap_or(num_cpus::get());
+        for _thread_id in 0..n_threads {
+            let rest = self.rest.clone();
+            let blocks = self.blocks.clone();
+            let next_height = self.next_height.clone();
+            let stop = stop.clone();
+            let stop_height = self.stop_height;
+            // Launch a worker.
+            tokio::spawn(async move{
+                loop {
+                    if *stop.read().await {
+                        break;
+                    }
+                    if blocks.read().await.len() > 1000 {
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        continue;
+                    }
+                    let height = {
+                        let mut next_height = next_height.write().await;
+                        let height = *next_height;
+                        *next_height += 1;
+                        height
+                    };
+                    if height > stop_height {
+                        break;
+                    }
+                    let (block_hash, block) = Self::fetch_block(&rest, height).await;
+                    blocks.write().await.insert(height, (block_hash, block));
+                }
+            });
+        }
+    }
+}
+
 struct Syncer {
     coin: String,
     config: Config,
@@ -24,34 +120,41 @@ struct Syncer {
     utxo_server: Arc<RwLock<UtxoServer>>,
     rest: bitcoin_rest::Context,
     stop: Arc<RwLock<bool>>,
+    block_fetcher: BlockFetcher,
 }
 
 impl Syncer {
-    fn new(coin: &str, config: &Config) -> Self {
+    async fn new(coin: &str, config: &Config) -> Self {
         let utxo_db = UtxoDB::new(coin);
         let utxo_server = Arc::new(RwLock::new((&utxo_db).into()));
+        let block_db = BlockDB::new(coin);
+        let start_height = match block_db.get_synced_height() {
+            Some(h) => h + 1,
+            None => 0,
+        };
+        let rest = get_rest(&config.coins[coin]);
+        let chaininfo = rest.chaininfo().await.expect("Failed to fetch chaininfo.");
+        let stop_height = chaininfo.blocks;
         Self {
             coin: coin.to_string(),
             config: (*config).clone(),
-            block_db: BlockDB::new(coin),
+            block_db,
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin))),
             utxo_db,
             utxo_server,
-            rest: get_rest(&config.coins[coin]),
+            rest,
             stop: Arc::new(RwLock::new(false)),
+            block_fetcher: BlockFetcher::new(coin, config, start_height, stop_height),
         }
     }
     fn coin_config(&self) -> &CoinConfig {
         &self.config.coins[&self.coin]
     }
-    pub async fn synced_height(&self) -> Option<u32> {
+    pub fn synced_height(&self) -> Option<u32> {
         self.block_db.get_synced_height()
     }
-    async fn fetch_block(&self, height: u32) -> (BlockHash, Block) {
-        let block_hash = self.rest.blockhashbyheight(height).await
-            .expect(&format!("Failed to fetch block at height = {}.", height));
-        let block = self.rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
-        (block_hash, block)
+    async fn fetch_block(&mut self, height: u32) -> (BlockHash, Block) {
+        self.block_fetcher.get(height).await
     }
     async fn process_block(&mut self, height: u32) {
         let begin = Instant::now();
@@ -78,13 +181,13 @@ impl Syncer {
         self.block_db.put_block_hash(height, &block_hash);
         self.block_db.put_synced_height(height);
         println!(
-            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
+            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms) (blocks:{:3})",
             height, block.txdata.len(), vins, vouts,
             rest_elapsed.as_millis(), utxo_elapsed.as_millis(),
-            addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
+            addr_index_elapsed.as_millis(), begin.elapsed().as_millis(), self.block_fetcher.len().await);
     }
     async fn process_reorgs(&mut self) {
-        let mut height = match self.synced_height().await {
+        let mut height = match self.synced_height() {
             Some(h) => h,
             None => return (),
         };
@@ -104,7 +207,7 @@ impl Syncer {
     }
     async fn sync(&mut self) -> u32 {
         self.process_reorgs().await;
-        let start_height = match self.synced_height().await {
+        let start_height = match self.synced_height() {
             Some(h) => h + 1,
             None => 0,
         };
@@ -126,11 +229,13 @@ impl Syncer {
     async fn run(&mut self) {
         // Register Ctrl-C watch.
         let stop = self.stop.clone();
-        tokio::task::spawn(async move {
+        tokio::spawn(async move {
             tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
-            println!("Ctrl-C was pressed. Exiting syncer...");
+            println!("Ctrl-C was pressed. Exiting Syncer...");
             *stop.write().await = true;
         });
+        // Run BlockFetcher.
+        self.block_fetcher.run(None);
         // Do initial sync.
         let begin = Instant::now();
         let mut synced_blocks = 0;
@@ -160,7 +265,7 @@ impl Syncer {
         socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
         loop {
             if *self.stop.read().await {
-                println!("Exiting syncer...");
+                println!("Exiting Syncer...");
                 break;
             }
             println!("Waiting for a ZeroMQ message...");
@@ -326,7 +431,7 @@ async fn main() {
     }
     let config = load_config();
     let coin = args[1].to_string();
-    let mut syncer = Syncer::new(&coin, &config);
+    let mut syncer = Syncer::new(&coin, &config).await;
     let addr_index_db = syncer.addr_index_db.clone();
     let utxo_server = syncer.utxo_server.clone();
     let mut handles = Vec::new();
