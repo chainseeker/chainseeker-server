@@ -141,7 +141,13 @@ impl Syncer {
                 break;
             }
         }
-        println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin.elapsed().as_millis());
+        let begin_elapsed = begin.elapsed().as_millis();
+        println!("Initial sync: synced {} blocks in {}ms ({}ms/block).",
+            synced_blocks, begin_elapsed, begin_elapsed / synced_blocks as u128);
+        if *self.stop.read().await {
+            println!("Syncer stopped.");
+            return;
+        }
         if synced_blocks > 0 {
             self.construct_utxo_server().await;
         }
