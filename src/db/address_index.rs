@@ -1,6 +1,6 @@
 use bitcoin::{Block, Txid, Script};
 
-use super::*;
+use super::super::*;
 
 pub struct AddressIndexDB {
     db: RocksDB,

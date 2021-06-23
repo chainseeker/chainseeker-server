@@ -1,6 +1,6 @@
 use bitcoin::BlockHash;
 
-use super::*;
+use super::super::*;
 
 const SYNCED_HEIGHT_KEY: &str = "synced_height";
 

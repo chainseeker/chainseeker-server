@@ -6,7 +6,7 @@ use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 use bitcoin::{Block, Txid, Script};
 
-use super::*;
+use super::super::*;
 
 pub struct UtxoServerValue {
     txid: Txid,  // +32 = 32

@@ -4,12 +4,8 @@ use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{Script, Txid, BlockHash};
 
-pub mod block_db;
-pub use block_db::*;
-pub mod address_index_db;
-pub use address_index_db::*;
-pub mod utxo_db;
-pub use utxo_db::*;
+pub mod db;
+pub use db::*;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
