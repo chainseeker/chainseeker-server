@@ -128,7 +128,9 @@ impl Syncer {
             }
         }
         println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin.elapsed().as_millis());
-        self.construct_utxo_server().await;
+        if synced_blocks > 0 {
+            self.construct_utxo_server().await;
+        }
         // Subscribe to ZeroMQ.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
