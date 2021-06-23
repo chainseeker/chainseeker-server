@@ -23,6 +23,7 @@ struct Syncer {
     utxo_db: UtxoDB,
     utxo_server: Arc<RwLock<UtxoServer>>,
     rest: bitcoin_rest::Context,
+    stop: Arc<RwLock<bool>>,
 }
 
 impl Syncer {
@@ -37,6 +38,7 @@ impl Syncer {
             utxo_db,
             utxo_server,
             rest: get_rest(&config.coins[coin]),
+            stop: Arc::new(RwLock::new(false)),
         }
     }
     fn coin_config(&self) -> &CoinConfig {
@@ -108,15 +110,27 @@ impl Syncer {
         };
         let chaininfo = self.rest.chaininfo().await.expect("Failed to fetch chaininfo.");
         let target_height = chaininfo.blocks;
+        let mut synced_blocks = 0;
         for height in start_height..(target_height + 1) {
+            if *self.stop.read().await {
+                break;
+            }
             self.process_block(height).await;
+            synced_blocks += 1;
         }
-        target_height + 1 - start_height
+        synced_blocks
     }
     async fn construct_utxo_server(&mut self) {
         self.utxo_server.write().await.load_from_db(&self.utxo_db);
     }
     async fn run(&mut self) {
+        // Register Ctrl-C watch.
+        let stop = self.stop.clone();
+        tokio::task::spawn(async move {
+            tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
+            println!("Ctrl-C was pressed. Exiting syncer...");
+            *stop.write().await = true;
+        });
         // Do initial sync.
         let begin = Instant::now();
         let mut synced_blocks = 0;
@@ -137,15 +151,25 @@ impl Syncer {
         let coin_config = self.coin_config();
         socket.connect(&coin_config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
+        socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
         loop {
+            if *self.stop.read().await {
+                println!("Exiting syncer...");
+                break;
+            }
             println!("Waiting for a ZeroMQ message...");
             let multipart = socket.recv_multipart(0).expect("Failed to receive a ZeroMQ message.");
             assert_eq!(multipart.len(), 3);
+            let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.");
+            if topic != "hashblock" {
+                continue;
+            }
             let blockhash = &multipart[1];
             println!("Received a new block from ZeroMQ: {}", hex::encode(blockhash));
             self.sync().await;
             self.construct_utxo_server().await;
         }
+        println!("Syncer stopped.");
     }
 }
 
@@ -268,9 +292,13 @@ impl HttpServer {
         });
         let server = Server::bind(&addr).serve(make_svc);
         println!("HTTP server is listening on http://{}:{}/", ip, port);
-        if let Err(e) = server.await {
+        let graceful = server.with_graceful_shutdown(async {
+            tokio::signal::ctrl_c().await.expect("Failed to install Ctrl+C signal handler.");
+        });
+        if let Err(e) = graceful.await {
             panic!("HttpServer failed: {}", e);
         }
+        println!("HTTP server stopped.");
     }
 }
 
@@ -303,6 +331,7 @@ async fn main() {
         let server = HttpServer::new(addr_index_db, utxo_server);
         server.run(&coin, &config).await;
     }));
+    // Join for the threads.
     for handle in handles.iter_mut() {
         handle.await.expect("Failed to await a tokio JoinHandle.");
     }
