@@ -29,26 +29,34 @@ impl Serialize for UtxoServerValue {
     }
 }
 
-fn serialize_value(value: &UtxoServerValue) -> Vec<u8> {
-    let mut buf: [u8; 44] = [0; 44];
-    value.txid.consensus_encode(&mut buf[0..32]).expect("Failed to encode txid.");
-    buf[32..36].copy_from_slice(&value.vout.to_le_bytes());
-    buf[36..44].copy_from_slice(&value.value.to_le_bytes());
-    buf.to_vec()
+impl From<&UtxoServerValue> for Vec<u8> {
+    fn from(value: &UtxoServerValue) -> Vec<u8> {
+        let mut buf: [u8; 44] = [0; 44];
+        value.txid.consensus_encode(&mut buf[0..32]).expect("Failed to encode txid.");
+        buf[32..36].copy_from_slice(&value.vout.to_le_bytes());
+        buf[36..44].copy_from_slice(&value.value.to_le_bytes());
+        buf.to_vec()
+    }
+}
+
+impl From<&[u8]> for UtxoServerValue {
+    fn from(buf: &[u8]) -> UtxoServerValue {
+        let txid = deserialize_txid(&buf[0..32]);
+        let vout = bytes_to_u32(&buf[32..36]);
+        let value = bytes_to_u64(&buf[36..44]);
+        UtxoServerValue {
+            txid,
+            vout,
+            value,
+        }
+    }
 }
 
 fn deserialize_values(buf: &[u8]) -> Vec<UtxoServerValue> {
     let mut ret = Vec::new();
     for i in 0..(buf.len() / 44) {
         let buf = &buf[(44 * i)..(44 * (i + 1))];
-        let txid = deserialize_txid(&buf[0..32]);
-        let vout = bytes_to_u32(&buf[32..36]);
-        let value = bytes_to_u64(&buf[36..44]);
-        ret.push(UtxoServerValue {
-            txid,
-            vout,
-            value,
-        });
+        ret.push(buf.into());
     }
     ret
 }
@@ -144,10 +152,10 @@ impl UtxoServerInStorage {
         let values = self.db.get(script_pubkey.clone()).expect("Failed to get from UTXO server DB.");
         match values {
             Some(mut values) => {
-                values.append(&mut serialize_value(&value));
+                values.append(&mut (&value).into());
                 self.db.put(script_pubkey, values)
             },
-            None => self.db.put(script_pubkey, serialize_value(&value)),
+            None => self.db.put(script_pubkey, Vec::<u8>::from(&value)),
         }.expect("Failed to put to DB.");
     }
 }
