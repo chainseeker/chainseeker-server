@@ -6,6 +6,12 @@ use bitcoin::{Script, Txid, BlockHash};
 
 pub mod db;
 pub use db::*;
+pub mod block_fetcher;
+pub use block_fetcher::*;
+pub mod syncer;
+pub use syncer::*;
+pub mod http_server;
+pub use http_server::*;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
@@ -22,6 +28,15 @@ pub struct CoinConfig {
 pub struct Config {
     pub http_ip: String,
     pub coins: std::collections::HashMap<String, CoinConfig>,
+}
+
+pub fn load_config() -> Config {
+    let config_path = format!("{}/config.toml", get_data_dir_path().expect("Failed to get data directory path."));
+    let mut config_file = std::fs::File::open(&config_path)
+        .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
+    let mut config_str = String::new();
+    config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
+    toml::from_str(&config_str).expect("Failed to parse config file.")
 }
 
 pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
