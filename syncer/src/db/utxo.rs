@@ -8,6 +8,7 @@ use bitcoin::{Block, Txid, Script};
 
 use super::super::*;
 
+#[derive(Debug, Clone)]
 pub struct UtxoServerValue {
     txid: Txid,  // +32 = 32
     vout: u32,   // + 4 = 36
@@ -62,8 +63,11 @@ impl UtxoServer {
             db: HashMap::new(),
         }
     }
-    pub fn get(&self, script_pubkey: &Script) -> Option<&Vec<UtxoServerValue>> {
-        self.db.get(script_pubkey)
+    pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
+        match self.db.get(script_pubkey) {
+            Some(values) => (*values).clone(),
+            None => Vec::new(),
+        }
     }
     pub fn load_from_db(&mut self, utxos: &UtxoDB) {
         self.db.clear();
