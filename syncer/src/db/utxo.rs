@@ -8,6 +8,66 @@ use bitcoin::{Block, Txid, Script};
 
 use super::super::*;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RichListEntry {
+    script_pubkey: Script,
+    value: u64,
+}
+
+impl PartialOrd for RichListEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.value.partial_cmp(&other.value)
+    }
+}
+
+impl Ord for RichListEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.value.cmp(&other.value)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RichList {
+    /// (script_pubkey, value)
+    entries: Vec<RichListEntry>,
+}
+
+impl From<&UtxoDB> for RichList {
+    fn from(utxos: &UtxoDB) -> Self {
+        let begin = Instant::now();
+        // Accumulate balances.
+        let mut map: HashMap<Script, u64> = HashMap::new();
+        let print_stat = |i: u32, force: bool| {
+            if i % 100_000 == 0 || force {
+                print!("\rConstructing RichList ({} entries processed)...", i);
+                stdout().flush().expect("Failed to flush.");
+            }
+        };
+        let mut i = 0;
+        for (_key, value) in utxos.db.full_iterator(rocksdb::IteratorMode::Start) {
+            print_stat(i, false);
+            i += 1;
+            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
+            let value = map.get(&script_pubkey).unwrap_or(&0u64) + value;
+            map.insert(script_pubkey, value);
+        }
+        print_stat(i, true);
+        println!(" ({}ms).", begin.elapsed().as_millis());
+        // Construct RichList instance.
+        let mut entries = map.iter().map(|(script_pubkey, value)| {
+            RichListEntry {
+                script_pubkey: (*script_pubkey).clone(),
+                value: *value,
+            }
+        }).collect::<Vec<RichListEntry>>();
+        entries.sort_unstable_by(|a, b| b.cmp(a));
+        let rich_list = RichList {
+            entries,
+        };
+        rich_list
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct UtxoServerValue {
     txid: Txid,  // +32 = 32
@@ -30,7 +90,7 @@ impl Serialize for UtxoServerValue {
 }
 
 impl From<&UtxoServerValue> for Vec<u8> {
-    fn from(value: &UtxoServerValue) -> Vec<u8> {
+    fn from(value: &UtxoServerValue) -> Self {
         let mut buf: [u8; 44] = [0; 44];
         value.txid.consensus_encode(&mut buf[0..32]).expect("Failed to encode txid.");
         buf[32..36].copy_from_slice(&value.vout.to_le_bytes());
