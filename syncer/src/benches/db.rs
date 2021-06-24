@@ -11,8 +11,22 @@ const BLOCK: &[u8] = include_bytes!("block_500000.bin");
 fn bench_db(c: &mut Criterion) {
     let block = Block::consensus_decode(BLOCK).expect("Failed to decode block.");
     let mut utxo_db = UtxoDB::new(COIN);
-    c.bench_function("utxo", |b| b.iter(|| {
+    c.bench_function("utxo_db", |b| b.iter(|| {
         utxo_db.process_block(&block, true);
+    }));
+    utxo_db.process_block(&block, true);
+    let utxo = Utxo::from(&utxo_db);
+    c.bench_function("utxo_server_in_memory", |b| b.iter(|| {
+        let _print_gag = gag::Gag::stdout().unwrap();
+        UtxoServerInMemory::from(&utxo);
+    }));
+    c.bench_function("utxo_server_in_storage", |b| b.iter(|| {
+        let _print_gag = gag::Gag::stdout().unwrap();
+        UtxoServerInStorage::from(&utxo);
+    }));
+    c.bench_function("rich_list", |b| b.iter(|| {
+        let _print_gag = gag::Gag::stdout().unwrap();
+        RichList::from(&utxo);
     }));
     // Construct dummy data.
     let mut previous_pubkeys = Vec::new();
@@ -22,7 +36,7 @@ fn bench_db(c: &mut Criterion) {
         }
     }
     let addr_index_db = AddressIndexDB::new(COIN);
-    c.bench_function("address_index", |b| b.iter(|| {
+    c.bench_function("address_index_db", |b| b.iter(|| {
         addr_index_db.process_block(&block, &previous_pubkeys);
     }));
 }

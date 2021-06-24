@@ -25,6 +25,7 @@ bitcoin-rest = "0.0.6"
 
 [dev-dependencies]
 criterion = "0.3"
+gag = "1.0"
 
 [[bench]]
 name = "db"
