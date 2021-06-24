@@ -134,9 +134,22 @@ impl Syncer {
         synced_blocks
     }
     async fn reconstruct_utxo(&mut self) {
+        let begin = Instant::now();
         let utxo: Utxo = (&self.utxo_db).into();
-        *self.utxo_server.write().await = (&utxo).into();
-        *self.rich_list.write().await = (&utxo).into();
+        let utxo = Arc::new(RwLock::new(utxo));
+        let utxo1 = utxo.clone();
+        let utxo_server_join = tokio::task::spawn(async move {
+            let utxo = &*utxo1.read().await;
+            UtxoServer::from(utxo)
+        });
+        let utxo2 = utxo.clone();
+        let rich_list_join = tokio::task::spawn(async move {
+            let utxo = &*utxo2.read().await;
+            RichList::from(utxo)
+        });
+        *self.utxo_server.write().await = utxo_server_join.await.unwrap();
+        *self.rich_list.write().await = rich_list_join.await.unwrap();
+        println!("Syncer.reconstruct_utxo(): executed in {}ms.", begin.elapsed().as_millis());
     }
     pub async fn run(&mut self) {
         // Register Ctrl-C watch.

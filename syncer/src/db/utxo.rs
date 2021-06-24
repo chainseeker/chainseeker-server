@@ -66,23 +66,20 @@ impl From<&Utxo> for RichList {
         // Accumulate balances.
         let mut map: HashMap<Script, u64> = HashMap::new();
         let print_stat = |i: u32, force: bool| {
-            if i % 100_000 == 0 || force {
-                print!("\rConstructing RichList ({} entries processed)...", i);
-                stdout().flush().expect("Failed to flush.");
+            if i % 10_000_000 == 0 || force {
+                println!("RichList: processed {} entries...", i);
             }
         };
         let mut i = 0;
         for utxo in utxo.utxos.iter() {
-            print_stat(i, false);
-            i += 1;
             let value = map.get(&utxo.script_pubkey).unwrap_or(&0u64) + utxo.value;
             map.insert(utxo.script_pubkey.clone(), value);
+            i += 1;
+            print_stat(i, false);
         }
         print_stat(i, true);
-        println!(" ({}ms).", begin_acc.elapsed().as_millis());
+        println!("RichList: processed in {}ms.", begin_acc.elapsed().as_millis());
         // Construct RichList instance.
-        print!("Constructing RichList...");
-        stdout().flush().expect("Failed to flush.");
         let begin_construct = Instant::now();
         let mut entries = map.par_iter().map(|(script_pubkey, value)| {
             RichListEntry {
@@ -90,12 +87,10 @@ impl From<&Utxo> for RichList {
                 value: *value,
             }
         }).collect::<Vec<RichListEntry>>();
-        println!(" ({}ms).", begin_construct.elapsed().as_millis());
+        println!("RichList: constructed in {}ms.", begin_construct.elapsed().as_millis());
         let begin_sort = Instant::now();
-        print!("Sorting RichList...");
-        stdout().flush().expect("Failed to flush.");
         entries.par_sort_unstable_by(|a, b| b.cmp(a));
-        println!(" ({}ms).", begin_sort.elapsed().as_millis());
+        println!("RichList: sorted in {}ms.", begin_sort.elapsed().as_millis());
         let rich_list = RichList {
             entries,
         };
@@ -156,6 +151,7 @@ fn deserialize_values(buf: &[u8]) -> Vec<UtxoServerValue> {
     ret
 }
 
+#[derive(Debug, Clone)]
 pub struct UtxoServer {
     db: HashMap<Script, Vec<UtxoServerValue>>,
 }
@@ -179,15 +175,12 @@ impl From<&Utxo> for UtxoServer {
         let mut db = HashMap::new();
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
-            if i % 100_000 == 0 || force {
-                print!("\rConstructing UtxoServer ({} entries processed)...", i);
-                stdout().flush().expect("Failed to flush.");
+            if i % 10_000_000 == 0 || force {
+                println!("UtxoServer: processed {} entries...", i);
             }
         };
         let mut i = 0;
         for utxo in utxo_db.utxos.iter() {
-            print_stat(i, false);
-            i += 1;
             let cur = match db.get_mut(&utxo.script_pubkey) {
                 Some(cur) => cur,
                 None => {
@@ -202,15 +195,18 @@ impl From<&Utxo> for UtxoServer {
                 value: utxo.value,
             };
             cur.push(v);
+            i += 1;
+            print_stat(i, false);
         }
         print_stat(i, true);
-        println!(" ({}ms).", begin.elapsed().as_millis());
+        println!("UtxoServer: processed in {}ms.", begin.elapsed().as_millis());
         Self {
             db,
         }
     }
 }
 
+#[derive(Debug)]
 pub struct UtxoServerInStorage {
     db: RocksDB,
 }
@@ -251,6 +247,7 @@ impl UtxoServerInStorage {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct UtxoEntry {
     script_pubkey: Script,
     txid: Txid,
@@ -258,6 +255,7 @@ pub struct UtxoEntry {
     value: u64,
 }
 
+#[derive(Debug, Clone)]
 pub struct Utxo {
     utxos: Vec<UtxoEntry>
 }
@@ -293,6 +291,7 @@ impl From<&UtxoDB> for Utxo {
     }
 }
 
+#[derive(Debug)]
 pub struct UtxoDB {
     /// Stores:
     ///     key   = txid || vout
