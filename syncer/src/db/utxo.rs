@@ -1,3 +1,4 @@
+use core::ops::Range;
 use std::io::stdout;
 use std::time::Instant;
 use std::collections::HashMap;
@@ -12,6 +13,17 @@ use super::super::*;
 pub struct RichListEntry {
     script_pubkey: Script,
     value: u64,
+}
+
+impl Serialize for RichListEntry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let mut state = serializer.serialize_struct("RichListEntry", 2)?;
+        state.serialize_field("script_pubkey", &hex::encode(serialize_script(&self.script_pubkey)))?;
+        state.serialize_field("value", &self.value)?;
+        state.end()
+    }
 }
 
 impl PartialOrd for RichListEntry {
@@ -30,6 +42,15 @@ impl Ord for RichListEntry {
 pub struct RichList {
     /// (script_pubkey, value)
     entries: Vec<RichListEntry>,
+}
+
+impl RichList {
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn get_in_range(&self, range: Range<usize>) -> Vec<RichListEntry> {
+        self.entries[range].to_vec()
+    }
 }
 
 impl From<&UtxoDB> for RichList {

@@ -14,6 +14,7 @@ pub struct Syncer {
     addr_index_db: Arc<RwLock<AddressIndexDB>>,
     utxo_db: UtxoDB,
     utxo_server: Arc<RwLock<UtxoServer>>,
+    rich_list: Arc<RwLock<RichList>>,
     rest: bitcoin_rest::Context,
     stop: Arc<RwLock<bool>>,
     block_fetcher: BlockFetcher,
@@ -23,6 +24,7 @@ impl Syncer {
     pub async fn new(coin: &str, config: &Config) -> Self {
         let utxo_db = UtxoDB::new(coin);
         let utxo_server = Arc::new(RwLock::new((&utxo_db).into()));
+        let rich_list = Arc::new(RwLock::new((&utxo_db).into()));
         let block_db = BlockDB::new(coin);
         let start_height = match block_db.get_synced_height() {
             Some(h) => h + 1,
@@ -38,6 +40,7 @@ impl Syncer {
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin))),
             utxo_db,
             utxo_server,
+            rich_list,
             rest,
             stop: Arc::new(RwLock::new(false)),
             block_fetcher: BlockFetcher::new(coin, config, start_height, stop_height),
@@ -48,6 +51,9 @@ impl Syncer {
     }
     pub fn utxo_server(&self) -> Arc<RwLock<UtxoServer>> {
         self.utxo_server.clone()
+    }
+    pub fn rich_list(&self) -> Arc<RwLock<RichList>> {
+        self.rich_list.clone()
     }
     fn coin_config(&self) -> &CoinConfig {
         &self.config.coins[&self.coin]
@@ -125,8 +131,9 @@ impl Syncer {
         }
         synced_blocks
     }
-    async fn construct_utxo_server(&mut self) {
-        self.utxo_server.write().await.load_from_db(&self.utxo_db);
+    async fn reconstruct_utxo(&mut self) {
+        *self.utxo_server.write().await = (&self.utxo_db).into();
+        *self.rich_list.write().await = (&self.utxo_db).into();
     }
     pub async fn run(&mut self) {
         // Register Ctrl-C watch.
@@ -156,7 +163,7 @@ impl Syncer {
             return;
         }
         if synced_blocks > 0 {
-            self.construct_utxo_server().await;
+            self.reconstruct_utxo().await;
         }
         // Subscribe to ZeroMQ.
         let zmq_ctx = zmq::Context::new();
@@ -180,7 +187,7 @@ impl Syncer {
             let blockhash = &multipart[1];
             println!("Received a new block from ZeroMQ: {}", hex::encode(blockhash));
             self.sync().await;
-            self.construct_utxo_server().await;
+            self.reconstruct_utxo().await;
         }
         println!("Syncer stopped.");
     }

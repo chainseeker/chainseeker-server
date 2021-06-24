@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::time::Instant;
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -18,18 +19,24 @@ use super::*;
 struct State {
     addr_index_db: Arc<RwLock<AddressIndexDB>>,
     utxo_server: Arc<RwLock<UtxoServer>>,
+    rich_list: Arc<RwLock<RichList>>,
 }
 
 pub struct HttpServer {
     addr_index_db: Arc<RwLock<AddressIndexDB>>,
     utxo_server: Arc<RwLock<UtxoServer>>,
+    rich_list: Arc<RwLock<RichList>>,
 }
 
 impl HttpServer {
-    pub fn new(addr_index_db: Arc<RwLock<AddressIndexDB>>, utxo_server: Arc<RwLock<UtxoServer>>) -> Self {
+    pub fn new(
+        addr_index_db: Arc<RwLock<AddressIndexDB>>,
+        utxo_server: Arc<RwLock<UtxoServer>>,
+        rich_list: Arc<RwLock<RichList>>) -> Self {
         Self{
             addr_index_db,
             utxo_server,
+            rich_list,
         }
     }
     fn response(status: &StatusCode, body: String) -> Response<Body> {
@@ -45,13 +52,16 @@ impl HttpServer {
     fn not_found(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::NOT_FOUND, msg)
     }
+    fn bad_request(msg: &str) -> Response<Body> {
+        Self::error(&StatusCode::BAD_REQUEST, msg)
+    }
     fn internal_error(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::INTERNAL_SERVER_ERROR, msg)
     }
     fn ok(json: String) -> Response<Body> {
         Self::response(&StatusCode::OK, json)
     }
-    /// `/addr_index/SCRIPT` endpoint.
+    /// `/addr_index/:script` endpoint.
     async fn addr_index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let state = req.data::<State>().unwrap();
         let addr_index_db = &state.addr_index_db;
@@ -74,7 +84,7 @@ impl HttpServer {
             Err(_) => return Ok(Self::not_found("Failed to decode input script.")),
         }
     }
-    /// `/utxo/SCRIPT` endpoint.
+    /// `/utxo/:script` endpoint.
     async fn utxo_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let state = req.data::<State>().unwrap();
         let utxo_server = &state.utxo_server;
@@ -93,6 +103,27 @@ impl HttpServer {
             Err(_) => return Ok(Self::not_found("Failed to decode input script.")),
         }
     }
+    /// `/rich_list/:offset/:limit` endpoint.
+    async fn rich_list_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let offset: usize = match req.param("offset").unwrap().parse() {
+            Ok(offset) => offset,
+            Err(_) => return Ok(Self::bad_request("Cannot parse \"offset\" as an integer.")),
+        };
+        let limit: usize = match req.param("limit").unwrap().parse() {
+            Ok(limit) => limit,
+            Err(_) => return Ok(Self::bad_request("Cannot parse \"limit\" as an integer.")),
+        };
+        let state = req.data::<State>().unwrap();
+        let rich_list = state.rich_list.read().await;
+        let begin = min(offset, rich_list.len() - 1usize);
+        let end = min(offset + limit, rich_list.len() - 1usize);
+        let addresses = rich_list.get_in_range(begin..end);
+        let json = serde_json::to_string(&addresses);
+        match json {
+            Ok(json) => return Ok(Self::ok(json)),
+            Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
+        };
+    }
     pub async fn run(&self, coin: &str, config: &Config) {
         let ip = &config.http_ip;
         let port = config.coins[coin].http_port;
@@ -103,6 +134,7 @@ impl HttpServer {
             .data(State {
                 addr_index_db: self.addr_index_db.clone(),
                 utxo_server: self.utxo_server.clone(),
+                rich_list: self.rich_list.clone(),
             })
             .middleware(Middleware::pre(|req| async move {
                 req.set_context(Instant::now());
@@ -110,6 +142,7 @@ impl HttpServer {
             }))
             .get("/addr_index/:script", Self::addr_index_handler)
             .get("/utxo/:script", Self::utxo_handler)
+            .get("/rich_list/:offset/:limit", Self::rich_list_handler)
             .any(|_req| async {
                 Ok(Self::not_found("invalid URL."))
             })
