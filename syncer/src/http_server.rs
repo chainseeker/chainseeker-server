@@ -8,10 +8,17 @@ use tokio::sync::RwLock;
 use bitcoin_hashes::hex::FromHex;
 use bitcoin::Script;
 
-use hyper::{Body, Request, Response, Server, Method, StatusCode};
-use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, Server, StatusCode};
+
+use routerify::prelude::*;
+use routerify::{Middleware, Router, RouterService};
 
 use super::*;
+
+struct State {
+    addr_index_db: Arc<RwLock<AddressIndexDB>>,
+    utxo_server: Arc<RwLock<UtxoServer>>,
+}
 
 pub struct HttpServer {
     addr_index_db: Arc<RwLock<AddressIndexDB>>,
@@ -45,8 +52,11 @@ impl HttpServer {
         Self::response(&StatusCode::OK, json)
     }
     /// `/addr_index/SCRIPT` endpoint.
-    async fn addr_index(addr_index_db: &Arc<RwLock<AddressIndexDB>>, hex: &str) -> Response<Body> {
-        let script = Script::from_hex(hex);
+    async fn addr_index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let state = req.data::<State>().unwrap();
+        let addr_index_db = &state.addr_index_db;
+        let script_hex = req.param("script").unwrap();
+        let script = Script::from_hex(script_hex);
         match script {
             Ok(script) => {
                 let txids = addr_index_db.read().await.get(&script);
@@ -57,56 +67,31 @@ impl HttpServer {
                 }).collect();
                 let json = serde_json::to_string(&txids);
                 match json {
-                    Ok(json) => return Self::ok(json),
-                    Err(_) => return Self::internal_error("Failed to encode to JSON."),
+                    Ok(json) => return Ok(Self::ok(json)),
+                    Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
                 };
             },
-            Err(_) => return Self::not_found("Failed to decode input script."),
+            Err(_) => return Ok(Self::not_found("Failed to decode input script.")),
         }
     }
     /// `/utxo/SCRIPT` endpoint.
-    async fn utxo(utxo_server: &Arc<RwLock<UtxoServer>>, hex: &str) -> Response<Body> {
-        let script = Script::from_hex(hex);
+    async fn utxo_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let state = req.data::<State>().unwrap();
+        let utxo_server = &state.utxo_server;
+        let script_hex = req.param("script").unwrap();
+        let script = Script::from_hex(script_hex);
         match script {
             Ok(script) => {
                 let utxo_server = utxo_server.read().await;
                 let values = utxo_server.get(&script);
                 let json = serde_json::to_string(&values);
                 match json {
-                    Ok(json) => return Self::ok(json),
-                    Err(_) => return Self::internal_error("Failed to encode to JSON."),
+                    Ok(json) => return Ok(Self::ok(json)),
+                    Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
                 };
             },
-            Err(_) => return Self::not_found("Failed to decode input script."),
+            Err(_) => return Ok(Self::not_found("Failed to decode input script.")),
         }
-    }
-    async fn route(
-        addr_index_db: &Arc<RwLock<AddressIndexDB>>,
-        utxo_server: &Arc<RwLock<UtxoServer>>,
-        req: &Request<Body>) -> Response<Body> {
-        if req.method() != Method::GET {
-            return Self::not_found("Invalid HTTP method.");
-        }
-        let path: Vec<&str> = req.uri().path().split('/').collect();
-        if path.len() < 3 {
-            return Self::not_found("Invalid number of params.");
-        }
-        if path[1] == "addr_index" {
-            return Self::addr_index(addr_index_db, path[2]).await;
-        }
-        if path[1] == "utxo" {
-            return Self::utxo(utxo_server, path[2]).await;
-        }
-        Self::not_found("Invalid API.")
-    }
-    async fn handle_request(
-        addr_index_db: Arc<RwLock<AddressIndexDB>>,
-        utxo_server: Arc<RwLock<UtxoServer>>,
-        req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let begin = Instant::now();
-        let res = Self::route(&addr_index_db, &utxo_server, &req).await;
-        println!("HTTP: {} {} {}us.", req.method(), req.uri().path(), begin.elapsed().as_micros());
-        Ok(res)
     }
     pub async fn run(&self, coin: &str, config: &Config) {
         let ip = &config.http_ip;
@@ -114,16 +99,34 @@ impl HttpServer {
         let addr = SocketAddr::from((
             ip.parse::<std::net::IpAddr>().expect("Failed to parse HTTP IP address."),
             port));
-        let make_svc = make_service_fn(move |_conn| {
-            let addr_index_db = self.addr_index_db.clone();
-            let utxo_server = self.utxo_server.clone();
-            async move {
-                Ok::<_, Infallible>(service_fn(move |req| {
-                    Self::handle_request(addr_index_db.clone(), utxo_server.clone(), req)
-                }))
-            }
-        });
-        let server = Server::bind(&addr).serve(make_svc);
+        let router = Router::builder()
+            .data(State {
+                addr_index_db: self.addr_index_db.clone(),
+                utxo_server: self.utxo_server.clone(),
+            })
+            .middleware(Middleware::pre(|req| async move {
+                req.set_context(Instant::now());
+                Ok(req)
+            }))
+            .get("/addr_index/:script", Self::addr_index_handler)
+            .get("/utxo/:script", Self::utxo_handler)
+            .any(|_req| async {
+                Ok(Self::not_found("invalid URL."))
+            })
+            .middleware(Middleware::post_with_info(|res, req_info| async move {
+                let begin = req_info.context::<Instant>().unwrap();
+                println!("HTTP: {} {} {} ({}us)",
+                    req_info.method(), req_info.uri().path(), res.status(), begin.elapsed().as_millis());
+                Ok(res)
+            }))
+            .err_handler_with_info(|err, _| async move {
+                eprintln!("{}", err);
+                Self::internal_error(&format!("Something went wrong: {}", err))
+            })
+            .build()
+            .unwrap();
+        let service = RouterService::new(router).unwrap();
+        let server = Server::bind(&addr).serve(service);
         println!("HTTP server is listening on http://{}:{}/", ip, port);
         let graceful = server.with_graceful_shutdown(async {
             tokio::signal::ctrl_c().await.expect("Failed to install Ctrl+C signal handler.");

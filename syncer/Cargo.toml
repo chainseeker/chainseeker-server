@@ -15,6 +15,7 @@ toml = "0.5"
 zmq = "0.9"
 tokio = { version = "1.6", features = ["rt-multi-thread", "macros", "signal"] }
 hyper = { version = "0.14", features = ["full"] }
+routerify = "2.1"
 rocksdb = "0.16"
 bitcoin = "0.26"
 bitcoin_hashes = "0.9"
