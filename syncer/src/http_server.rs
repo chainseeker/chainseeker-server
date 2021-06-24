@@ -103,6 +103,13 @@ impl HttpServer {
             Err(_) => return Ok(Self::not_found("Failed to decode input script.")),
         }
     }
+    /// `/rich_list/count` endpoint.
+    async fn rich_list_count_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let state = req.data::<State>().unwrap();
+        let rich_list = state.rich_list.read().await;
+        let json = format!("{{\"count\":{}}}", rich_list.len());
+        Ok(Self::ok(json))
+    }
     /// `/rich_list/:offset/:limit` endpoint.
     async fn rich_list_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let offset: usize = match req.param("offset").unwrap().parse() {
@@ -142,6 +149,7 @@ impl HttpServer {
             }))
             .get("/addr_index/:script", Self::addr_index_handler)
             .get("/utxo/:script", Self::utxo_handler)
+            .get("/rich_list/count", Self::rich_list_count_handler)
             .get("/rich_list/:offset/:limit", Self::rich_list_handler)
             .any(|_req| async {
                 Ok(Self::not_found("invalid URL."))
