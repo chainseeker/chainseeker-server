@@ -158,12 +158,15 @@ impl UtxoServer {
             None => Vec::new(),
         }
     }
-    pub fn load_from_db(&mut self, utxos: &UtxoDB) {
-        self.db.clear();
+}
+
+impl From<&UtxoDB> for UtxoServer {
+    fn from(utxos: &UtxoDB) -> Self {
+        let mut db = HashMap::new();
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
             if i % 100_000 == 0 || force {
-                print!("\rConstructing UTXO server ({} entries processed)...", i);
+                print!("\rConstructing UutxoServer ({} entries processed)...", i);
                 stdout().flush().expect("Failed to flush.");
             }
         };
@@ -173,12 +176,12 @@ impl UtxoServer {
             i += 1;
             let (txid, vout) = UtxoDB::deserialize_key(&key);
             let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
-            let cur = match self.db.get_mut(&script_pubkey) {
+            let cur = match db.get_mut(&script_pubkey) {
                 Some(cur) => cur,
                 None => {
                     let vec = Vec::new();
-                    self.db.insert(script_pubkey.clone(), vec);
-                    self.db.get_mut(&script_pubkey).unwrap()
+                    db.insert(script_pubkey.clone(), vec);
+                    db.get_mut(&script_pubkey).unwrap()
                 },
             };
             let v = UtxoServerValue {
@@ -190,14 +193,9 @@ impl UtxoServer {
         }
         print_stat(i, true);
         println!(" ({}ms).", begin.elapsed().as_millis());
-    }
-}
-
-impl From<&UtxoDB> for UtxoServer {
-    fn from(utxos: &UtxoDB) -> Self {
-        let mut ret = Self::new();
-        ret.load_from_db(utxos);
-        ret
+        Self {
+            db,
+        }
     }
 }
 
