@@ -12,6 +12,7 @@ num_cpus = "1.13"
 serde = "1.0"
 serde_json = "1.0"
 toml = "0.5"
+rayon = "1.5"
 zmq = "0.9"
 tokio = { version = "1.6", features = ["rt-multi-thread", "macros", "signal"] }
 hyper = { version = "0.14", features = ["full"] }

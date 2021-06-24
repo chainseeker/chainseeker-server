@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 
+use rayon::prelude::*;
+
 use bitcoin::{Block, Txid, Script};
 
 use super::super::*;
@@ -77,7 +79,7 @@ impl From<&Utxo> for RichList {
         print!("Constructing RichList...");
         stdout().flush().expect("Failed to flush.");
         let begin_construct = Instant::now();
-        let mut entries = map.iter().map(|(script_pubkey, value)| {
+        let mut entries = map.par_iter().map(|(script_pubkey, value)| {
             RichListEntry {
                 script_pubkey: (*script_pubkey).clone(),
                 value: *value,
@@ -87,7 +89,7 @@ impl From<&Utxo> for RichList {
         let begin_sort = Instant::now();
         print!("Sorting RichList...");
         stdout().flush().expect("Failed to flush.");
-        entries.sort_unstable_by(|a, b| b.cmp(a));
+        entries.par_sort_unstable_by(|a, b| b.cmp(a));
         println!(" ({}ms).", begin_sort.elapsed().as_millis());
         let rich_list = RichList {
             entries,
