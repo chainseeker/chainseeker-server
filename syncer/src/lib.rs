@@ -45,7 +45,7 @@ pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
 
 pub fn rocks_db(path: &str) -> RocksDB {
     let mut opts = Options::default();
-    opts.set_max_open_files(1000);
+    opts.set_max_open_files(100);
     opts.create_if_missing(true);
     RocksDB::open(&opts, path).expect("Failed to open the database.")
 }
