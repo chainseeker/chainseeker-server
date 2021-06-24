@@ -7,6 +7,8 @@ use bitcoin::{Txid, Script};
 
 use crate::*;
 
+pub type UtxoServer = UtxoServerInMemory;
+
 #[derive(Debug, Clone)]
 pub struct UtxoServerValue {
     txid: Txid,  // +32 = 32
@@ -51,21 +53,12 @@ impl From<&[u8]> for UtxoServerValue {
     }
 }
 
-fn deserialize_values(buf: &[u8]) -> Vec<UtxoServerValue> {
-    let mut ret = Vec::new();
-    for i in 0..(buf.len() / 44) {
-        let buf = &buf[(44 * i)..(44 * (i + 1))];
-        ret.push(buf.into());
-    }
-    ret
-}
-
 #[derive(Debug, Clone)]
-pub struct UtxoServer {
+pub struct UtxoServerInMemory {
     db: HashMap<Script, Vec<UtxoServerValue>>,
 }
 
-impl UtxoServer {
+impl UtxoServerInMemory {
     pub fn new() -> Self {
         Self {
             db: HashMap::new(),
@@ -79,7 +72,7 @@ impl UtxoServer {
     }
 }
 
-impl From<&Utxo> for UtxoServer {
+impl From<&Utxo> for UtxoServerInMemory {
     fn from(utxo_db: &Utxo) -> Self {
         let mut db = HashMap::new();
         let begin = Instant::now();
@@ -149,12 +142,20 @@ impl UtxoServerInStorage {
             db,
         }
     }
+    fn deserialize_values(buf: &[u8]) -> Vec<UtxoServerValue> {
+        let mut ret = Vec::new();
+        for i in 0..(buf.len() / 44) {
+            let buf = &buf[(44 * i)..(44 * (i + 1))];
+            ret.push(buf.into());
+        }
+        ret
+    }
     pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         let script_pubkey = serialize_script(script_pubkey);
         let ser = self.db.get(script_pubkey).expect("Failed to get from UTXO server DB.");
         match ser {
             Some(ser) => {
-                deserialize_values(&ser[..])
+                Self::deserialize_values(&ser[..])
             },
             None => Vec::new(),
         }
