@@ -8,6 +8,7 @@ use bitcoin::{Txid, Script};
 use crate::*;
 
 pub type UtxoServer = UtxoServerInMemory;
+//pub type UtxoServer = UtxoServerInStorage;
 
 #[derive(Debug, Clone)]
 pub struct UtxoServerValue {
@@ -69,6 +70,14 @@ impl UtxoServerInMemory {
             Some(values) => (*values).clone(),
             None => Vec::new(),
         }
+    }
+    pub fn balance(&self, script_pubkey: &Script) -> u64 {
+        let values = self.get(script_pubkey);
+        let mut value = 0u64;
+        for v in values.iter() {
+            value += v.value;
+        }
+        value
     }
 }
 
@@ -187,7 +196,7 @@ impl From<&Utxo> for UtxoServerInStorage {
         let mut i = 0;
         for utxo in utxos.utxos.iter() {
             i += 1;
-            if i % 10_000_000 == 0 || i == len {
+            if i % 100_000 == 0 || i == len {
                 println!("UtxoServerInStorage: constructing ({} of {})...", i, len);
             }
             let value = UtxoServerValue {

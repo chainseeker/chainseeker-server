@@ -172,8 +172,7 @@ impl Syncer {
             }
         }
         let begin_elapsed = begin.elapsed().as_millis();
-        println!("Initial sync: synced {} blocks in {}ms ({}ms/block).",
-            synced_blocks, begin_elapsed, begin_elapsed / synced_blocks as u128);
+        println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin_elapsed);
         if *self.stop.read().await {
             println!("Syncer stopped.");
             return;
@@ -187,21 +186,24 @@ impl Syncer {
         let coin_config = self.coin_config();
         socket.connect(&coin_config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
-        socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
+        println!("Waiting for a ZeroMQ message...");
         loop {
             if *self.stop.read().await {
                 println!("Exiting Syncer...");
                 break;
             }
-            println!("Waiting for a ZeroMQ message...");
-            let multipart = socket.recv_multipart(0).expect("Failed to receive a ZeroMQ message.");
-            assert_eq!(multipart.len(), 3);
-            let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.");
-            if topic != "hashblock" {
-                continue;
+            match socket.recv_multipart(1) {
+                Ok(multipart) => {
+                    assert_eq!(multipart.len(), 3);
+                    //let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.");
+                    let blockhash = &multipart[1];
+                    println!("Received a new block from ZeroMQ: {}", hex::encode(blockhash));
+                },
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    continue;
+                },
             }
-            let blockhash = &multipart[1];
-            println!("Received a new block from ZeroMQ: {}", hex::encode(blockhash));
             self.sync().await;
             self.reconstruct_utxo().await;
         }
