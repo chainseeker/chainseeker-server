@@ -47,6 +47,11 @@ pub struct RichList {
 }
 
 impl RichList {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
     pub fn len(&self) -> usize {
         self.entries.len()
     }

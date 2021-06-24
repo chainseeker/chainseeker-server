@@ -23,9 +23,8 @@ pub struct Syncer {
 impl Syncer {
     pub async fn new(coin: &str, config: &Config) -> Self {
         let utxo_db = UtxoDB::new(coin);
-        let utxo: Utxo = (&utxo_db).into();
-        let utxo_server = Arc::new(RwLock::new((&utxo).into()));
-        let rich_list = Arc::new(RwLock::new((&utxo).into()));
+        let utxo_server = Arc::new(RwLock::new(UtxoServer::new()));
+        let rich_list = Arc::new(RwLock::new(RichList::new()));
         let block_db = BlockDB::new(coin);
         let start_height = match block_db.get_synced_height() {
             Some(h) => h + 1,
@@ -34,7 +33,7 @@ impl Syncer {
         let rest = get_rest(&config.coins[coin]);
         let chaininfo = rest.chaininfo().await.expect("Failed to fetch chaininfo.");
         let stop_height = chaininfo.blocks;
-        Self {
+        let mut syncer = Self {
             coin: coin.to_string(),
             config: (*config).clone(),
             block_db,
@@ -45,7 +44,9 @@ impl Syncer {
             rest,
             stop: Arc::new(RwLock::new(false)),
             block_fetcher: BlockFetcher::new(coin, config, start_height, stop_height),
-        }
+        };
+        syncer.reconstruct_utxo().await;
+        syncer
     }
     pub fn addr_index_db(&self) -> Arc<RwLock<AddressIndexDB>> {
         self.addr_index_db.clone()
