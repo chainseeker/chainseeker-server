@@ -54,7 +54,6 @@ pub fn rocks_db(path: &str) -> RocksDB {
     let mut opts = Options::default();
     opts.set_max_open_files(100);
     opts.create_if_missing(true);
-    opts.increase_parallelism(num_cpus::get() as i32);
     RocksDB::open(&opts, path).expect("Failed to open the database.")
 }
 

@@ -1,6 +1,6 @@
 use bitcoin::{Block, Txid, Script};
 
-//use rayon::prelude::*;
+use rayon::prelude::*;
 
 use super::super::*;
 
@@ -67,7 +67,7 @@ impl AddressIndexDB {
                 elems.push((&vout.script_pubkey, txid));
             }
         }
-        let elems: Vec<Vec<u8>> = elems.iter().map(|elem| {
+        let elems: Vec<Vec<u8>> = elems.par_iter().map(|elem| {
             Self::serialize_key(elem.0, elem.1)
         }).collect();
         for elem in elems.iter() {
