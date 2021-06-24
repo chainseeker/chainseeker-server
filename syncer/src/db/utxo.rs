@@ -2,6 +2,7 @@ use core::ops::Range;
 use std::io::stdout;
 use std::time::Instant;
 use std::collections::HashMap;
+use rand::Rng;
 
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 
@@ -208,20 +209,36 @@ impl From<&Utxo> for UtxoServer {
 
 #[derive(Debug)]
 pub struct UtxoServerInStorage {
+    path: String,
     db: RocksDB,
 }
 
 impl UtxoServerInStorage {
-    fn get_path(coin: &str) -> String {
-        format!("/tmp/chainseeker/{}/utxo", coin)
+    fn get_random_path() -> String {
+        let rand_string: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(8)
+            .map(char::from)
+            .collect();
+        format!("/tmp/chainseeker/utxo/{}", rand_string)
     }
-    pub fn new(coin: &str) -> Self {
-        let path = Self::get_path(coin);
+    fn get_path() -> String {
+        loop {
+            let path = Self::get_random_path();
+            if !std::path::Path::new(&path).exists() {
+                return path;
+            }
+        }
+    }
+    pub fn new() -> Self {
+        let path = Self::get_path();
         if std::path::Path::new(&path).exists() {
             std::fs::remove_dir_all(&path).expect("Failed to remove directory.");
         }
+        let db = rocks_db(&path);
         Self {
-            db: rocks_db(&path),
+            path,
+            db,
         }
     }
     pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
@@ -244,6 +261,35 @@ impl UtxoServerInStorage {
             },
             None => self.db.put(script_pubkey, Vec::<u8>::from(&value)),
         }.expect("Failed to put to DB.");
+    }
+}
+
+impl Drop for UtxoServerInStorage {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.path).expect("Failed to remove UtxoServerInStorage directory.");
+    }
+}
+
+impl From<&Utxo> for UtxoServerInStorage {
+    fn from(utxos: &Utxo) -> UtxoServerInStorage {
+        let begin = Instant::now();
+        let server = UtxoServerInStorage::new();
+        let len = utxos.utxos.len();
+        let mut i = 0;
+        for utxo in utxos.utxos.iter() {
+            i += 1;
+            if i % 10_000_000 == 0 || i == len {
+                println!("UtxoServerInStorage: constructing ({} of {})...", i, len);
+            }
+            let value = UtxoServerValue {
+                txid: utxo.txid,
+                vout: utxo.vout,
+                value: utxo.value,
+            };
+            server.push(&utxo.script_pubkey, value);
+        }
+        println!("UtxoServerInStorage: constructed in {}ms.", begin.elapsed().as_millis());
+        server
     }
 }
 
@@ -397,28 +443,5 @@ impl UtxoDB {
                 self.db.delete(&key).expect("Failed to delete UTXO entry.");
             }
         }
-    }
-    pub fn create_server_in_storage(&self, coin: &str) -> UtxoServerInStorage {
-        let begin = Instant::now();
-        let server = UtxoServerInStorage::new(coin);
-        let len = self.len();
-        let mut i = 0;
-        for (key, value) in self.db.full_iterator(rocksdb::IteratorMode::Start) {
-            i += 1;
-            if i % 100_000 == 0 || i == len {
-                print!("\rConstructing UTXO server ({} of {})...", i, len);
-                stdout().flush().expect("Failed to flush.");
-            }
-            let (txid, vout) = UtxoDB::deserialize_key(&key);
-            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
-            let value = UtxoServerValue {
-                txid,
-                vout,
-                value,
-            };
-            server.push(&script_pubkey, value);
-        }
-        println!(" ({}ms).", begin.elapsed().as_millis());
-        server
     }
 }
