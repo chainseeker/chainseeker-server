@@ -23,8 +23,9 @@ pub struct Syncer {
 impl Syncer {
     pub async fn new(coin: &str, config: &Config) -> Self {
         let utxo_db = UtxoDB::new(coin);
-        let utxo_server = Arc::new(RwLock::new((&utxo_db).into()));
-        let rich_list = Arc::new(RwLock::new((&utxo_db).into()));
+        let utxo: Utxo = (&utxo_db).into();
+        let utxo_server = Arc::new(RwLock::new((&utxo).into()));
+        let rich_list = Arc::new(RwLock::new((&utxo).into()));
         let block_db = BlockDB::new(coin);
         let start_height = match block_db.get_synced_height() {
             Some(h) => h + 1,
@@ -132,8 +133,9 @@ impl Syncer {
         synced_blocks
     }
     async fn reconstruct_utxo(&mut self) {
-        *self.utxo_server.write().await = (&self.utxo_db).into();
-        *self.rich_list.write().await = (&self.utxo_db).into();
+        let utxo: Utxo = (&self.utxo_db).into();
+        *self.utxo_server.write().await = (&utxo).into();
+        *self.rich_list.write().await = (&utxo).into();
     }
     pub async fn run(&mut self) {
         // Register Ctrl-C watch.

@@ -53,9 +53,9 @@ impl RichList {
     }
 }
 
-impl From<&UtxoDB> for RichList {
-    fn from(utxos: &UtxoDB) -> Self {
-        let begin = Instant::now();
+impl From<&Utxo> for RichList {
+    fn from(utxo: &Utxo) -> Self {
+        let begin_acc = Instant::now();
         // Accumulate balances.
         let mut map: HashMap<Script, u64> = HashMap::new();
         let print_stat = |i: u32, force: bool| {
@@ -65,23 +65,30 @@ impl From<&UtxoDB> for RichList {
             }
         };
         let mut i = 0;
-        for (_key, value) in utxos.db.full_iterator(rocksdb::IteratorMode::Start) {
+        for utxo in utxo.utxos.iter() {
             print_stat(i, false);
             i += 1;
-            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
-            let value = map.get(&script_pubkey).unwrap_or(&0u64) + value;
-            map.insert(script_pubkey, value);
+            let value = map.get(&utxo.script_pubkey).unwrap_or(&0u64) + utxo.value;
+            map.insert(utxo.script_pubkey.clone(), value);
         }
         print_stat(i, true);
-        println!(" ({}ms).", begin.elapsed().as_millis());
+        println!(" ({}ms).", begin_acc.elapsed().as_millis());
         // Construct RichList instance.
+        print!("Constructing RichList...");
+        stdout().flush().expect("Failed to flush.");
+        let begin_construct = Instant::now();
         let mut entries = map.iter().map(|(script_pubkey, value)| {
             RichListEntry {
                 script_pubkey: (*script_pubkey).clone(),
                 value: *value,
             }
         }).collect::<Vec<RichListEntry>>();
+        println!(" ({}ms).", begin_construct.elapsed().as_millis());
+        let begin_sort = Instant::now();
+        print!("Sorting RichList...");
+        stdout().flush().expect("Failed to flush.");
         entries.sort_unstable_by(|a, b| b.cmp(a));
+        println!(" ({}ms).", begin_sort.elapsed().as_millis());
         let rich_list = RichList {
             entries,
         };
@@ -160,34 +167,32 @@ impl UtxoServer {
     }
 }
 
-impl From<&UtxoDB> for UtxoServer {
-    fn from(utxos: &UtxoDB) -> Self {
+impl From<&Utxo> for UtxoServer {
+    fn from(utxo_db: &Utxo) -> Self {
         let mut db = HashMap::new();
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
             if i % 100_000 == 0 || force {
-                print!("\rConstructing UutxoServer ({} entries processed)...", i);
+                print!("\rConstructing UtxoServer ({} entries processed)...", i);
                 stdout().flush().expect("Failed to flush.");
             }
         };
         let mut i = 0;
-        for (key, value) in utxos.db.full_iterator(rocksdb::IteratorMode::Start) {
+        for utxo in utxo_db.utxos.iter() {
             print_stat(i, false);
             i += 1;
-            let (txid, vout) = UtxoDB::deserialize_key(&key);
-            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
-            let cur = match db.get_mut(&script_pubkey) {
+            let cur = match db.get_mut(&utxo.script_pubkey) {
                 Some(cur) => cur,
                 None => {
                     let vec = Vec::new();
-                    db.insert(script_pubkey.clone(), vec);
-                    db.get_mut(&script_pubkey).unwrap()
+                    db.insert(utxo.script_pubkey.clone(), vec);
+                    db.get_mut(&utxo.script_pubkey).unwrap()
                 },
             };
             let v = UtxoServerValue {
-                txid,
-                vout,
-                value,
+                txid: utxo.txid,
+                vout: utxo.vout,
+                value: utxo.value,
             };
             cur.push(v);
         }
@@ -236,6 +241,48 @@ impl UtxoServerInStorage {
             },
             None => self.db.put(script_pubkey, Vec::<u8>::from(&value)),
         }.expect("Failed to put to DB.");
+    }
+}
+
+pub struct UtxoEntry {
+    script_pubkey: Script,
+    txid: Txid,
+    vout: u32,
+    value: u64,
+}
+
+pub struct Utxo {
+    utxos: Vec<UtxoEntry>
+}
+
+impl From<&UtxoDB> for Utxo {
+    fn from(utxo_db: &UtxoDB) -> Self {
+        let begin = Instant::now();
+        let mut utxos = Vec::new();
+        let print_stat = |i: u32, force: bool| {
+            if i % 100_000 == 0 || force {
+                print!("\rExtracting UTXOs ({} entries processed)...", i);
+                stdout().flush().expect("Failed to flush.");
+            }
+        };
+        let mut i = 0;
+        for (key, value) in utxo_db.db.full_iterator(rocksdb::IteratorMode::Start) {
+            print_stat(i, false);
+            i += 1;
+            let (txid, vout) = UtxoDB::deserialize_key(&key);
+            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
+            utxos.push(UtxoEntry {
+                script_pubkey,
+                txid,
+                vout,
+                value,
+            });
+        }
+        print_stat(i, true);
+        println!(" ({}ms).", begin.elapsed().as_millis());
+        Utxo {
+            utxos,
+        }
     }
 }
 
