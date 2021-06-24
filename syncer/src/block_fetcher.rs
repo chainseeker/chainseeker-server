@@ -46,16 +46,10 @@ impl BlockFetcher {
             },
             None => {
                 // Fallback.
-                let (block_hash, block) = Self::fetch_block(&self.rest, height).await;
+                let (block_hash, block) = fetch_block(&self.rest, height).await;
                 return (block_hash, block);
             },
         }
-    }
-    async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
-        let block_hash = rest.blockhashbyheight(height).await
-            .expect(&format!("Failed to fetch block at height = {}.", height));
-        let block = rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
-        (block_hash, block)
     }
     pub fn run(&self, n_threads: Option<usize>) {
         // Register Ctrl-C handler.
@@ -94,7 +88,7 @@ impl BlockFetcher {
                     if height > stop_height {
                         break;
                     }
-                    let (block_hash, block) = Self::fetch_block(&rest, height).await;
+                    let (block_hash, block) = fetch_block(&rest, height).await;
                     blocks.write().await.insert(height, (block_hash, block));
                 }
             });

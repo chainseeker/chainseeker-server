@@ -335,7 +335,7 @@ impl UtxoDB {
         let value = bytes_to_u64(&buf[script_pubkey_len..]);
         (script_pubkey, value)
     }
-    pub fn process_block(&mut self, block: &Block) -> Vec<Script> {
+    pub fn process_block(&mut self, block: &Block, no_panic: bool) -> Vec<Script> {
         // Process vouts.
         for tx in block.txdata.iter() {
             let txid = tx.txid();
@@ -361,7 +361,11 @@ impl UtxoDB {
                         let (script_pubkey, _value) = Self::deserialize_value(&value);
                         previous_script_pubkeys.push(script_pubkey);
                     },
-                    None => panic!("Failed to find UTXO entry."),
+                    None => {
+                        if !no_panic {
+                            panic!("Failed to find UTXO entry.");
+                        }
+                    },
                 }
             }
         }

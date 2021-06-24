@@ -1,5 +1,7 @@
 use bitcoin::{Block, Txid, Script};
 
+//use rayon::prelude::*;
+
 use super::super::*;
 
 pub struct AddressIndexDB {
@@ -42,23 +44,34 @@ impl AddressIndexDB {
         let key = Self::serialize_key(script, txid);
         self.db.put(key, Vec::new()).expect("Failed to put a database element.");
     }
-    pub fn process_block(&self, block: &Block, previous_pubkeys: Vec<Script>) {
+    pub fn process_block(&self, block: &Block, previous_pubkeys: &Vec<Script>) {
         let mut previous_pubkey_index = 0;
-        for tx in block.txdata.iter() {
-            let txid = tx.txid();
+        let txids: Vec<Txid> = block.txdata.iter().map(|tx| {
+            tx.txid()
+        }).collect();
+        let mut elems = Vec::new();
+        for i in 0..block.txdata.len() {
+            let tx = &block.txdata[i];
+            let txid = &txids[i];
             // Process vins.
             for vin in tx.input.iter() {
                 if vin.previous_output.is_null() {
                     continue;
                 }
                 // Fetch transaction from `previous_output`.
-                self.put(&previous_pubkeys[previous_pubkey_index], &txid);
+                elems.push((&previous_pubkeys[previous_pubkey_index], txid));
                 previous_pubkey_index += 1;
             }
             // Process vouts.
             for vout in tx.output.iter() {
-                self.put(&vout.script_pubkey, &txid);
+                elems.push((&vout.script_pubkey, txid));
             }
+        }
+        let elems: Vec<Vec<u8>> = elems.iter().map(|elem| {
+            Self::serialize_key(elem.0, elem.1)
+        }).collect();
+        for elem in elems.iter() {
+            self.db.put(elem, Vec::new()).unwrap();
         }
     }
 }

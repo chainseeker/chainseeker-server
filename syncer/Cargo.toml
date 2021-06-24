@@ -21,3 +21,11 @@ rocksdb = "0.16"
 bitcoin = "0.26"
 bitcoin_hashes = "0.9"
 bitcoin-rest = "0.0.6"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "db"
+path = "src/benches/db.rs"
+harness = false

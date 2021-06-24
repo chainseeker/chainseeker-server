@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use serde::Deserialize;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
-use bitcoin::{Script, Txid, BlockHash};
+use bitcoin::{Script, Txid, BlockHash, Block};
 
 pub mod db;
 pub use db::*;
@@ -41,6 +41,13 @@ pub fn load_config() -> Config {
 
 pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
     bitcoin_rest::new(&config.rest_endpoint)
+}
+
+pub async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
+    let block_hash = rest.blockhashbyheight(height).await
+        .expect(&format!("Failed to fetch block at height = {}.", height));
+    let block = rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
+    (block_hash, block)
 }
 
 pub fn rocks_db(path: &str) -> RocksDB {
