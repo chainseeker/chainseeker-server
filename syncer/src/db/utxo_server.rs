@@ -191,11 +191,6 @@ impl UtxoServerInStorage {
     pub async fn get(&self, script_pubkey: &Script) -> UtxoServerElement {
         self.db.get(script_pubkey).await
     }
-    async fn push(&mut self, script_pubkey: &Script, value: UtxoServerValue) {
-        let mut element = self.db.get(script_pubkey).await;
-        element.values.push(value);
-        self.db.put((*script_pubkey).clone(), element).await;
-    }
     pub async fn from(utxos: &Utxo) -> UtxoServerInStorage {
         let begin = Instant::now();
         let mut server = UtxoServerInStorage::new();
@@ -203,7 +198,7 @@ impl UtxoServerInStorage {
         let mut i = 0;
         for utxo in utxos.utxos.iter() {
             i += 1;
-            if i % 1000_000 == 0 || i == len {
+            if i % 10_000_000 == 0 || i == len {
                 println!("UtxoServerInStorage: constructing ({} of {})...", i, len);
             }
             let value = UtxoServerValue {
@@ -211,7 +206,7 @@ impl UtxoServerInStorage {
                 vout: utxo.vout,
                 value: utxo.value,
             };
-            server.push(&utxo.script_pubkey, value).await;
+            server.db.push(&utxo.script_pubkey, value).await;
         }
         println!("UtxoServerInStorage: constructed in {}ms.", begin.elapsed().as_millis());
         server

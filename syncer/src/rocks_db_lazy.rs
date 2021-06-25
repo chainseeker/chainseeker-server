@@ -33,6 +33,19 @@ impl RocksDBLazy {
     pub async fn put(&mut self, key: Script, value: UtxoServerElement) {
         self.buffer.write().await.insert(key, value);
     }
+    pub async fn push(&mut self, key: &Script, value: UtxoServerValue) {
+        let mut buffer = self.buffer.write().await;
+        match buffer.get_mut(key) {
+            Some(element) => {
+                element.values.push(value);
+            },
+            None => {
+                let mut element = UtxoServerElement::new();
+                element.values.push(value);
+                buffer.insert((*key).clone(), element);
+            }
+        }
+    }
     pub fn run(&self) {
         let stop = Arc::new(RwLock::new(false));
         tokio::spawn(async move {
