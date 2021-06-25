@@ -93,8 +93,8 @@ impl HttpServer {
         match script {
             Ok(script) => {
                 let utxo_server = utxo_server.read().await;
-                let values = utxo_server.get(&script).await;
-                let json = serde_json::to_string(&values);
+                let element = utxo_server.get(&script).await;
+                let json = serde_json::to_string(&element.values);
                 match json {
                     Ok(json) => return Ok(Self::ok(json)),
                     Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
