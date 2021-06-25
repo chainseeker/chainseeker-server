@@ -1,5 +1,6 @@
 use std::time::Instant;
 use std::sync::Arc;
+use tokio::sync::mpsc::channel;
 
 use tokio::sync::RwLock;
 
@@ -137,14 +138,29 @@ impl Syncer {
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
             if i % 1000 == 0 || force {
-                print!("\rProcessing UTXOs ({} entries processed)...", i);
+                print!("\rLoading UTXOs ({} entries processed)...", i);
                 flush_stdout();
             }
         };
-        let mut utxo_server = UtxoServer::new();
-        let mut rich_list_builder = RichListBuilder::new();
+        const BUFFER_SIZE: usize = 1024 * 1024;
+        let (utxo_server_tx, mut utxo_server_rx) = channel(BUFFER_SIZE);
+        let (rich_list_tx, mut rich_list_rx) = channel(BUFFER_SIZE);
+        let utxo_server_join = tokio::task::spawn(async move {
+            let mut utxo_server = UtxoServer::new();
+            while let Some(utxo) = utxo_server_rx.recv().await {
+                utxo_server.push(&utxo).await;
+            }
+            utxo_server
+        });
+        let rich_list_join = tokio::task::spawn(async move {
+            let mut rich_list_builder = RichListBuilder::new();
+            while let Some(utxo) = rich_list_rx.recv().await {
+                rich_list_builder.push(&utxo);
+            }
+            rich_list_builder.finalize()
+        });
         let mut i = 0;
-        for (key, value) in self.utxo_db.db.full_iterator(rocksdb::IteratorMode::Start) {
+        for (key, value) in self.utxo_db.db.iterator(rocksdb::IteratorMode::Start) {
             print_stat(i, false);
             i += 1;
             let (txid, vout) = UtxoDB::deserialize_key(&key);
@@ -155,15 +171,17 @@ impl Syncer {
                 vout,
                 value,
             };
-            utxo_server.push(&utxo).await;
-            rich_list_builder.push(&utxo);
+            utxo_server_tx.send(utxo.clone()).await.unwrap();
+            rich_list_tx.send(utxo.clone()).await.unwrap();
         }
         print_stat(i, true);
         println!("");
-        println!("Processed all UTXOs in {}ms.", begin.elapsed().as_millis());
-        let begin_rich_list = Instant::now();
-        let rich_list = rich_list_builder.finalize();
-        println!("RichList finalized in {}ms.", begin_rich_list.elapsed().as_millis());
+        println!("Loaded all UTXOs in {}ms.", begin.elapsed().as_millis());
+        // Wait async tasks to finish.
+        drop(utxo_server_tx);
+        let utxo_server = utxo_server_join.await.unwrap();
+        drop(rich_list_tx);
+        let rich_list = rich_list_join.await.unwrap();
         *self.utxo_server.write().await = utxo_server;
         *self.rich_list.write().await = rich_list;
         println!("Syncer.reconstruct_utxo(): executed in {}ms.", begin.elapsed().as_millis());
