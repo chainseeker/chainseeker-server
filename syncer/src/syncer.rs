@@ -16,6 +16,7 @@ pub struct Syncer {
     utxo_db: UtxoDB,
     utxo_server: Arc<RwLock<UtxoServer>>,
     rich_list: Arc<RwLock<RichList>>,
+    rich_list_builder: RichListBuilder,
     rest: bitcoin_rest::Context,
     stop: Arc<RwLock<bool>>,
     block_fetcher: BlockFetcher,
@@ -34,7 +35,7 @@ impl Syncer {
         let rest = get_rest(&config.coins[coin]);
         let chaininfo = rest.chaininfo().await.expect("Failed to fetch chaininfo.");
         let stop_height = chaininfo.blocks;
-        let mut syncer = Self {
+        let syncer = Self {
             coin: coin.to_string(),
             config: (*config).clone(),
             block_db,
@@ -42,11 +43,12 @@ impl Syncer {
             utxo_db,
             utxo_server,
             rich_list,
+            rich_list_builder: RichListBuilder::new(),
             rest,
             stop: Arc::new(RwLock::new(false)),
             block_fetcher: BlockFetcher::new(coin, config, start_height, stop_height),
         };
-        syncer.reconstruct_utxo().await;
+        //syncer.reconstruct_utxo().await;
         syncer
     }
     pub fn addr_index_db(&self) -> Arc<RwLock<AddressIndexDB>> {
@@ -67,7 +69,7 @@ impl Syncer {
     async fn fetch_block(&mut self, height: u32) -> (BlockHash, Block) {
         self.block_fetcher.get(height).await
     }
-    async fn process_block(&mut self, height: u32) {
+    async fn process_block(&mut self, height: u32, initial: bool) {
         let begin = Instant::now();
         // Fetch block from REST.
         let begin_rest = Instant::now();
@@ -81,6 +83,11 @@ impl Syncer {
         let begin_addr_index = Instant::now();
         self.addr_index_db.write().await.process_block(&block, &previous_utxos);
         let addr_index_elapsed = begin_addr_index.elapsed();
+        if !initial {
+            self.utxo_server.write().await.process_block(&block, &previous_utxos).await;
+            self.rich_list_builder.process_block(&block, &previous_utxos).await;
+            *self.rich_list.write().await = self.rich_list_builder.finalize();
+        }
         // Count vins/vouts.
         let mut vins: usize = 0;
         let mut vouts: usize = 0;
@@ -116,7 +123,7 @@ impl Syncer {
             self.block_db.put_synced_height(height);
         }
     }
-    async fn sync(&mut self) -> u32 {
+    async fn sync(&mut self, init: bool) -> u32 {
         self.process_reorgs().await;
         let start_height = match self.synced_height() {
             Some(h) => h + 1,
@@ -129,7 +136,7 @@ impl Syncer {
             if *self.stop.read().await {
                 break;
             }
-            self.process_block(height).await;
+            self.process_block(height, init).await;
             synced_blocks += 1;
         }
         synced_blocks
@@ -157,7 +164,7 @@ impl Syncer {
             while let Some(utxo) = rich_list_rx.recv().await {
                 rich_list_builder.push(&utxo);
             }
-            rich_list_builder.finalize()
+            rich_list_builder
         });
         let mut i = 0;
         for (key, value) in self.utxo_db.db.iterator(rocksdb::IteratorMode::Start) {
@@ -181,9 +188,9 @@ impl Syncer {
         drop(utxo_server_tx);
         let utxo_server = utxo_server_join.await.unwrap();
         drop(rich_list_tx);
-        let rich_list = rich_list_join.await.unwrap();
+        self.rich_list_builder = rich_list_join.await.unwrap();
         *self.utxo_server.write().await = utxo_server;
-        *self.rich_list.write().await = rich_list;
+        *self.rich_list.write().await = self.rich_list_builder.finalize();
         println!("Syncer.reconstruct_utxo(): executed in {}ms.", begin.elapsed().as_millis());
     }
     pub async fn run(&mut self) {
@@ -200,7 +207,7 @@ impl Syncer {
         let begin = Instant::now();
         let mut synced_blocks = 0;
         loop {
-            let tmp = self.sync().await;
+            let tmp = self.sync(true).await;
             synced_blocks += tmp;
             if tmp == 0 {
                 break;
@@ -239,8 +246,7 @@ impl Syncer {
                     continue;
                 },
             }
-            self.sync().await;
-            self.reconstruct_utxo().await;
+            self.sync(false).await;
         }
         println!("Syncer stopped.");
     }
