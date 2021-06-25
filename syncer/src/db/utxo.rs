@@ -1,6 +1,3 @@
-use std::io::stdout;
-use std::time::Instant;
-
 use bitcoin::{Block, Txid, Script};
 
 use crate::*;
@@ -11,42 +8,6 @@ pub struct UtxoEntry {
     pub txid: Txid,
     pub vout: u32,
     pub value: u64,
-}
-
-#[derive(Debug, Clone)]
-pub struct Utxo {
-    pub utxos: Vec<UtxoEntry>
-}
-
-impl From<&UtxoDB> for Utxo {
-    fn from(utxo_db: &UtxoDB) -> Self {
-        let begin = Instant::now();
-        let mut utxos = Vec::new();
-        let print_stat = |i: u32, force: bool| {
-            if i % 100_000 == 0 || force {
-                print!("\rExtracting UTXOs ({} entries processed)...", i);
-                stdout().flush().expect("Failed to flush.");
-            }
-        };
-        let mut i = 0;
-        for (key, value) in utxo_db.db.full_iterator(rocksdb::IteratorMode::Start) {
-            print_stat(i, false);
-            i += 1;
-            let (txid, vout) = UtxoDB::deserialize_key(&key);
-            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
-            utxos.push(UtxoEntry {
-                script_pubkey,
-                txid,
-                vout,
-                value,
-            });
-        }
-        print_stat(i, true);
-        println!(" ({}ms).", begin.elapsed().as_millis());
-        Utxo {
-            utxos,
-        }
-    }
 }
 
 #[derive(Debug)]

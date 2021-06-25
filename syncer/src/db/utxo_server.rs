@@ -1,4 +1,3 @@
-use std::time::Instant;
 use std::collections::HashMap;
 use rand::Rng;
 
@@ -132,24 +131,6 @@ impl UtxoServerInMemory {
         };
         element.values.push(v);
     }
-    pub async fn from(utxo_db: &Utxo) -> Self {
-        let mut server = Self::new();
-        let begin = Instant::now();
-        let print_stat = |i: u32, force: bool| {
-            if i % 10_000_000 == 0 || force {
-                println!("UtxoServer: processed {} entries...", i);
-            }
-        };
-        let mut i = 0;
-        for utxo in utxo_db.utxos.iter() {
-            server.push(utxo).await;
-            i += 1;
-            print_stat(i, false);
-        }
-        print_stat(i, true);
-        println!("UtxoServer: processed in {}ms.", begin.elapsed().as_millis());
-        server
-    }
 }
 
 #[derive(Debug)]
@@ -199,24 +180,6 @@ impl UtxoServerInStorage {
             value: utxo.value,
         };
         self.db.push(&utxo.script_pubkey, value).await;
-    }
-    pub async fn from(utxo_db: &Utxo) -> Self {
-        let mut server = Self::new();
-        let begin = Instant::now();
-        let print_stat = |i: u32, force: bool| {
-            if i % 10_000_000 == 0 || force {
-                println!("UtxoServer: processed {} entries...", i);
-            }
-        };
-        let mut i = 0;
-        for utxo in utxo_db.utxos.iter() {
-            server.push(utxo).await;
-            i += 1;
-            print_stat(i, false);
-        }
-        print_stat(i, true);
-        println!("UtxoServer: processed in {}ms.", begin.elapsed().as_millis());
-        server
     }
 }
 
