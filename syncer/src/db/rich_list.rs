@@ -75,7 +75,7 @@ impl RichListBuilder {
         let v = self.map.get_mut(script_pubkey).unwrap();
         *v -= value;
     }
-    pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+    pub fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
         // Process vouts.
         for tx in block.txdata.iter() {
             let txid = tx.txid();

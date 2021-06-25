@@ -94,7 +94,7 @@ impl Syncer {
         let addr_index_elapsed = begin_addr_index.elapsed();
         if !initial {
             self.utxo_server.write().await.process_block(&block, &previous_utxos).await;
-            self.rich_list_builder.process_block(&block, &previous_utxos).await;
+            self.rich_list_builder.process_block(&block, &previous_utxos);
             *self.rich_list.write().await = self.rich_list_builder.finalize();
         }
         // Count vins/vouts.

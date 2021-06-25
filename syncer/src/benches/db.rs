@@ -9,44 +9,56 @@ use chainseeker_syncer::*;
 const COIN: &str = "bench";
 const BLOCK: &[u8] = include_bytes!("block_500000.bin");
 
-async fn run_utxo_server_in_memory(utxo: &Utxo) {
+async fn run_utxo_server_in_memory_push(utxos: &Vec<UtxoEntry>) {
     let _print_gag = gag::Gag::stdout().unwrap();
-    UtxoServerInMemory::from(utxo).await;
+    let mut utxo_server = UtxoServerInMemory::new();
+    for utxo in utxos {
+        utxo_server.push(&utxo).await;
+    }
 }
 
-async fn run_utxo_server_in_storage(utxo: &Utxo) {
+async fn run_utxo_server_in_storage_push(utxos: &Vec<UtxoEntry>) {
     let _print_gag = gag::Gag::stdout().unwrap();
-    UtxoServerInStorage::from(utxo).await;
+    let mut utxo_server = UtxoServerInStorage::new();
+    for utxo in utxos {
+        utxo_server.push(&utxo).await;
+    }
 }
 
 fn bench_db(c: &mut Criterion) {
     let block = Block::consensus_decode(BLOCK).expect("Failed to decode block.");
     let mut utxo_db = UtxoDB::new(COIN);
-    c.bench_function("utxo_db", |b| b.iter(|| {
+    c.bench_function("UtxoDB.process_block()", |b| b.iter(|| {
         utxo_db.process_block(&block, true);
     }));
-    utxo_db.process_block(&block, true);
-    let utxo = Utxo::from(&utxo_db);
-    c.bench_function("utxo_server_in_memory", |b| b.to_async(FuturesExecutor).iter(|| {
-        run_utxo_server_in_memory(&utxo)
+    let utxos = utxo_db.process_block(&block, true);
+    c.bench_function("UtxoServerInMemory.push()", |b| b.to_async(FuturesExecutor).iter(|| {
+        run_utxo_server_in_memory_push(&utxos)
     }));
-    c.bench_function("utxo_server_in_storage", |b| b.to_async(FuturesExecutor).iter(|| {
-        run_utxo_server_in_storage(&utxo)
-    }));
-    c.bench_function("rich_list", |b| b.iter(|| {
-        let _print_gag = gag::Gag::stdout().unwrap();
-        RichList::from(&utxo);
+    c.bench_function("UtxoServerInStorage.push()", |b| b.to_async(FuturesExecutor).iter(|| {
+        run_utxo_server_in_storage_push(&utxos)
     }));
     // Construct dummy data.
-    let mut previous_pubkeys = Vec::new();
+    let mut previous_utxos = Vec::new();
     for tx in block.txdata.iter() {
         for _vin in tx.input.iter() {
-            previous_pubkeys.push(block.txdata[0].output[0].script_pubkey.clone());
+            previous_utxos.push(UtxoEntry {
+                script_pubkey: block.txdata[0].output[0].script_pubkey.clone(),
+                txid: tx.txid(),
+                vout: 0,
+                value: 12345678u64,
+            });
         }
     }
+    c.bench_function("RichList", |b| b.iter(|| {
+        let _print_gag = gag::Gag::stdout().unwrap();
+        let mut rich_list_builder = RichListBuilder::new();
+        rich_list_builder.process_block(&block, &previous_utxos);
+        let _rich_list = rich_list_builder.finalize();
+    }));
     let addr_index_db = AddressIndexDB::new(COIN);
-    c.bench_function("address_index_db", |b| b.iter(|| {
-        addr_index_db.process_block(&block, &previous_pubkeys);
+    c.bench_function("AddressIndexDB", |b| b.iter(|| {
+        addr_index_db.process_block(&block, &previous_utxos);
     }));
 }
 
