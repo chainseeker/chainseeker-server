@@ -140,7 +140,7 @@ impl Syncer {
         let utxo1 = utxo.clone();
         let utxo_server_join = tokio::task::spawn(async move {
             let utxo = &*utxo1.read().await;
-            UtxoServer::from(utxo)
+            UtxoServer::from(utxo).await
         });
         let utxo2 = utxo.clone();
         let rich_list_join = tokio::task::spawn(async move {

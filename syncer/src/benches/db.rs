@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::async_executor::FuturesExecutor;
 
 use bitcoin::consensus::Decodable;
 use bitcoin::Block;
@@ -7,6 +8,11 @@ use chainseeker_syncer::*;
 
 const COIN: &str = "bench";
 const BLOCK: &[u8] = include_bytes!("block_500000.bin");
+
+async fn run_utxo_server_in_storage(utxo: &Utxo) {
+    let _print_gag = gag::Gag::stdout().unwrap();
+    UtxoServerInStorage::from(utxo).await;
+}
 
 fn bench_db(c: &mut Criterion) {
     let block = Block::consensus_decode(BLOCK).expect("Failed to decode block.");
@@ -20,9 +26,8 @@ fn bench_db(c: &mut Criterion) {
         let _print_gag = gag::Gag::stdout().unwrap();
         UtxoServerInMemory::from(&utxo);
     }));
-    c.bench_function("utxo_server_in_storage", |b| b.iter(|| {
-        let _print_gag = gag::Gag::stdout().unwrap();
-        UtxoServerInStorage::from(&utxo);
+    c.bench_function("utxo_server_in_storage", |b| b.to_async(FuturesExecutor).iter(|| {
+        run_utxo_server_in_storage(&utxo)
     }));
     c.bench_function("rich_list", |b| b.iter(|| {
         let _print_gag = gag::Gag::stdout().unwrap();

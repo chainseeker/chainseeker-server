@@ -65,24 +65,21 @@ impl UtxoServerInMemory {
             db: HashMap::new(),
         }
     }
-    pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
+    pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         match self.db.get(script_pubkey) {
             Some(values) => (*values).clone(),
             None => Vec::new(),
         }
     }
-    pub fn balance(&self, script_pubkey: &Script) -> u64 {
-        let values = self.get(script_pubkey);
+    pub async fn balance(&self, script_pubkey: &Script) -> u64 {
+        let values = self.get(script_pubkey).await;
         let mut value = 0u64;
         for v in values.iter() {
             value += v.value;
         }
         value
     }
-}
-
-impl From<&Utxo> for UtxoServerInMemory {
-    fn from(utxo_db: &Utxo) -> Self {
+    pub async fn from(utxo_db: &Utxo) -> Self {
         let mut db = HashMap::new();
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
@@ -120,7 +117,7 @@ impl From<&Utxo> for UtxoServerInMemory {
 #[derive(Debug)]
 pub struct UtxoServerInStorage {
     path: String,
-    db: RocksDB,
+    db: RocksDBLazy,
 }
 
 impl UtxoServerInStorage {
@@ -145,7 +142,7 @@ impl UtxoServerInStorage {
         if std::path::Path::new(&path).exists() {
             std::fs::remove_dir_all(&path).expect("Failed to remove directory.");
         }
-        let db = rocks_db(&path);
+        let db = RocksDBLazy::new(&path);
         Self {
             path,
             db,
@@ -159,9 +156,9 @@ impl UtxoServerInStorage {
         }
         ret
     }
-    pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
+    pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         let script_pubkey = serialize_script(script_pubkey);
-        let ser = self.db.get(script_pubkey).expect("Failed to get from UTXO server DB.");
+        let ser = self.db.get(&script_pubkey).await.expect("Failed to get from UTXO server DB.");
         match ser {
             Some(ser) => {
                 Self::deserialize_values(&ser[..])
@@ -169,29 +166,20 @@ impl UtxoServerInStorage {
             None => Vec::new(),
         }
     }
-    fn push(&self, script_pubkey: &Script, value: UtxoServerValue) {
+    async fn push(&mut self, script_pubkey: &Script, value: UtxoServerValue) {
         let script_pubkey = serialize_script(script_pubkey);
-        let values = self.db.get(script_pubkey.clone()).expect("Failed to get from UTXO server DB.");
+        let values = self.db.get(&script_pubkey).await.expect("Failed to get from UTXO server DB.");
         match values {
             Some(mut values) => {
                 values.append(&mut (&value).into());
-                self.db.put(script_pubkey, values)
+                self.db.put(script_pubkey, values).await;
             },
-            None => self.db.put(script_pubkey, Vec::<u8>::from(&value)),
-        }.expect("Failed to put to DB.");
+            None => self.db.put(script_pubkey, Vec::<u8>::from(&value)).await,
+        };
     }
-}
-
-impl Drop for UtxoServerInStorage {
-    fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.path).expect("Failed to remove UtxoServerInStorage directory.");
-    }
-}
-
-impl From<&Utxo> for UtxoServerInStorage {
-    fn from(utxos: &Utxo) -> UtxoServerInStorage {
+    pub async fn from(utxos: &Utxo) -> UtxoServerInStorage {
         let begin = Instant::now();
-        let server = UtxoServerInStorage::new();
+        let mut server = UtxoServerInStorage::new();
         let len = utxos.utxos.len();
         let mut i = 0;
         for utxo in utxos.utxos.iter() {
@@ -204,9 +192,15 @@ impl From<&Utxo> for UtxoServerInStorage {
                 vout: utxo.vout,
                 value: utxo.value,
             };
-            server.push(&utxo.script_pubkey, value);
+            server.push(&utxo.script_pubkey, value).await;
         }
         println!("UtxoServerInStorage: constructed in {}ms.", begin.elapsed().as_millis());
         server
+    }
+}
+
+impl Drop for UtxoServerInStorage {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.path).expect("Failed to remove UtxoServerInStorage directory.");
     }
 }

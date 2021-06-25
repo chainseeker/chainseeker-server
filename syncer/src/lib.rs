@@ -4,6 +4,8 @@ use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{Script, Txid, BlockHash, Block};
 
+pub mod rocks_db_lazy;
+pub use rocks_db_lazy::*;
 pub mod db;
 pub use db::*;
 pub mod block_fetcher;

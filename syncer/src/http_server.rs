@@ -93,7 +93,7 @@ impl HttpServer {
         match script {
             Ok(script) => {
                 let utxo_server = utxo_server.read().await;
-                let values = utxo_server.get(&script);
+                let values = utxo_server.get(&script).await;
                 let json = serde_json::to_string(&values);
                 match json {
                     Ok(json) => return Ok(Self::ok(json)),
