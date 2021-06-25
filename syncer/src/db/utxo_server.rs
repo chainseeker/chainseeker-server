@@ -117,8 +117,23 @@ impl UtxoServerInMemory {
         }
         value
     }
+    pub async fn push(&mut self, utxo: &UtxoEntry) {
+        let element = match self.db.get_mut(&utxo.script_pubkey) {
+            Some(element) => element,
+            None => {
+                self.db.insert(utxo.script_pubkey.clone(), UtxoServerElement::new());
+                self.db.get_mut(&utxo.script_pubkey).unwrap()
+            },
+        };
+        let v = UtxoServerValue {
+            txid: utxo.txid,
+            vout: utxo.vout,
+            value: utxo.value,
+        };
+        element.values.push(v);
+    }
     pub async fn from(utxo_db: &Utxo) -> Self {
-        let mut db = HashMap::new();
+        let mut server = Self::new();
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
             if i % 10_000_000 == 0 || force {
@@ -127,27 +142,13 @@ impl UtxoServerInMemory {
         };
         let mut i = 0;
         for utxo in utxo_db.utxos.iter() {
-            let element = match db.get_mut(&utxo.script_pubkey) {
-                Some(element) => element,
-                None => {
-                    db.insert(utxo.script_pubkey.clone(), UtxoServerElement::new());
-                    db.get_mut(&utxo.script_pubkey).unwrap()
-                },
-            };
-            let v = UtxoServerValue {
-                txid: utxo.txid,
-                vout: utxo.vout,
-                value: utxo.value,
-            };
-            element.values.push(v);
+            server.push(utxo).await;
             i += 1;
             print_stat(i, false);
         }
         print_stat(i, true);
         println!("UtxoServer: processed in {}ms.", begin.elapsed().as_millis());
-        Self {
-            db,
-        }
+        server
     }
 }
 
@@ -191,24 +192,30 @@ impl UtxoServerInStorage {
     pub async fn get(&self, script_pubkey: &Script) -> UtxoServerElement {
         self.db.get(script_pubkey).await
     }
-    pub async fn from(utxos: &Utxo) -> UtxoServerInStorage {
+    pub async fn push(&mut self, utxo: &UtxoEntry) {
+        let value = UtxoServerValue {
+            txid: utxo.txid,
+            vout: utxo.vout,
+            value: utxo.value,
+        };
+        self.db.push(&utxo.script_pubkey, value).await;
+    }
+    pub async fn from(utxo_db: &Utxo) -> Self {
+        let mut server = Self::new();
         let begin = Instant::now();
-        let mut server = UtxoServerInStorage::new();
-        let len = utxos.utxos.len();
-        let mut i = 0;
-        for utxo in utxos.utxos.iter() {
-            i += 1;
-            if i % 10_000_000 == 0 || i == len {
-                println!("UtxoServerInStorage: constructing ({} of {})...", i, len);
+        let print_stat = |i: u32, force: bool| {
+            if i % 10_000_000 == 0 || force {
+                println!("UtxoServer: processed {} entries...", i);
             }
-            let value = UtxoServerValue {
-                txid: utxo.txid,
-                vout: utxo.vout,
-                value: utxo.value,
-            };
-            server.db.push(&utxo.script_pubkey, value).await;
+        };
+        let mut i = 0;
+        for utxo in utxo_db.utxos.iter() {
+            server.push(utxo).await;
+            i += 1;
+            print_stat(i, false);
         }
-        println!("UtxoServerInStorage: constructed in {}ms.", begin.elapsed().as_millis());
+        print_stat(i, true);
+        println!("UtxoServer: processed in {}ms.", begin.elapsed().as_millis());
         server
     }
 }
