@@ -19,6 +19,10 @@ const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
 type RocksDB = DBWithThreadMode<MultiThreaded>;
 
+pub fn flush_stdout() {
+    std::io::stdout().flush().expect("Failed to flush.");
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct CoinConfig {
     pub rest_endpoint: String,

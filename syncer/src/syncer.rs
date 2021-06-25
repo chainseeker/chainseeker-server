@@ -138,7 +138,7 @@ impl Syncer {
         let print_stat = |i: u32, force: bool| {
             if i % 1000 == 0 || force {
                 print!("\rProcessing UTXOs ({} entries processed)...", i);
-                std::io::stdout().flush().expect("Failed to flush.");
+                flush_stdout();
             }
         };
         let mut utxo_server = UtxoServer::new();
