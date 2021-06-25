@@ -11,9 +11,9 @@ pub type UtxoServer = UtxoServerInMemory;
 
 #[derive(Debug, Clone)]
 pub struct UtxoServerValue {
-    txid: Txid,  // +32 = 32
-    vout: u32,   // + 4 = 36
-    value: u64,  // + 8 = 44
+    pub txid: Txid,  // +32 = 32
+    pub vout: u32,   // + 4 = 36
+    pub value: u64,  // + 8 = 44
 }
 
 impl Serialize for UtxoServerValue {
@@ -131,6 +131,40 @@ impl UtxoServerInMemory {
         };
         element.values.push(v);
     }
+    pub fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
+        let element = self.db.get_mut(script_pubkey).unwrap();
+        element.values = element.values.iter().filter(|&utxo_value| {
+            !(utxo_value.txid == *txid && utxo_value.vout == vout)
+        }).cloned().collect();
+    }
+    pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+        // Process vouts.
+        for tx in block.txdata.iter() {
+            let txid = tx.txid();
+            for vout in 0..tx.output.len() {
+                let output = &tx.output[vout];
+                let utxo = UtxoEntry {
+                    script_pubkey: output.script_pubkey.clone(),
+                    txid,
+                    vout: vout as u32,
+                    value: output.value,
+                };
+                self.push(&utxo).await;
+            }
+        }
+        // Process vins.
+        let mut previous_utxo_index = 0;
+        for tx in block.txdata.iter() {
+            for vin in tx.input.iter() {
+                if vin.previous_output.is_null() {
+                    continue;
+                }
+                let utxo = &previous_utxos[previous_utxo_index];
+                self.remove(&utxo.script_pubkey, &utxo.txid, utxo.vout);
+                previous_utxo_index += 1;
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -180,6 +214,37 @@ impl UtxoServerInStorage {
             value: utxo.value,
         };
         self.db.push(&utxo.script_pubkey, value).await;
+    }
+    pub async fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
+        self.db.remove(script_pubkey, txid, vout).await;
+    }
+    pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+        // Process vouts.
+        for tx in block.txdata.iter() {
+            let txid = tx.txid();
+            for vout in 0..tx.output.len() {
+                let output = &tx.output[vout];
+                let utxo = UtxoEntry {
+                    script_pubkey: output.script_pubkey.clone(),
+                    txid,
+                    vout: vout as u32,
+                    value: output.value,
+                };
+                self.push(&utxo).await;
+            }
+        }
+        // Process vins.
+        let mut previous_utxo_index = 0;
+        for tx in block.txdata.iter() {
+            for vin in tx.input.iter() {
+                if vin.previous_output.is_null() {
+                    continue;
+                }
+                let utxo = &previous_utxos[previous_utxo_index];
+                self.remove(&utxo.script_pubkey, &utxo.txid, utxo.vout).await;
+                previous_utxo_index += 1;
+            }
+        }
     }
 }
 

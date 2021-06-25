@@ -44,8 +44,8 @@ impl AddressIndexDB {
         let key = Self::serialize_key(script, txid);
         self.db.put(key, Vec::new()).expect("Failed to put a database element.");
     }
-    pub fn process_block(&self, block: &Block, previous_pubkeys: &Vec<Script>) {
-        let mut previous_pubkey_index = 0;
+    pub fn process_block(&self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+        let mut previous_utxo_index = 0;
         let txids: Vec<Txid> = block.txdata.iter().map(|tx| {
             tx.txid()
         }).collect();
@@ -59,8 +59,8 @@ impl AddressIndexDB {
                     continue;
                 }
                 // Fetch transaction from `previous_output`.
-                elems.push((&previous_pubkeys[previous_pubkey_index], txid));
-                previous_pubkey_index += 1;
+                elems.push((&previous_utxos[previous_utxo_index].script_pubkey, txid));
+                previous_utxo_index += 1;
             }
             // Process vouts.
             for vout in tx.output.iter() {

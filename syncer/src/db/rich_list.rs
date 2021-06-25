@@ -71,6 +71,38 @@ impl RichListBuilder {
         let value = self.map.get(&utxo.script_pubkey).unwrap_or(&0u64) + utxo.value;
         self.map.insert(utxo.script_pubkey.clone(), value);
     }
+    pub fn remove(&mut self, script_pubkey: &Script, value: u64) {
+        let v = self.map.get_mut(script_pubkey).unwrap();
+        *v -= value;
+    }
+    pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+        // Process vouts.
+        for tx in block.txdata.iter() {
+            let txid = tx.txid();
+            for vout in 0..tx.output.len() {
+                let output = &tx.output[vout];
+                let utxo = UtxoEntry {
+                    script_pubkey: output.script_pubkey.clone(),
+                    txid,
+                    vout: vout as u32,
+                    value: output.value,
+                };
+                self.push(&utxo);
+            }
+        }
+        // Process vins.
+        let mut previous_utxo_index = 0;
+        for tx in block.txdata.iter() {
+            for vin in tx.input.iter() {
+                if vin.previous_output.is_null() {
+                    continue;
+                }
+                let previous_utxo = &previous_utxos[previous_utxo_index];
+                self.remove(&previous_utxo.script_pubkey, previous_utxo.value);
+                previous_utxo_index += 1;
+            }
+        }
+    }
     pub fn finalize(&self) -> RichList {
         // Construct RichList instance.
         let mut entries = self.map.par_iter().map(|(script_pubkey, value)| {

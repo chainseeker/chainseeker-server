@@ -75,11 +75,11 @@ impl Syncer {
         let rest_elapsed = begin_rest.elapsed();
         // Process for UTXOs.
         let begin_utxo = Instant::now();
-        let previous_pubkeys = self.utxo_db.process_block(&block, false);
+        let previous_utxos = self.utxo_db.process_block(&block, false);
         let utxo_elapsed = begin_utxo.elapsed();
         // Process for address index.
         let begin_addr_index = Instant::now();
-        self.addr_index_db.write().await.process_block(&block, &previous_pubkeys);
+        self.addr_index_db.write().await.process_block(&block, &previous_utxos);
         let addr_index_elapsed = begin_addr_index.elapsed();
         // Count vins/vouts.
         let mut vins: usize = 0;

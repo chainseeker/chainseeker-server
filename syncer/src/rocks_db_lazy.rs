@@ -30,7 +30,7 @@ impl RocksDBLazy {
             },
         }
     }
-    pub async fn put(&mut self, key: Script, value: UtxoServerElement) {
+    pub async fn insert(&mut self, key: Script, value: UtxoServerElement) {
         self.buffer.write().await.insert(key, value);
     }
     pub async fn push(&mut self, key: &Script, value: UtxoServerValue) {
@@ -45,6 +45,13 @@ impl RocksDBLazy {
                 buffer.insert((*key).clone(), element);
             }
         }
+    }
+    pub async fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
+        let element = self.get(script_pubkey).await;
+        let values = element.values.iter().filter(|&utxo_value| {
+            !(utxo_value.txid == *txid && utxo_value.vout == vout)
+        }).cloned().collect();
+        self.insert((*script_pubkey).clone(), UtxoServerElement { values }).await;
     }
     pub fn run(&self) {
         let stop = Arc::new(RwLock::new(false));

@@ -54,31 +54,39 @@ impl UtxoDB {
         let value = bytes_to_u64(&buf[script_pubkey_len..]);
         (script_pubkey, value)
     }
-    pub fn process_block(&mut self, block: &Block, no_panic: bool) -> Vec<Script> {
+    pub fn process_block(&mut self, block: &Block, no_panic: bool) -> Vec<UtxoEntry> {
         // Process vouts.
         for tx in block.txdata.iter() {
             let txid = tx.txid();
             for vout in 0..tx.output.len() {
-                let key = Self::serialize_key(&txid,  vout as u32);
+                let key = Self::serialize_key(&txid, vout as u32);
                 let output = &tx.output[vout];
                 let value = Self::serialize_value(&output.script_pubkey, output.value);
                 self.db.put(key, value).expect("Failed to put to DB.");
             }
         }
         // Process vins.
-        let mut previous_script_pubkeys = Vec::new();
+        let mut previous_utxos = Vec::new();
         for tx in block.txdata.iter() {
             for vin in tx.input.iter() {
                 if vin.previous_output.is_null() {
                     continue;
                 }
-                let key = Self::serialize_key(&vin.previous_output.txid, vin.previous_output.vout);
+                let txid = vin.previous_output.txid;
+                let vout = vin.previous_output.vout;
+                let key = Self::serialize_key(&txid, vout);
                 let value = self.db.get(&key).expect("Failed to get UTXO entry.");
                 match value {
                     Some(value) => {
                         self.db.delete(&key).expect("Failed to delete UTXO entry.");
-                        let (script_pubkey, _value) = Self::deserialize_value(&value);
-                        previous_script_pubkeys.push(script_pubkey);
+                        let (script_pubkey, value) = Self::deserialize_value(&value);
+                        let utxo = UtxoEntry {
+                            script_pubkey,
+                            txid,
+                            vout,
+                            value,
+                        };
+                        previous_utxos.push(utxo);
                     },
                     None => {
                         if !no_panic {
@@ -88,7 +96,7 @@ impl UtxoDB {
                 }
             }
         }
-        previous_script_pubkeys
+        previous_utxos
     }
     pub async fn reorg_block(&mut self, rest: &bitcoin_rest::Context, block: &Block) {
         // Process vins.
