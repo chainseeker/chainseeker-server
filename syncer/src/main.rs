@@ -7,9 +7,13 @@ async fn main() {
         println!("usage: {} COIN", args[0]);
         return;
     }
-    let config = load_config();
     let coin = args[1].to_string();
+    let config = load_config();
     let mut syncer = Syncer::new(&coin, &config).await;
+    syncer.initial_sync().await;
+    if syncer.is_stopped().await {
+        return;
+    }
     let addr_index_db = syncer.addr_index_db();
     let utxo_server = syncer.utxo_server();
     let rich_list = syncer.rich_list();

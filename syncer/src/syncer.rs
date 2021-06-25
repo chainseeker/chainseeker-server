@@ -48,8 +48,17 @@ impl Syncer {
             stop: Arc::new(RwLock::new(false)),
             block_fetcher: BlockFetcher::new(coin, config, start_height, stop_height),
         };
-        //syncer.reconstruct_utxo().await;
+        // Register Ctrl-C watch.
+        let stop = syncer.stop.clone();
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
+            println!("Ctrl-C was pressed. Exiting Syncer...");
+            *stop.write().await = true;
+        });
         syncer
+    }
+    pub async fn is_stopped(&self) -> bool {
+        *self.stop.read().await
     }
     pub fn addr_index_db(&self) -> Arc<RwLock<AddressIndexDB>> {
         self.addr_index_db.clone()
@@ -133,7 +142,7 @@ impl Syncer {
         let target_height = chaininfo.blocks;
         let mut synced_blocks = 0;
         for height in start_height..(target_height + 1) {
-            if *self.stop.read().await {
+            if self.is_stopped().await {
                 break;
             }
             self.process_block(height, init).await;
@@ -193,14 +202,7 @@ impl Syncer {
         *self.rich_list.write().await = self.rich_list_builder.finalize();
         println!("Syncer.reconstruct_utxo(): executed in {}ms.", begin.elapsed().as_millis());
     }
-    pub async fn run(&mut self) {
-        // Register Ctrl-C watch.
-        let stop = self.stop.clone();
-        tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
-            println!("Ctrl-C was pressed. Exiting Syncer...");
-            *stop.write().await = true;
-        });
+    pub async fn initial_sync(&mut self) -> u32 {
         // Run BlockFetcher.
         self.block_fetcher.run(None);
         // Do initial sync.
@@ -215,13 +217,12 @@ impl Syncer {
         }
         let begin_elapsed = begin.elapsed().as_millis();
         println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin_elapsed);
-        if *self.stop.read().await {
-            println!("Syncer stopped.");
-            return;
-        }
-        if synced_blocks > 0 {
+        if !self.is_stopped().await {
             self.reconstruct_utxo().await;
         }
+        synced_blocks
+    }
+    pub async fn run(&mut self) {
         // Subscribe to ZeroMQ.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
