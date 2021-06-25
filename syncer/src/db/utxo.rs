@@ -54,7 +54,7 @@ pub struct UtxoDB {
     /// Stores:
     ///     key   = txid || vout
     ///     value = script_pubkey || value
-    db: RocksDB,
+    pub db: RocksDB,
 }
 
 impl UtxoDB {
@@ -70,24 +70,24 @@ impl UtxoDB {
     pub fn len(&self) -> usize {
         self.db.full_iterator(rocksdb::IteratorMode::Start).count()
     }
-    fn serialize_key(txid: &Txid, vout: u32) -> Vec<u8> {
+    pub fn serialize_key(txid: &Txid, vout: u32) -> Vec<u8> {
         let mut buf = Vec::new();
         buf.push(txid.to_vec());
         buf.push(vout.to_le_bytes().to_vec());
         buf.concat()
     }
-    fn deserialize_key(buf: &[u8]) -> (Txid, u32) {
+    pub fn deserialize_key(buf: &[u8]) -> (Txid, u32) {
         let txid = deserialize_txid(&buf[0..32]);
         let vout = bytes_to_u32(&buf[32..36]);
         (txid, vout)
     }
-    fn serialize_value(script_pubkey: &Script, value: u64) -> Vec<u8> {
+    pub fn serialize_value(script_pubkey: &Script, value: u64) -> Vec<u8> {
         let mut buf = Vec::new();
         buf.push(script_pubkey.to_bytes());
         buf.push(value.to_le_bytes().to_vec());
         buf.concat()
     }
-    fn deserialize_value(buf: &[u8]) -> (Script, u64) {
+    pub fn deserialize_value(buf: &[u8]) -> (Script, u64) {
         let script_pubkey_len = buf.len() - 8;
         let script_pubkey = deserialize_script(&buf[0..script_pubkey_len]);
         let value = bytes_to_u64(&buf[script_pubkey_len..]);

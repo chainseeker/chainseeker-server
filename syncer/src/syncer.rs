@@ -135,20 +135,37 @@ impl Syncer {
     }
     async fn reconstruct_utxo(&mut self) {
         let begin = Instant::now();
-        let utxo: Utxo = (&self.utxo_db).into();
-        let utxo = Arc::new(RwLock::new(utxo));
-        let utxo1 = utxo.clone();
-        let utxo_server_join = tokio::task::spawn(async move {
-            let utxo = &*utxo1.read().await;
-            UtxoServer::from(utxo).await
-        });
-        let utxo2 = utxo.clone();
-        let rich_list_join = tokio::task::spawn(async move {
-            let utxo = &*utxo2.read().await;
-            RichList::from(utxo)
-        });
-        *self.utxo_server.write().await = utxo_server_join.await.unwrap();
-        *self.rich_list.write().await = rich_list_join.await.unwrap();
+        let print_stat = |i: u32, force: bool| {
+            if i % 1000 == 0 || force {
+                print!("\rProcessing UTXOs ({} entries processed)...", i);
+                std::io::stdout().flush().expect("Failed to flush.");
+            }
+        };
+        let mut utxo_server = UtxoServer::new();
+        let mut rich_list_builder = RichListBuilder::new();
+        let mut i = 0;
+        for (key, value) in self.utxo_db.db.full_iterator(rocksdb::IteratorMode::Start) {
+            print_stat(i, false);
+            i += 1;
+            let (txid, vout) = UtxoDB::deserialize_key(&key);
+            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
+            let utxo = UtxoEntry {
+                script_pubkey,
+                txid,
+                vout,
+                value,
+            };
+            utxo_server.push(&utxo).await;
+            rich_list_builder.push(&utxo);
+        }
+        print_stat(i, true);
+        println!("");
+        println!("Processed all UTXOs in {}ms.", begin.elapsed().as_millis());
+        let begin_rich_list = Instant::now();
+        let rich_list = rich_list_builder.finalize();
+        println!("RichList finalized in {}ms.", begin_rich_list.elapsed().as_millis());
+        *self.utxo_server.write().await = utxo_server;
+        *self.rich_list.write().await = rich_list;
         println!("Syncer.reconstruct_utxo(): executed in {}ms.", begin.elapsed().as_millis());
     }
     pub async fn run(&mut self) {

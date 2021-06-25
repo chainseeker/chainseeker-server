@@ -1,5 +1,4 @@
 use core::ops::Range;
-use std::time::Instant;
 use std::collections::HashMap;
 
 use serde::ser::{Serialize, Serializer, SerializeStruct};
@@ -57,40 +56,32 @@ impl RichList {
     }
 }
 
-impl From<&Utxo> for RichList {
-    fn from(utxo: &Utxo) -> Self {
-        let begin_acc = Instant::now();
-        // Accumulate balances.
-        let mut map: HashMap<Script, u64> = HashMap::new();
-        let print_stat = |i: u32, force: bool| {
-            if i % 10_000_000 == 0 || force {
-                println!("RichList: processed {} entries...", i);
-            }
-        };
-        let mut i = 0;
-        for utxo in utxo.utxos.iter() {
-            let value = map.get(&utxo.script_pubkey).unwrap_or(&0u64) + utxo.value;
-            map.insert(utxo.script_pubkey.clone(), value);
-            i += 1;
-            print_stat(i, false);
+#[derive(Debug, Clone)]
+pub struct RichListBuilder {
+    map: HashMap<Script, u64>,
+}
+
+impl RichListBuilder {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
         }
-        print_stat(i, true);
-        println!("RichList: processed in {}ms.", begin_acc.elapsed().as_millis());
+    }
+    pub fn push(&mut self, utxo: &UtxoEntry) {
+        let value = self.map.get(&utxo.script_pubkey).unwrap_or(&0u64) + utxo.value;
+        self.map.insert(utxo.script_pubkey.clone(), value);
+    }
+    pub fn finalize(&self) -> RichList {
         // Construct RichList instance.
-        let begin_construct = Instant::now();
-        let mut entries = map.par_iter().map(|(script_pubkey, value)| {
+        let mut entries = self.map.par_iter().map(|(script_pubkey, value)| {
             RichListEntry {
                 script_pubkey: (*script_pubkey).clone(),
                 value: *value,
             }
         }).collect::<Vec<RichListEntry>>();
-        println!("RichList: constructed in {}ms.", begin_construct.elapsed().as_millis());
-        let begin_sort = Instant::now();
         entries.par_sort_unstable_by(|a, b| b.cmp(a));
-        println!("RichList: sorted in {}ms.", begin_sort.elapsed().as_millis());
-        let rich_list = RichList {
+        RichList {
             entries,
-        };
-        rich_list
+        }
     }
 }
