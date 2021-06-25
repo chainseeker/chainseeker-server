@@ -148,6 +148,9 @@ impl UtxoServerInStorage {
             db,
         }
     }
+    pub fn run(&self) {
+        self.db.run();
+    }
     fn deserialize_values(buf: &[u8]) -> Vec<UtxoServerValue> {
         let mut ret = Vec::new();
         for i in 0..(buf.len() / 44) {
@@ -184,7 +187,7 @@ impl UtxoServerInStorage {
         let mut i = 0;
         for utxo in utxos.utxos.iter() {
             i += 1;
-            if i % 100_000 == 0 || i == len {
+            if i % 1000_000 == 0 || i == len {
                 println!("UtxoServerInStorage: constructing ({} of {})...", i, len);
             }
             let value = UtxoServerValue {

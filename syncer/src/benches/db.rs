@@ -9,6 +9,11 @@ use chainseeker_syncer::*;
 const COIN: &str = "bench";
 const BLOCK: &[u8] = include_bytes!("block_500000.bin");
 
+async fn run_utxo_server_in_memory(utxo: &Utxo) {
+    let _print_gag = gag::Gag::stdout().unwrap();
+    UtxoServerInMemory::from(utxo).await;
+}
+
 async fn run_utxo_server_in_storage(utxo: &Utxo) {
     let _print_gag = gag::Gag::stdout().unwrap();
     UtxoServerInStorage::from(utxo).await;
@@ -22,9 +27,8 @@ fn bench_db(c: &mut Criterion) {
     }));
     utxo_db.process_block(&block, true);
     let utxo = Utxo::from(&utxo_db);
-    c.bench_function("utxo_server_in_memory", |b| b.iter(|| {
-        let _print_gag = gag::Gag::stdout().unwrap();
-        UtxoServerInMemory::from(&utxo);
+    c.bench_function("utxo_server_in_memory", |b| b.to_async(FuturesExecutor).iter(|| {
+        run_utxo_server_in_memory(&utxo)
     }));
     c.bench_function("utxo_server_in_storage", |b| b.to_async(FuturesExecutor).iter(|| {
         run_utxo_server_in_storage(&utxo)
