@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  SCCACHE_CACHE_SIZE: 512M
   CC: /tmp/sccache/sccache cc
   CXX: /tmp/sccache/sccache c++
 
