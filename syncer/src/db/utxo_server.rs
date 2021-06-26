@@ -6,8 +6,8 @@ use bitcoin::{Txid, Script};
 
 use crate::*;
 
-pub type UtxoServer = UtxoServerInMemory;
-//pub type UtxoServer = UtxoServerInStorage;
+//pub type UtxoServer = UtxoServerInMemory;
+pub type UtxoServer = UtxoServerInStorage;
 
 #[derive(Debug, Clone)]
 pub struct UtxoServerValue {
@@ -196,10 +196,12 @@ impl UtxoServerInStorage {
             std::fs::remove_dir_all(&path).expect("Failed to remove directory.");
         }
         let db = RocksDBLazy::new(&path);
-        Self {
+        let server = Self {
             path,
             db,
-        }
+        };
+        server.run();
+        server
     }
     pub fn run(&self) {
         self.db.run();

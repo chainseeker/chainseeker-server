@@ -5,6 +5,8 @@ use tokio::sync::RwLock;
 
 use crate::*;
 
+const MAX_ENTRIES: usize = 1000_000;
+
 #[derive(Debug)]
 pub struct RocksDBLazy {
     buffer: Arc<RwLock<HashMap<Script, UtxoServerElement>>>,
@@ -34,6 +36,13 @@ impl RocksDBLazy {
         self.buffer.write().await.insert(key, value);
     }
     pub async fn push(&mut self, key: &Script, value: UtxoServerValue) {
+        loop {
+            if self.buffer.read().await.len() > MAX_ENTRIES {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            } else {
+                break;
+            }
+        }
         let mut buffer = self.buffer.write().await;
         match buffer.get_mut(key) {
             Some(element) => {
@@ -55,22 +64,33 @@ impl RocksDBLazy {
     }
     pub fn run(&self) {
         let stop = Arc::new(RwLock::new(false));
-        tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
-            println!("Ctrl-C was pressed. Exiting RocksDBLazy...");
-            *stop.write().await = true;
-        });
+        {
+            let stop = stop.clone();
+            tokio::spawn(async move {
+                tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
+                println!("Ctrl-C was pressed. Exiting RocksDBLazy...");
+                *stop.write().await = true;
+            });
+        }
         let buffer = self.buffer.clone();
         let db = self.db.clone();
         tokio::spawn(async move {
             loop {
+                if *stop.read().await {
+                    break;
+                }
                 if buffer.read().await.len() == 0 {
                     std::thread::sleep(std::time::Duration::from_millis(100));
                     continue;
                 }
-                for (key, val) in buffer.read().await.iter() {
+                let buffer: Vec<(Script, UtxoServerElement)> = {
+                    let mut buffer = buffer.write().await;
+                    let buf = buffer.iter().map(|(key, value)| ((*key).clone(), (*value).clone())).collect();
+                    *buffer = HashMap::new();
+                    buf
+                };
+                for (key, val) in buffer.iter() {
                     db.write().await.put(serialize_script(key), Vec::<u8>::from(val)).expect("Failed to put to DB.");
-                    buffer.write().await.remove(key);
                 }
             }
         });
