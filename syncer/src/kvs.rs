@@ -15,9 +15,9 @@ pub trait KVS<K, V>
     where K: Serialize + Deserialize, V: Serialize + Deserialize,
 {
     fn new(path: &str) -> Self;
-    fn get(&self, key: K) -> Option<Vec<u8>>;
-    fn put(&self, key: K, value: V);
-    fn delete(&self, key: K);
+    fn get(&self, key: &K) -> Option<Vec<u8>>;
+    fn put(&self, key: &K, value: &V);
+    fn delete(&self, key: &K);
     fn iter(&self) -> Box<dyn Iterator<Item = (K, V)> + '_>;
 }
 
@@ -57,11 +57,16 @@ impl<'a, K, V> Iterator for RocksDBIterator<'a, K, V>
     }
 }
 
-pub struct RocksDB {
+#[derive(Debug)]
+pub struct RocksDB<K, V>
+    where K: Serialize + Deserialize, V: Serialize + Deserialize,
+{
     db: Rocks,
+    _k: PhantomData<fn() -> K>,
+    _v: PhantomData<fn() -> V>,
 }
 
-impl<K, V> KVS<K, V> for RocksDB
+impl<K, V> KVS<K, V> for RocksDB<K, V>
     where K: Serialize + Deserialize + 'static, V: Serialize + Deserialize + 'static,
 {
     fn new(path: &str) -> Self {
@@ -71,15 +76,17 @@ impl<K, V> KVS<K, V> for RocksDB
         let db = Rocks::open(&opts, path).expect("Failed to open the database.");
         Self {
             db,
+            _k: PhantomData,
+            _v: PhantomData,
         }
     }
-    fn get(&self, key: K) -> Option<Vec<u8>> {
+    fn get(&self, key: &K) -> Option<Vec<u8>> {
         self.db.get(key.serialize()).unwrap()
     }
-    fn put(&self, key: K, value: V) {
+    fn put(&self, key: &K, value: &V) {
         self.db.put(key.serialize(), value.serialize()).unwrap();
     }
-    fn delete(&self, key: K) {
+    fn delete(&self, key: &K) {
         self.db.delete(key.serialize()).unwrap();
     }
     fn iter(&self) -> Box<dyn Iterator<Item = (K, V)> + '_> {

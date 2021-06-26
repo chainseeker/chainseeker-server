@@ -1,5 +1,4 @@
 use std::io::{Read, Write};
-use serde::Deserialize;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{Script, Txid, BlockHash, Block};
@@ -25,14 +24,14 @@ pub fn flush_stdout() {
     std::io::stdout().flush().expect("Failed to flush.");
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct CoinConfig {
     pub rest_endpoint: String,
     pub zmq_endpoint: String,
     pub http_port: u16,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
     pub http_ip: String,
     pub coins: std::collections::HashMap<String, CoinConfig>,

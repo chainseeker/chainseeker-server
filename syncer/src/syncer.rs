@@ -176,17 +176,10 @@ impl Syncer {
             rich_list_builder
         });
         let mut i = 0;
-        for (key, value) in self.utxo_db.db.iterator(rocksdb::IteratorMode::Start) {
+        for (key, value) in self.utxo_db.db.iter() {
             print_stat(i, false);
             i += 1;
-            let (txid, vout) = UtxoDB::deserialize_key(&key);
-            let (script_pubkey, value) = UtxoDB::deserialize_value(&value);
-            let utxo = UtxoEntry {
-                script_pubkey,
-                txid,
-                vout,
-                value,
-            };
+            let utxo: UtxoEntry = (key, value).into();
             utxo_server_tx.send(utxo.clone()).await.unwrap();
             rich_list_tx.send(utxo.clone()).await.unwrap();
         }
