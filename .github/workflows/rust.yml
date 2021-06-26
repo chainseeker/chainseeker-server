@@ -38,3 +38,16 @@ jobs:
 
     - name: Run benchmark
       run: cargo criterion
+
+    - name: Install stable toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Run cargo-tarpaulin
+      uses: actions-rs/tarpaulin@v0.1
+
+    - name: Upload to codecov.io
+      uses: codecov/codecov-action@v1
+
