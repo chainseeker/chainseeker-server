@@ -57,3 +57,35 @@ impl BlockDB {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::fs::remove_dir_all;
+    use super::*;
+    #[test]
+    fn get_path() {
+        let path = BlockDB::get_path("test");
+        assert_eq!(path, format!("{}/.chainseeker/test/block", std::env::var("HOME").unwrap()));
+    }
+    #[test]
+    fn put_and_get_block_hash() {
+        let height = 123456;
+        let block_hash_arr = hex::decode("00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048").unwrap();
+        let block_hash = deserialize_block_hash(&block_hash_arr);
+        let coin = "test_block_hash";
+        let block_db = BlockDB::new(&coin);
+        block_db.put_block_hash(height, &block_hash);
+        let block_hash_test = block_db.get_block_hash(height).unwrap();
+        assert_eq!(block_hash_test, block_hash);
+        remove_dir_all(BlockDB::get_path(&coin)).unwrap();
+    }
+    #[test]
+    fn put_and_get_synced_height() {
+        let height = 123456;
+        let coin = "test_synced_height";
+        let block_db = BlockDB::new(&coin);
+        block_db.put_synced_height(height);
+        let height_test = block_db.get_synced_height().unwrap();
+        assert_eq!(height_test, height);
+        remove_dir_all(BlockDB::get_path(&coin)).unwrap();
+    }
+}
