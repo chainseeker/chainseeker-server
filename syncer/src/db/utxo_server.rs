@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use rand::Rng;
 
-use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::ser::{Serializer, SerializeStruct};
 use bitcoin::{Txid, Script};
 
 use crate::*;
@@ -9,14 +9,20 @@ use crate::*;
 //pub type UtxoServer = UtxoServerInMemory;
 pub type UtxoServer = UtxoServerInStorage;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UtxoServerValue {
     pub txid: Txid,  // +32 = 32
     pub vout: u32,   // + 4 = 36
     pub value: u64,  // + 8 = 44
 }
 
-impl Serialize for UtxoServerValue {
+impl ConstantSize for UtxoServerValue {
+    fn len() -> usize {
+        44
+    }
+}
+
+impl serde::ser::Serialize for UtxoServerValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
@@ -40,6 +46,12 @@ impl From<&UtxoServerValue> for Vec<u8> {
     }
 }
 
+impl Serialize for UtxoServerValue {
+    fn serialize(&self) -> Vec<u8> {
+        self.into()
+    }
+}
+
 impl From<&[u8]> for UtxoServerValue {
     fn from(buf: &[u8]) -> UtxoServerValue {
         assert_eq!(buf.len(), 44);
@@ -51,6 +63,12 @@ impl From<&[u8]> for UtxoServerValue {
             vout,
             value,
         }
+    }
+}
+
+impl Deserialize for UtxoServerValue {
+    fn deserialize(buf: &[u8]) -> Self {
+        buf.into()
     }
 }
 
@@ -167,10 +185,37 @@ impl UtxoServerInMemory {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, std::hash::Hash)]
+struct UtxoServerInStorageKey {
+    script_pubkey: Script,
+}
+
+impl From<&Script> for UtxoServerInStorageKey {
+    fn from(script_pubkey: &Script) -> Self {
+        Self {
+            script_pubkey: (*script_pubkey).clone(),
+        }
+    }
+}
+
+impl Serialize for UtxoServerInStorageKey {
+    fn serialize(&self) -> Vec<u8> {
+        serialize_script(&self.script_pubkey)
+    }
+}
+
+impl Deserialize for UtxoServerInStorageKey {
+    fn deserialize(buf: &[u8]) -> Self {
+        Self {
+            script_pubkey: deserialize_script(buf),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct UtxoServerInStorage {
     path: String,
-    db: RocksDBLazy,
+    db: RocksDBLazy<UtxoServerInStorageKey, UtxoServerValue>,
 }
 
 impl UtxoServerInStorage {
@@ -207,7 +252,9 @@ impl UtxoServerInStorage {
         self.db.run();
     }
     pub async fn get(&self, script_pubkey: &Script) -> UtxoServerElement {
-        self.db.get(script_pubkey).await
+        UtxoServerElement {
+            values: self.db.get(&script_pubkey.into()).await,
+        }
     }
     pub async fn push(&mut self, utxo: &UtxoEntry) {
         let value = UtxoServerValue {
@@ -215,10 +262,18 @@ impl UtxoServerInStorage {
             vout: utxo.vout,
             value: utxo.value,
         };
-        self.db.push(&utxo.script_pubkey, value).await;
+        self.db.push(&(&utxo.script_pubkey).into(), &value).await;
     }
-    pub async fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
-        self.db.remove(script_pubkey, txid, vout).await;
+    pub async fn remove(&mut self, utxo: &UtxoEntry) {
+        let key = UtxoServerInStorageKey {
+            script_pubkey: utxo.script_pubkey.clone()
+        };
+        let value = UtxoServerValue {
+            txid: utxo.txid,
+            vout: utxo.vout,
+            value: utxo.value,
+        };
+        self.db.remove(&key, &value).await;
     }
     pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
         // Process vouts.
@@ -243,7 +298,7 @@ impl UtxoServerInStorage {
                     continue;
                 }
                 let utxo = &previous_utxos[previous_utxo_index];
-                self.remove(&utxo.script_pubkey, &utxo.txid, utxo.vout).await;
+                self.remove(utxo).await;
                 previous_utxo_index += 1;
             }
         }

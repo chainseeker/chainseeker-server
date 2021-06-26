@@ -8,34 +8,40 @@ use crate::*;
 const MAX_ENTRIES: usize = 1000_000;
 
 #[derive(Debug)]
-pub struct RocksDBLazy {
-    buffer: Arc<RwLock<HashMap<Script, UtxoServerElement>>>,
-    db: Arc<RwLock<RocksDBBase>>,
+pub struct RocksDBLazy<K, V>
+    where K: Serialize + Deserialize,
+          V: Serialize + Deserialize + ConstantSize,
+{
+    buffer: Arc<RwLock<HashMap<K, Vec<V>>>>,
+    db: Arc<RwLock<RocksDB<K, Vec<V>>>>,
 }
 
-impl RocksDBLazy {
+impl<K, V> RocksDBLazy<K, V>
+    where K: Serialize + Deserialize + Sync + Send + Clone + 'static + Eq + std::hash::Hash,
+          V: Serialize + Deserialize + Sync + Send + Clone + 'static + ConstantSize + PartialEq,
+{
     pub fn new(path: &str) -> Self {
         Self {
             buffer: Arc::new(RwLock::new(HashMap::new())),
-            db: Arc::new(RwLock::new(rocks_db(path))),
+            db: Arc::new(RwLock::new(RocksDB::new(path))),
         }
     }
-    pub async fn get(&self, key: &Script) -> UtxoServerElement {
+    pub async fn get(&self, key: &K) -> Vec<V> {
         match self.buffer.read().await.get(key) {
             Some(value) => (*value).clone(),
             None => {
-                let ser = self.db.read().await.get(key).unwrap();
-                match ser {
-                    Some(ser) => UtxoServerElement::from(&ser[..]),
-                    None => UtxoServerElement::new(),
+                let value = self.db.read().await.get(key);
+                match value {
+                    Some(value) => value,
+                    None => Vec::new(),
                 }
             },
         }
     }
-    pub async fn insert(&mut self, key: Script, value: UtxoServerElement) {
+    pub async fn insert(&mut self, key: K, value: Vec<V>) {
         self.buffer.write().await.insert(key, value);
     }
-    pub async fn push(&mut self, key: &Script, value: UtxoServerValue) {
+    pub async fn push(&mut self, key: &K, value: &V) {
         loop {
             if self.buffer.read().await.len() > MAX_ENTRIES {
                 std::thread::sleep(std::time::Duration::from_millis(100));
@@ -45,22 +51,25 @@ impl RocksDBLazy {
         }
         let mut buffer = self.buffer.write().await;
         match buffer.get_mut(key) {
-            Some(element) => {
-                element.values.push(value);
+            Some(values) => {
+                values.push((*value).clone());
             },
             None => {
-                let mut element = UtxoServerElement::new();
-                element.values.push(value);
-                buffer.insert((*key).clone(), element);
+                let mut values = Vec::new();
+                values.push((*value).clone());
+                buffer.insert((*key).clone(), values);
             }
         }
     }
-    pub async fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
-        let element = self.get(script_pubkey).await;
-        let values = element.values.iter().filter(|&utxo_value| {
-            !(utxo_value.txid == *txid && utxo_value.vout == vout)
-        }).cloned().collect();
-        self.insert((*script_pubkey).clone(), UtxoServerElement { values }).await;
+    pub async fn remove(&mut self, key: &K, value: &V) {
+        let values_old = self.get(key).await;
+        let mut values = Vec::new();
+        for v in values_old.iter() {
+            if *v != *value {
+                values.push((*v).clone());
+            }
+        }
+        self.insert((*key).clone(), values).await;
     }
     pub fn run(&self) {
         let stop = Arc::new(RwLock::new(false));
@@ -83,14 +92,13 @@ impl RocksDBLazy {
                     std::thread::sleep(std::time::Duration::from_millis(100));
                     continue;
                 }
-                let buffer: Vec<(Script, UtxoServerElement)> = {
-                    let mut buffer = buffer.write().await;
-                    let buf = buffer.iter().map(|(key, value)| ((*key).clone(), (*value).clone())).collect();
-                    *buffer = HashMap::new();
+                let buffer: Vec<(K, Vec<V>)> = {
+                    let buf = buffer.read().await.iter().map(|(k, v)| ((*k).clone(), (*v).clone())).collect();
+                    *buffer.write().await = HashMap::new();
                     buf
                 };
                 for (key, val) in buffer.iter() {
-                    db.write().await.put(serialize_script(key), Vec::<u8>::from(val)).expect("Failed to put to DB.");
+                    db.write().await.put(key, val);
                 }
             }
         });

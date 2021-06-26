@@ -5,12 +5,39 @@ use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode};
 
 use crate::*;
 
+pub trait ConstantSize {
+    fn len() -> usize;
+}
+
 pub trait Serialize {
     fn serialize(&self) -> Vec<u8>;
 }
 
+impl<S> Serialize for Vec<S>
+    where S: Serialize,
+{
+    fn serialize(&self) -> Vec<u8> {
+        self.iter().map(|item| item.serialize()).collect::<Vec<Vec<u8>>>().concat()
+    }
+}
+
 pub trait Deserialize {
     fn deserialize(buf: &[u8]) -> Self;
+}
+
+impl<D> Deserialize for Vec<D>
+    where D: Deserialize + ConstantSize,
+{
+    fn deserialize(buf: &[u8]) -> Self {
+        let len = D::len();
+        let mut offset = 0usize;
+        let mut ret = Vec::new();
+        while offset < buf.len() {
+            ret.push(D::deserialize(&buf[offset..offset+len]));
+            offset += len;
+        }
+        ret
+    }
 }
 
 pub trait KVS<K, V>
