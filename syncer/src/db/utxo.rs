@@ -17,13 +17,17 @@ pub struct UtxoDBKey {
 
 impl Serialize for UtxoDBKey {
     fn serialize(&self) -> Vec<u8> {
-        UtxoDB::serialize_key(&self.txid, self.vout)
+        let mut buf = Vec::new();
+        buf.push(self.txid.to_vec());
+        buf.push(self.vout.to_le_bytes().to_vec());
+        buf.concat()
     }
 }
 
 impl Deserialize for UtxoDBKey {
     fn deserialize(buf: &[u8]) -> Self {
-        let (txid, vout) = UtxoDB::deserialize_key(buf);
+        let txid = deserialize_txid(&buf[0..32]);
+        let vout = bytes_to_u32(&buf[32..36]);
         Self {
             txid,
             vout,
@@ -38,13 +42,18 @@ pub struct UtxoDBValue {
 
 impl Serialize for UtxoDBValue {
     fn serialize(&self) -> Vec<u8> {
-        UtxoDB::serialize_value(&self.script_pubkey, self.value)
+        let mut buf = Vec::new();
+        buf.push(self.script_pubkey.to_bytes());
+        buf.push(self.value.to_le_bytes().to_vec());
+        buf.concat()
     }
 }
 
 impl Deserialize for UtxoDBValue {
     fn deserialize(buf: &[u8]) -> Self {
-        let (script_pubkey, value) = UtxoDB::deserialize_value(buf);
+        let script_pubkey_len = buf.len() - 8;
+        let script_pubkey = deserialize_script(&buf[0..script_pubkey_len]);
+        let value = bytes_to_u64(&buf[script_pubkey_len..]);
         Self {
             script_pubkey,
             value,
@@ -83,29 +92,6 @@ impl UtxoDB {
     pub fn len(&self) -> usize {
         self.db.iter().count()
     }
-    pub fn serialize_key(txid: &Txid, vout: u32) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(txid.to_vec());
-        buf.push(vout.to_le_bytes().to_vec());
-        buf.concat()
-    }
-    pub fn deserialize_key(buf: &[u8]) -> (Txid, u32) {
-        let txid = deserialize_txid(&buf[0..32]);
-        let vout = bytes_to_u32(&buf[32..36]);
-        (txid, vout)
-    }
-    pub fn serialize_value(script_pubkey: &Script, value: u64) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(script_pubkey.to_bytes());
-        buf.push(value.to_le_bytes().to_vec());
-        buf.concat()
-    }
-    pub fn deserialize_value(buf: &[u8]) -> (Script, u64) {
-        let script_pubkey_len = buf.len() - 8;
-        let script_pubkey = deserialize_script(&buf[0..script_pubkey_len]);
-        let value = bytes_to_u64(&buf[script_pubkey_len..]);
-        (script_pubkey, value)
-    }
     pub fn process_block(&mut self, block: &Block, no_panic: bool) -> Vec<UtxoEntry> {
         // Process vouts.
         for tx in block.txdata.iter() {
@@ -140,12 +126,11 @@ impl UtxoDB {
                 match value {
                     Some(value) => {
                         self.db.delete(&key);
-                        let (script_pubkey, value) = Self::deserialize_value(&value);
                         let utxo = UtxoEntry {
-                            script_pubkey,
+                            script_pubkey: value.script_pubkey,
                             txid,
                             vout,
-                            value,
+                            value: value.value,
                         };
                         previous_utxos.push(utxo);
                     },

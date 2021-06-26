@@ -17,7 +17,7 @@ pub trait KVS<K, V>
     where K: Serialize + Deserialize, V: Serialize + Deserialize,
 {
     fn new(path: &str) -> Self;
-    fn get(&self, key: &K) -> Option<Vec<u8>>;
+    fn get(&self, key: &K) -> Option<V>;
     fn put(&self, key: &K, value: &V);
     fn delete(&self, key: &K);
     fn iter(&self) -> Box<dyn Iterator<Item = (K, V)> + '_>;
@@ -119,8 +119,11 @@ impl<K, V> KVS<K, V> for RocksDB<K, V>
             _v: PhantomData,
         }
     }
-    fn get(&self, key: &K) -> Option<Vec<u8>> {
-        self.db.get(key.serialize()).unwrap()
+    fn get(&self, key: &K) -> Option<V> {
+        match self.db.get(key.serialize()).unwrap() {
+            Some(value) => Some(V::deserialize(&value)),
+            None => None,
+        }
     }
     fn put(&self, key: &K, value: &V) {
         self.db.put(key.serialize(), value.serialize()).unwrap();
