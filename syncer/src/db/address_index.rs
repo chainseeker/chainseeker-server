@@ -1,11 +1,53 @@
-use bitcoin::{Block, Txid, Script};
-
 use rayon::prelude::*;
+use bitcoin::{Block, Txid, Script};
 
 use super::super::*;
 
+pub struct AddressIndexDBKey {
+    script_pubkey: Script,
+    txid: Txid,
+}
+
+impl Serialize for AddressIndexDBKey {
+    fn serialize(&self) -> Vec<u8> {
+        AddressIndexDB::serialize_key(&self.script_pubkey, &self.txid)
+    }
+}
+
+impl Deserialize for AddressIndexDBKey {
+    fn deserialize(buf: &[u8]) -> Self {
+        let script_pubkey = deserialize_script(&buf[0..buf.len()-32]);
+        let txid = deserialize_txid(&buf[buf.len()-32..]);
+        AddressIndexDBKey {
+            script_pubkey,
+            txid,
+        }
+    }
+}
+
+pub struct AddressIndexDBValue {
+}
+
+impl AddressIndexDBValue {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for AddressIndexDBValue {
+    fn serialize(&self) -> Vec<u8> {
+        Vec::new()
+    }
+}
+
+impl Deserialize for AddressIndexDBValue {
+    fn deserialize(_buf: &[u8]) -> Self {
+        Self {}
+    }
+}
+
 pub struct AddressIndexDB {
-    db: RocksDB,
+    db: RocksDBBase,
 }
 
 /// The database which stores (script_pubkey, txid) tuple.

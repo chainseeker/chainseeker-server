@@ -6,7 +6,7 @@ use crate::*;
 const SYNCED_HEIGHT_KEY: &str = "synced_height";
 
 pub struct BlockDB {
-    db: RocksDB,
+    db: RocksDBBase,
 }
 
 impl BlockDB {

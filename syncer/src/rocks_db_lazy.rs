@@ -8,7 +8,7 @@ use crate::*;
 #[derive(Debug)]
 pub struct RocksDBLazy {
     buffer: Arc<RwLock<HashMap<Script, UtxoServerElement>>>,
-    db: Arc<RwLock<RocksDB>>,
+    db: Arc<RwLock<RocksDBBase>>,
 }
 
 impl RocksDBLazy {

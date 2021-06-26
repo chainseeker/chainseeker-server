@@ -18,7 +18,7 @@ pub use http_server::*;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
-type RocksDB = DBWithThreadMode<MultiThreaded>;
+type RocksDBBase = DBWithThreadMode<MultiThreaded>;
 
 pub fn flush_stdout() {
     std::io::stdout().flush().expect("Failed to flush.");
@@ -57,11 +57,11 @@ pub async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHas
     (block_hash, block)
 }
 
-pub fn rocks_db(path: &str) -> RocksDB {
+pub fn rocks_db(path: &str) -> RocksDBBase {
     let mut opts = Options::default();
     opts.set_max_open_files(100);
     opts.create_if_missing(true);
-    RocksDB::open(&opts, path).expect("Failed to open the database.")
+    RocksDBBase::open(&opts, path).expect("Failed to open the database.")
 }
 
 pub fn get_data_dir_path() -> Result<String, Box<dyn std::error::Error>> {

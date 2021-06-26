@@ -67,14 +67,14 @@ pub struct UtxoDB {
     /// Stores:
     ///     key   = txid || vout
     ///     value = script_pubkey || value
-    pub db: kvs::RocksDB<UtxoDBKey, UtxoDBValue>,
+    pub db: RocksDB<UtxoDBKey, UtxoDBValue>,
 }
 
 impl UtxoDB {
     pub fn new(coin: &str) -> Self {
         let path = Self::get_path(coin);
         Self {
-            db: kvs::RocksDB::new(&path),
+            db: RocksDB::new(&path),
         }
     }
     fn get_path(coin: &str) -> String {
