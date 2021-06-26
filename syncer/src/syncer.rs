@@ -177,6 +177,9 @@ impl Syncer {
         });
         let mut i = 0;
         for (key, value) in self.utxo_db.db.iter() {
+            if self.is_stopped().await {
+                return;
+            }
             print_stat(i, false);
             i += 1;
             let utxo: UtxoEntry = (key, value).into();
