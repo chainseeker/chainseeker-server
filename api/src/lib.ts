@@ -3,7 +3,7 @@ import * as bitcoin from 'bitcoinjs-lib';
 import bitcoinClassify from './bitcoinClassify';
 import * as xcp from 'counterjs';
 
-import * as cs from 'chainseeker-lib';
+import * as cs from 'chainseeker/dist/types';
 
 import { RestClient } from './RestClient';
 

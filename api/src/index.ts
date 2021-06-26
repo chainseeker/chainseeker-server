@@ -10,7 +10,7 @@ import bitcoinClassify from './bitcoinClassify';
 import * as rpc from 'json-rpc2';
 import coininfo from 'coininfo';
 
-import * as cs from 'chainseeker-lib';
+import * as cs from 'chainseeker/dist/types';
 
 import { RestClient } from './RestClient';
 import { SyncerClient } from './SyncerClient';
