@@ -21,7 +21,7 @@
     "graphql": "^14.4.2",
     "json-rpc2": "^2.0.0",
     "morgan": "^1.9.1",
-    "node-fetch": "^2.1.2",
+    "node-fetch": "^2.6.1",
     "typescript": "^3.5.3",
     "websocket": "^1.0.29",
     "zeromq": "^5.1.0"
