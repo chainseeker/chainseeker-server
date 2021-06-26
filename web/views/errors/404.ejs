@@ -1,0 +1,15 @@
+<%# vim: set filetype=html: %>
+
+<%- include('../templates/header.ejs', { title: 'Page Not Found' }) %>
+
+<div class="page-header">
+	<h1>404 Not Found</h1>
+</div>
+
+<div class="container">
+	<p>The page you are looking for was not found.</p>
+	<p>Message: <%= message %></p>
+</div>
+
+<%- include('../templates/footer.ejs') %>
+

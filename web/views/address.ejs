@@ -1,0 +1,85 @@
+<%# vim: set filetype=html: %>
+
+<%- include('templates/header.ejs', { title: `Address ${addr.addr}` }) %>
+
+<div class="page-header">
+	<h1>Address <small>[<%= addr.addr %>]</small></h1>
+</div>
+
+<table class="table">
+	<tbody>
+		<tr>
+			<th>Final Balance</th>
+			<td><%- formatAmount(addr.balance) %></td>
+			<th>#transactions</th>
+			<td><%= addr.txids.length.toLocaleString() %></td>
+		</tr>
+	</tbody>
+</table>
+
+<%- include('api.ejs', { api_path: `/txids/${addr.addr}` }); %>
+
+<h2>Transactions Involving <small>[ Page <%= (addr.page+1).toLocaleString() %> of <%= addr.pageTotal.toLocaleString() %> ]</small></h2>
+
+<nav aria-label="Page navigation example">
+	<ul class="pagination justify-content-center">
+		<% if(addr.page == 0) { %>
+		<li class="page-item disabled"><a class="page-link" href="#"><i class="fa fa-step-backward"></i> First</a></li>
+		<% } else { %>
+		<li class="page-item"><a class="page-link" href="?page=0"><i class="fa fa-step-backward"></i> First</a></li>
+		<% } %>
+		<% if(addr.page < 10) { %>
+		<li class="page-item disabled"><a class="page-link" href="#">《 -10</a></li>
+		<% } else { %>
+		<li class="page-item"><a class="page-link" href="?page=<%= addr.page-10 %>">《 -10</a></li>
+		<% } %>
+		<% if(addr.page < 1) { %>
+		<li class="page-item disabled"><a class="page-link" href="#">〈 Prev</a></li>
+		<% } else { %>
+		<li class="page-item"><a class="page-link" href="?page=<%= addr.page-1 %>">〈 Prev</a></li>
+		<% } %>
+		<li class="page-item disabled"><a class="page-link" href="#">This Block</a></li>
+		<% if(addr.pageTotal - addr.page <= 1) { %>
+		<li class="page-item disabled"><a class="page-link" href="#">Next 〉</a></li>
+		<% } else { %>
+		<li class="page-item"><a class="page-link" href="?page=<%= addr.page+1 %>">Next 〉</a></li>
+		<% } %>
+		<% if(addr.pageTotal - addr.page <= 10) { %>
+		<li class="page-item disabled"><a class="page-link" href="#">+10 》</a></li>
+		<% } else { %>
+		<li class="page-item"><a class="page-link" href="?page=<%= addr.page+10 %>">+10 》</a></li>
+		<% } %>
+		<% if(addr.pageTotal == addr.page+1) { %>
+		<li class="page-item disabled"><a class="page-link" href="#">Last <i class="fa fa-step-forward"></i></a></li>
+		<% } else { %>
+		<li class="page-item"><a class="page-link" href="?page=<%= addr.pageTotal-1 %>">Last <i class="fa fa-step-forward"></i></a></li>
+		<% } %>
+	</ul>
+</nav>
+
+<% for(let i=0; i<addr.txs.length; i++) { %>
+<% const tx = addr.txs[i] %>
+<table class="table">
+	<thead>
+		<tr>
+			<th colspan="3">
+				<!--<span class="badge badge-dark"><%= i %></span>-->
+				<a href="<%= config.server.web.prefix %>/tx/<%= tx.txid %>"><%= tx.txid %></a>
+				<div class="pull-right">
+					<small>
+						<%- tx.confirmed_height ? 'Confirmed at <a href="'+config.server.web.prefix+'/block/'+tx.confirmed_height+'">#'+tx.confirmed_height.toLocaleString()+'</a>' : '(unconfirmed)' %><br/>
+					</small>
+				</div>
+			</th>
+		</tr>
+	</thead>
+	<tbody>
+		<%- include('transaction_movements.ejs', { tx: tx, colorize: [addr.addr] }) %>
+	</tbody>
+</table>
+<% } %>
+
+
+
+<%- include('templates/footer.ejs') %>
+

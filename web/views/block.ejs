@@ -1,0 +1,98 @@
+<%# vim: set filetype=html: %>
+
+<%- include('templates/header.ejs', { title: `Block ${block.hash}` }) %>
+
+<div class="page-header">
+	<h1>Block <small>#<%= block.height.toLocaleString() %></small></h1>
+</div>
+
+<%- include('templates/pagination.ejs', {
+	page: block.height,
+	firstPage: 0,
+	total: status.blocks,
+	prefix: 'block',
+	firstText: 'Genesis',
+	currentText: 'This Block',
+	lastText: 'Last',
+}) %>
+
+<table class="table">
+	<tbody>
+		<tr data-toggle="tooltip" data-placement="top" title="The hash of the block header (reversed).">
+			<th>Block ID</th>
+			<td colspan="3"><%= block.hash %></td>
+		</tr>
+		<tr data-toggle="tooltip" data-placement="top" title="The hash of the previous block mined.">
+			<th>Previous Block ID</th>
+			<td colspan="3"><a href="<%= config.server.web.prefix %>/block/<%= block.previousblockhash %>"><%= block.previousblockhash %></a></td>
+		</tr>
+		<tr data-toggle="tooltip" data-placement="top" title="Merkle root of the transactions included in this block.">
+			<th>Merkle Root</th>
+			<td colspan="3"><%= block.merkleroot %></td>
+		</tr>
+		<tr>
+			<th>Time</th>
+			<td><span class="unixtime"><%= block.time %></span></td>
+			<th>Version</th>
+			<td><%= block.version %> (0x<%= ('00000000'+block.version.toString(16)).slice(-8) %>)</td>
+		</tr>
+		<tr>
+			<th>Bits</th>
+			<td><%= block.bits %></td>
+			<th>Difficulty</th>
+			<td><%= block.difficulty %></td>
+		</tr>
+		<tr>
+			<th>Nonce</th>
+			<td colspan="3"><%= block.nonce %> (0x<%= ('00000000'+block.nonce.toString(16)).slice(-8) %>)</td>
+		</tr>
+		<tr data-toggle="tooltip" data-placement="top" title="The size of the block (includes witness data).">
+			<th>Size</th>
+			<td colspan="3"><%= block.size.toLocaleString() %> bytes</td>
+		</tr>
+		<tr>
+			<th>Stripped Size</th>
+			<td><%= block.strippedsize.toLocaleString() %> bytes</td>
+			<th>Weight</th>
+			<td><%= block.weight.toLocaleString() %> WU</td>
+		</tr>
+		<tr>
+			<th>#transactions</th>
+			<td colspan="3"><%= block.txids.length.toLocaleString() %></td>
+		</tr>
+		<tr>
+			<th>Block Reward</th>
+			<td><%- formatAmount(block.reward) %></td>
+			<th>Transaction Fee in Total</th>
+			<td><%- formatAmount(block.fee) %></td>
+		</tr>
+	</tbody>
+</table>
+
+<%- include('api.ejs', { api_path: `/block/${block.hash}` }); %>
+
+<h2>Transactions in the Block</h2>
+
+<% for(let i in block.txs) { %>
+<% const tx = block.txs[i] %>
+<table class="table">
+	<thead>
+		<tr>
+			<th colspan="3">
+				<a href="<%= config.server.web.prefix %>/tx/<%= tx.txid %>"><%= tx.txid %></a>
+				<% if(tx.vin[0].address != 'coinbase') { %>
+				<div class="pull-right"><small>(fee: <%- formatAmount(tx.fee) %>)</small></div>
+				<% } else { %>
+				<div class="pull-right"><small>(fee reward: <%- formatAmount(-(block.reward + tx.fee)) %>)</small></div>
+				<% } %>
+			</th>
+		</tr>
+	</thead>
+	<tbody>
+		<%- include('transaction_movements.ejs', { tx: tx, colorize: [] }) %>
+	</tbody>
+</table>
+<% } %>
+
+<%- include('templates/footer.ejs') %>
+

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		
+		<!-- Load JavaScript library. -->
+		<script src="<%= config.server.web.prefix %>/static/vendor/js/jquery-3.2.1.min.js"></script>
+		<script src="<%= config.server.web.prefix %>/static/vendor/js/jdenticon-1.7.2.min.js"></script>
+		<script src="<%= config.server.web.prefix %>/static/vendor/js/moment-2.19.3.min.js"></script>
+		<script src="<%= config.server.web.prefix %>/static/vendor/js/popper-1.12.3.min.js"></script>
+		<script src="<%= config.server.web.prefix %>/static/vendor/bootstrap-4.0.0-beta.2/js/bootstrap.min.js"></script>
+		
+		<!-- Load CSS. -->
+		<link rel="stylesheet" href="<%= config.server.web.prefix %>/static/vendor/font-awesome-4.7.0/css/font-awesome.min.css">
+		<link rel="stylesheet" href="<%= config.server.web.prefix %>/static/vendor/bootstrap-4.0.0-beta.2/css/bootstrap.min.css">
+		<link rel="stylesheet" href="<%= config.server.web.prefix %>/static/css/chainseeker.css">
+		
+		<% if(config.google_analytics) { %>
+		<!-- Global site tag (gtag.js) - Google Analytics -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=UA-113021873-1"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+			gtag('config', '<%= config.google_analytics %>');
+		</script>
+		<% } %>
+		
+		<script type="text/javascript">
+			const symbol = '<%= config.coin.symbol %>';
+			const server_prefix = '<%= config.server.web.prefix %>';
+			const public_endpoint = '<%= config.endpoint.apiPublic %>';
+			const websocket_endpoint = '<%= config.endpoint.websocket %>';
+			$(document).ready(function () {
+				jdenticon.update('canvas[data-jdenticon-value]');
+				$('[data-toggle="tooltip"]').tooltip()
+				// Convert UNIX time.
+				$('.unixtime').each(function() { $(this).text(moment(1000*$(this).text()).format('YYYY/MM/DD HH:mm:ss')) });
+			});
+		</script>
+		
+		<% if(title) { %>
+		<title>Chainseeker [<%= config.coin.symbol %>] - <%= title %></title>
+		<% } else { %>
+		<title>Chainseeker [<%= config.coin.symbol %>]</title>
+		<% } %>
+		
+	</head>
+	<body>
+		
+		<nav class="navbar navbar-expand-lg navbar-light bg-light">
+			<a class="navbar-brand" href="<%= config.server.web.prefix %>/">chainseeker [<%= config.coin.symbol %>]</a>
+			<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+				<span class="navbar-toggler-icon"></span>
+			</button>
+			<div class="collapse navbar-collapse" id="navbarSupportedContent">
+				<ul class="navbar-nav mr-auto">
+					<li class="nav-item dropdown">
+						<a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+							Stats
+						</a>
+						<div class="dropdown-menu" aria-labelledby="navbarDropdown">
+							<a class="dropdown-item" href="<%= config.server.web.prefix %>/stat/nonce">Nonce Distribution</a>
+							<a class="dropdown-item" href="<%= config.server.web.prefix %>/stat/size">Block Size</a>
+							<a class="dropdown-item" href="<%= config.server.web.prefix %>/stat/richlist">Rich List</a>
+						</div>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link" href="https://chainseeker.docs.apiary.io/" target="_blank">REST API <span class="sr-only">(REST API documentation)</span></a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link" href="<%= config.endpoint.apiPublic %>/graphql" target="_blank">GraphQL API <span class="sr-only">(GraphQL API playground)</span></a>
+					</li>
+				</ul>
+				<form class="form-inline my-2 my-lg-0" onsubmit="location.href='<%= config.server.web.prefix %>/search/'+$('#search-text').val(); return false;">
+					<input class="form-control mr-sm-2" id="search-text" type="search" placeholder="txid, blockid, height, address" aria-label="Search" style="min-width:600px;;">
+					<button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
+				</form>
+			</div>
+		</nav>
+		
+		<div class="container">
+

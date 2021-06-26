@@ -1,0 +1,43 @@
+<%# vim: set filetype=html: %>
+
+<% const pages = Math.ceil(addressBalances.count / LIMIT); %>
+<%- include('../templates/header.ejs', { title: 'Stat &raquo Rich List '+page.toLocaleString()+' of '+pages.toLocaleString() }) %>
+
+<div class="page-header">
+	<h1>Stat &raquo; Rich List (<%- page.toLocaleString() %> of <%- pages.toLocaleString() %>)</h1>
+</div>
+
+<%- include('../templates/pagination.ejs', {
+	page: page,
+	firstPage: 1,
+	total: pages,
+	prefix: 'stat/richlist',
+	firstText: 'Richest',
+	currentText: 'This Page',
+	lastText: 'Poorest',
+}) %>
+
+<hr />
+
+<table class="table">
+	<thead>
+		<tr>
+			<th>Rank</th>
+			<th>Address</th>
+			<th>Balance</th>
+		</tr>
+	</thead>
+	<tbody>
+		<% for(const i in addressBalances.data) { %>
+		<% const addressBalance = addressBalances.data[i]; %>
+		<tr>
+			<td>#<%- ((page-1)*LIMIT + (+i) + 1).toLocaleString() %></td>
+			<td><span title="ScriptPubKey: <%= addressBalance.scriptPubKey %>"><%- addressBalance.address ?  formatAddress(addressBalance.address) : 'unknown' %></span></td>
+			<td><%- formatAmount(addressBalance.value) %></td>
+		</tr>
+		<% } %>
+	</tbody>
+</table>
+
+<%- include('../templates/footer.ejs') %>
+

@@ -1,0 +1,54 @@
+<%# vim: set filetype=html: %>
+
+<%- include('templates/header.ejs', { title: null }) %>
+
+<script type="text/javascript">
+	let bestheight = <%- status.blocks %>;
+</script>
+
+<script src="<%= config.server.prefix %>/static/js/chainseeker.js"></script>
+<script src="<%= config.server.prefix %>/static/js/index.js"></script>
+
+<div class="page-header">
+	<h1>Latest Blocks</h1>
+</div>
+
+<table class="table" id="latest-blocks">
+	<thead>
+		<tr>
+			<th>Height</th>
+			<th>Time</th>
+			<th># of txs</th>
+			<th>Size</th>
+			<th>ID</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td colspan="5" class="text-center">(Loading...)</td>
+		</tr>
+	</tbody>
+</table>
+
+<div class="page-header">
+	<h1>Latest Transactions</h1>
+</div>
+
+<table class="table" id="latest-txs">
+	<thead>
+		<tr>
+			<th>Transaction ID</th>
+			<th>Time</th>
+			<th>Size</th>
+			<th>Value Transacted</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td colspan="4" class="text-center">(no transactions yet...)</td>
+		</tr>
+	</tbody>
+</table>
+
+<%- include('templates/footer.ejs') %>
+
