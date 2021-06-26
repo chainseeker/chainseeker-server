@@ -1,6 +1,9 @@
 chainseeker-server
 ==================
 
+[![Rust](https://github.com/chainseeker/chainseeker-server/actions/workflows/rust.yml/badge.svg)](https://github.com/chainseeker/chainseeker-server/actions/workflows/rust.yml)
+[![codecov](https://codecov.io/gh/chainseeker/chainseeker-server/branch/master/graph/badge.svg?token=MGtM2XKGaD)](https://codecov.io/gh/chainseeker/chainseeker-server)
+
 **chainseeker.info**: fast and reliable open-source cryptocurrency block explorer.
 
 This is a server-side implementation of chainseeker.info.
