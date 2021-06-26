@@ -1,6 +1,7 @@
+use std::convert::TryInto;
 use bitcoin::BlockHash;
 
-use super::super::*;
+use crate::*;
 
 const SYNCED_HEIGHT_KEY: &str = "synced_height";
 
@@ -9,11 +10,11 @@ pub struct BlockDB {
 }
 
 impl BlockDB {
-    pub fn get_path(coin: &str) -> String {
+    pub fn path(coin: &str) -> String {
         format!("{}/{}/block", get_data_dir_path().expect("Failed to get the data directory path."), coin)
     }
     pub fn new(coin: &str) -> Self {
-        let path = Self::get_path(coin);
+        let path = Self::path(coin);
         Self {
             db: rocks_db(&path),
         }
@@ -32,28 +33,17 @@ impl BlockDB {
         }
     }
     pub fn get_synced_height(&self) -> Option<u32> {
-        let synced_height_vec_option = self.db.get(SYNCED_HEIGHT_KEY).expect("Failed to get the synced height.");
-        if let Some(synced_height_vec) = synced_height_vec_option {
-            if synced_height_vec.len() != 4 {
-                return None;
-            }
-            let synced_height: u32 =
-                ((synced_height_vec[0] as u32) <<  0) |
-                ((synced_height_vec[1] as u32) <<  8) |
-                ((synced_height_vec[2] as u32) << 16) |
-                ((synced_height_vec[3] as u32) << 24);
-            return Some(synced_height);
+        match self.db.get(SYNCED_HEIGHT_KEY).expect("Failed to get the synced height.") {
+            Some(synced_height) => {
+                let buf: [u8; 4] = synced_height.try_into().unwrap();
+                Some(u32::from_le_bytes(buf))
+            },
+            None => None,
         }
-        None
     }
     pub fn put_synced_height(&self, height: u32) {
-        let height_arr: [u8; 4] = [
-            ((height >>  0) & 0xff) as u8,
-            ((height >>  8) & 0xff) as u8,
-            ((height >> 16) & 0xff) as u8,
-            ((height >> 24) & 0xff) as u8,
-        ];
-        self.db.put(SYNCED_HEIGHT_KEY, height_arr).expect("Failed to put the synced height.");
+        let height = height.to_le_bytes();
+        self.db.put(SYNCED_HEIGHT_KEY, height).expect("Failed to put the synced height.");
     }
 }
 
@@ -62,8 +52,8 @@ mod tests {
     use std::fs::remove_dir_all;
     use super::*;
     #[test]
-    fn get_path() {
-        let path = BlockDB::get_path("test");
+    fn path() {
+        let path = BlockDB::path("test");
         assert_eq!(path, format!("{}/.chainseeker/test/block", std::env::var("HOME").unwrap()));
     }
     #[test]
@@ -71,21 +61,21 @@ mod tests {
         let height = 123456;
         let block_hash_arr = hex::decode("00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048").unwrap();
         let block_hash = deserialize_block_hash(&block_hash_arr);
-        let coin = "test_block_hash";
+        let coin = "test/block_hash";
         let block_db = BlockDB::new(&coin);
         block_db.put_block_hash(height, &block_hash);
         let block_hash_test = block_db.get_block_hash(height).unwrap();
         assert_eq!(block_hash_test, block_hash);
-        remove_dir_all(BlockDB::get_path(&coin)).unwrap();
+        remove_dir_all(BlockDB::path(&coin)).unwrap();
     }
     #[test]
     fn put_and_get_synced_height() {
         let height = 123456;
-        let coin = "test_synced_height";
+        let coin = "test/synced_height";
         let block_db = BlockDB::new(&coin);
         block_db.put_synced_height(height);
         let height_test = block_db.get_synced_height().unwrap();
         assert_eq!(height_test, height);
-        remove_dir_all(BlockDB::get_path(&coin)).unwrap();
+        remove_dir_all(BlockDB::path(&coin)).unwrap();
     }
 }
