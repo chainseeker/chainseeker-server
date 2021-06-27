@@ -16,12 +16,7 @@ use routerify::{Middleware, Router, RouterService};
 
 use super::*;
 
-struct State {
-    addr_index_db: Arc<RwLock<AddressIndexDB>>,
-    utxo_server: Arc<RwLock<UtxoServer>>,
-    rich_list: Arc<RwLock<RichList>>,
-}
-
+#[derive(Debug, Clone)]
 pub struct HttpServer {
     addr_index_db: Arc<RwLock<AddressIndexDB>>,
     utxo_server: Arc<RwLock<UtxoServer>>,
@@ -63,8 +58,8 @@ impl HttpServer {
     }
     /// `/addr_index/:script` endpoint.
     async fn addr_index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let state = req.data::<State>().unwrap();
-        let addr_index_db = &state.addr_index_db;
+        let server = req.data::<HttpServer>().unwrap();
+        let addr_index_db = &server.addr_index_db;
         let script_hex = req.param("script").unwrap();
         let script = Script::from_hex(script_hex);
         match script {
@@ -86,8 +81,8 @@ impl HttpServer {
     }
     /// `/utxo/:script` endpoint.
     async fn utxo_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let state = req.data::<State>().unwrap();
-        let utxo_server = &state.utxo_server;
+        let server = req.data::<HttpServer>().unwrap();
+        let utxo_server = &server.utxo_server;
         let script_hex = req.param("script").unwrap();
         let script = Script::from_hex(script_hex);
         match script {
@@ -105,8 +100,8 @@ impl HttpServer {
     }
     /// `/rich_list/count` endpoint.
     async fn rich_list_count_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let state = req.data::<State>().unwrap();
-        let rich_list = state.rich_list.read().await;
+        let server = req.data::<HttpServer>().unwrap();
+        let rich_list = server.rich_list.read().await;
         let json = format!("{{\"count\":{}}}", rich_list.len());
         Ok(Self::ok(json))
     }
@@ -120,8 +115,8 @@ impl HttpServer {
             Ok(limit) => limit,
             Err(_) => return Ok(Self::bad_request("Cannot parse \"limit\" as an integer.")),
         };
-        let state = req.data::<State>().unwrap();
-        let rich_list = state.rich_list.read().await;
+        let server = req.data::<HttpServer>().unwrap();
+        let rich_list = server.rich_list.read().await;
         let begin = min(offset, rich_list.len() - 1usize);
         let end = min(offset + limit, rich_list.len() - 1usize);
         let addresses = rich_list.get_in_range(begin..end);
@@ -138,11 +133,7 @@ impl HttpServer {
             ip.parse::<std::net::IpAddr>().expect("Failed to parse HTTP IP address."),
             port));
         let router = Router::builder()
-            .data(State {
-                addr_index_db: self.addr_index_db.clone(),
-                utxo_server: self.utxo_server.clone(),
-                rich_list: self.rich_list.clone(),
-            })
+            .data((*self).clone())
             .middleware(Middleware::pre(|req| async move {
                 req.set_context(Instant::now());
                 Ok(req)

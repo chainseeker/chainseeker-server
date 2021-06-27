@@ -3,6 +3,7 @@ use bitcoin::{Block, Txid, Script};
 
 use super::super::*;
 
+#[derive(Debug, Clone)]
 pub struct AddressIndexDBKey {
     script_pubkey: Script,
     txid: Txid,
@@ -25,6 +26,7 @@ impl Deserialize for AddressIndexDBKey {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct AddressIndexDBValue {
 }
 
@@ -46,6 +48,7 @@ impl Deserialize for AddressIndexDBValue {
     }
 }
 
+#[derive(Debug)]
 pub struct AddressIndexDB {
     db: RocksDBBase,
 }
