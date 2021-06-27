@@ -40,7 +40,7 @@ impl<K, V> RocksDBMulti<K, V>
 mod test {
     use super::*;
     #[test]
-    fn rocks_db() {
+    fn rocks_db_multi() {
         let db = RocksDBMulti::<String, u32>::new("/tmp/chainseeker/test_rocks_db_multi", true);
         let key1 = "bar".to_string();
         let key2 = "foo".to_string();

@@ -26,6 +26,22 @@ pub fn flush_stdout() {
     std::io::stdout().flush().expect("Failed to flush.");
 }
 
+pub fn data_dir() -> String {
+    let home = std::env::var("HOME").unwrap();
+    format!("{}/{}", home, DEFAULT_DATA_DIR)
+}
+
+pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
+    bitcoin_rest::new(&config.rest_endpoint)
+}
+
+pub fn rocks_db(path: &str) -> RocksDBBase {
+    let mut opts = Options::default();
+    opts.set_max_open_files(100);
+    opts.create_if_missing(true);
+    RocksDBBase::open(&opts, path).expect("Failed to open the database.")
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CoinConfig {
     pub rest_endpoint: String,
@@ -46,29 +62,6 @@ pub fn load_config() -> Config {
     let mut config_str = String::new();
     config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
     toml::from_str(&config_str).expect("Failed to parse config file.")
-}
-
-pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
-    bitcoin_rest::new(&config.rest_endpoint)
-}
-
-pub async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
-    let block_hash = rest.blockhashbyheight(height).await
-        .expect(&format!("Failed to fetch block at height = {}.", height));
-    let block = rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
-    (block_hash, block)
-}
-
-pub fn rocks_db(path: &str) -> RocksDBBase {
-    let mut opts = Options::default();
-    opts.set_max_open_files(100);
-    opts.create_if_missing(true);
-    RocksDBBase::open(&opts, path).expect("Failed to open the database.")
-}
-
-pub fn data_dir() -> String {
-    let home = std::env::var("HOME").unwrap();
-    format!("{}/{}", home, DEFAULT_DATA_DIR)
 }
 
 pub fn serialize_script(script: &Script) -> Vec<u8> {
