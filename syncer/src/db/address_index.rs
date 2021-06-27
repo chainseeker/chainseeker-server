@@ -53,7 +53,7 @@ pub struct AddressIndexDB {
 /// The database which stores (script_pubkey, txid) tuple.
 impl AddressIndexDB {
     pub fn get_path(coin: &str) -> String {
-        format!("{}/{}/address_index", get_data_dir_path().expect("Failed to get the data directory path."), coin)
+        format!("{}/{}/address_index", data_dir(), coin)
     }
     pub fn new(coin: &str) -> Self {
         let path = Self::get_path(coin);

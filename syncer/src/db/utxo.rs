@@ -87,7 +87,7 @@ impl UtxoDB {
         }
     }
     fn get_path(coin: &str) -> String {
-        format!("{}/{}/utxo", get_data_dir_path().expect("Failed to get the data directory path."), coin)
+        format!("{}/{}/utxo", data_dir(), coin)
     }
     pub fn len(&self) -> usize {
         self.db.iter().count()

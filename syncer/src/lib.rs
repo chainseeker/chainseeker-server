@@ -40,7 +40,7 @@ pub struct Config {
 }
 
 pub fn load_config() -> Config {
-    let config_path = format!("{}/config.toml", get_data_dir_path().expect("Failed to get data directory path."));
+    let config_path = format!("{}/config.toml", data_dir());
     let mut config_file = std::fs::File::open(&config_path)
         .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
     let mut config_str = String::new();
@@ -66,9 +66,9 @@ pub fn rocks_db(path: &str) -> RocksDBBase {
     RocksDBBase::open(&opts, path).expect("Failed to open the database.")
 }
 
-pub fn get_data_dir_path() -> Result<String, Box<dyn std::error::Error>> {
-    let home = std::env::var("HOME")?;
-    Ok(home + "/" + DEFAULT_DATA_DIR)
+pub fn data_dir() -> String {
+    let home = std::env::var("HOME").unwrap();
+    format!("{}/{}", home, DEFAULT_DATA_DIR)
 }
 
 pub fn serialize_script(script: &Script) -> Vec<u8> {

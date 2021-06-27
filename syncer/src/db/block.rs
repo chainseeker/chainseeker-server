@@ -11,7 +11,7 @@ pub struct BlockDB {
 
 impl BlockDB {
     pub fn path(coin: &str) -> String {
-        format!("{}/{}/block", get_data_dir_path().expect("Failed to get the data directory path."), coin)
+        format!("{}/{}/block", data_dir(), coin)
     }
     pub fn new(coin: &str) -> Self {
         let path = Self::path(coin);
