@@ -14,6 +14,7 @@ pub struct RocksDBLazy<K, V>
 {
     buffer: Arc<RwLock<HashMap<K, Vec<V>>>>,
     db: Arc<RwLock<RocksDB<K, Vec<V>>>>,
+    stop: Arc<RwLock<bool>>,
 }
 
 impl<K, V> RocksDBLazy<K, V>
@@ -24,6 +25,7 @@ impl<K, V> RocksDBLazy<K, V>
         Self {
             buffer: Arc::new(RwLock::new(HashMap::new())),
             db: Arc::new(RwLock::new(RocksDB::new(path, temporary))),
+            stop: Arc::new(RwLock::new(false)),
         }
     }
     pub async fn get(&self, key: &K) -> Vec<V> {
@@ -72,9 +74,8 @@ impl<K, V> RocksDBLazy<K, V>
         self.insert((*key).clone(), values).await;
     }
     pub fn run(&self) {
-        let stop = Arc::new(RwLock::new(false));
         {
-            let stop = stop.clone();
+            let stop = self.stop.clone();
             tokio::spawn(async move {
                 tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
                 println!("Ctrl-C was pressed. Exiting RocksDBLazy...");
@@ -83,6 +84,7 @@ impl<K, V> RocksDBLazy<K, V>
         }
         let buffer = self.buffer.clone();
         let db = self.db.clone();
+        let stop = self.stop.clone();
         tokio::spawn(async move {
             loop {
                 if *stop.read().await {
@@ -102,5 +104,8 @@ impl<K, V> RocksDBLazy<K, V>
                 }
             }
         });
+    }
+    pub async fn stop(&self) {
+        *self.stop.write().await = true;
     }
 }

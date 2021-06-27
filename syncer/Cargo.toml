@@ -24,7 +24,7 @@ bitcoin_hashes = "0.9"
 bitcoin-rest = "0.0.6"
 
 [dev-dependencies]
-criterion = { version = "0.3", features = ["async_futures"] }
+criterion = { version = "0.3", features = [] }
 gag = "1.0"
 
 [[bench]]

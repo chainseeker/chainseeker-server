@@ -1,6 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use criterion::async_executor::FuturesExecutor;
-
+use tokio::runtime::Runtime;
 use bitcoin::consensus::Decodable;
 use bitcoin::Block;
 
@@ -23,20 +22,26 @@ async fn run_utxo_server_in_storage_push(utxos: &Vec<UtxoEntry>) {
     for utxo in utxos {
         utxo_server.push(&utxo).await;
     }
+    //utxo_server.stop().await;
 }
 
 fn bench_db(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
     let block = Block::consensus_decode(BLOCK).expect("Failed to decode block.");
     let mut utxo_db = UtxoDB::new(COIN);
     c.bench_function("UtxoDB.process_block()", |b| b.iter(|| {
         utxo_db.process_block(&block, true);
     }));
     let utxos = utxo_db.process_block(&block, true);
-    c.bench_function("UtxoServerInMemory.push()", |b| b.to_async(FuturesExecutor).iter(|| {
-        run_utxo_server_in_memory_push(&utxos)
+    c.bench_function("UtxoServerInMemory.push()", |b| b.iter(|| {
+        rt.block_on(async {
+            run_utxo_server_in_memory_push(&utxos).await;
+        });
     }));
-    c.bench_function("UtxoServerInStorage.push()", |b| b.to_async(FuturesExecutor).iter(|| {
-        run_utxo_server_in_storage_push(&utxos)
+    c.bench_function("UtxoServerInStorage.push()", |b| b.iter(|| {
+        rt.block_on(async {
+            run_utxo_server_in_storage_push(&utxos).await;
+        });
     }));
     // Construct dummy data.
     let mut previous_utxos = Vec::new();

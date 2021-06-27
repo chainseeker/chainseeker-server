@@ -6,7 +6,7 @@ use bitcoin::{Txid, Script};
 use crate::*;
 
 //pub type UtxoServer = UtxoServerInMemory;
-pub type UtxoServer = UtxoServerInStorage;
+pub type UtxoServer = UtxoServerInStorageLazy;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UtxoServerValue {
@@ -212,10 +212,90 @@ impl Deserialize for UtxoServerInStorageKey {
 #[derive(Debug)]
 pub struct UtxoServerInStorage {
     path: String,
-    db: RocksDBLazy<UtxoServerInStorageKey, UtxoServerValue>,
+    db: RocksDBMulti<UtxoServerInStorageKey, UtxoServerValue>,
 }
 
 impl UtxoServerInStorage {
+    fn get_path() -> String {
+        loop {
+            let path = tmp_dir("utxo", 8);
+            if !std::path::Path::new(&path).exists() {
+                return path;
+            }
+        }
+    }
+    pub fn new() -> Self {
+        let path = Self::get_path();
+        if std::path::Path::new(&path).exists() {
+            std::fs::remove_dir_all(&path).expect("Failed to remove directory.");
+        }
+        let db = RocksDBMulti::new(path.clone(), true);
+        Self {
+            path,
+            db,
+        }
+    }
+    pub async fn get(&self, script_pubkey: &Script) -> UtxoServerElement {
+        UtxoServerElement {
+            values: self.db.get(&script_pubkey.into()),
+        }
+    }
+    pub async fn push(&mut self, utxo: &UtxoEntry) {
+        let value = UtxoServerValue {
+            txid: utxo.txid,
+            vout: utxo.vout,
+            value: utxo.value,
+        };
+        self.db.push(&(&utxo.script_pubkey).into(), value);
+    }
+    pub async fn remove(&mut self, utxo: &UtxoEntry) {
+        let key = UtxoServerInStorageKey {
+            script_pubkey: utxo.script_pubkey.clone()
+        };
+        let value = UtxoServerValue {
+            txid: utxo.txid,
+            vout: utxo.vout,
+            value: utxo.value,
+        };
+        self.db.pop(&key, &value);
+    }
+    pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+        // Process vouts.
+        for tx in block.txdata.iter() {
+            let txid = tx.txid();
+            for vout in 0..tx.output.len() {
+                let output = &tx.output[vout];
+                let utxo = UtxoEntry {
+                    script_pubkey: output.script_pubkey.clone(),
+                    txid,
+                    vout: vout as u32,
+                    value: output.value,
+                };
+                self.push(&utxo).await;
+            }
+        }
+        // Process vins.
+        let mut previous_utxo_index = 0;
+        for tx in block.txdata.iter() {
+            for vin in tx.input.iter() {
+                if vin.previous_output.is_null() {
+                    continue;
+                }
+                let utxo = &previous_utxos[previous_utxo_index];
+                self.remove(utxo).await;
+                previous_utxo_index += 1;
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UtxoServerInStorageLazy {
+    path: String,
+    db: RocksDBLazy<UtxoServerInStorageKey, UtxoServerValue>,
+}
+
+impl UtxoServerInStorageLazy {
     fn get_path() -> String {
         loop {
             let path = tmp_dir("utxo", 8);
@@ -239,6 +319,9 @@ impl UtxoServerInStorage {
     }
     pub fn run(&self) {
         self.db.run();
+    }
+    pub async fn stop(&self) {
+        self.db.stop().await;
     }
     pub async fn get(&self, script_pubkey: &Script) -> UtxoServerElement {
         UtxoServerElement {
@@ -291,11 +374,5 @@ impl UtxoServerInStorage {
                 previous_utxo_index += 1;
             }
         }
-    }
-}
-
-impl Drop for UtxoServerInStorage {
-    fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.path).expect("Failed to remove UtxoServerInStorage directory.");
     }
 }
