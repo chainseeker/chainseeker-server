@@ -10,7 +10,7 @@ const BLOCK: &[u8] = include_bytes!("block_500000.bin");
 
 async fn run_utxo_server_in_memory_push(utxos: &Vec<UtxoEntry>) {
     let _print_gag = gag::Gag::stdout().unwrap();
-    let mut utxo_server = UtxoServerInMemory::new();
+    let mut utxo_server = UtxoServerInMemory::new(COIN);
     for utxo in utxos {
         utxo_server.push(&utxo).await;
     }
@@ -18,7 +18,7 @@ async fn run_utxo_server_in_memory_push(utxos: &Vec<UtxoEntry>) {
 
 async fn run_utxo_server_in_storage_push(utxos: &Vec<UtxoEntry>) {
     let _print_gag = gag::Gag::stdout().unwrap();
-    let mut utxo_server = UtxoServerInStorage::new();
+    let mut utxo_server = UtxoServerInStorage::new(COIN);
     for utxo in utxos {
         utxo_server.push(&utxo).await;
     }
