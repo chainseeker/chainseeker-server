@@ -12,19 +12,16 @@ pub struct Syncer {
     coin: String,
     config: Config,
     block_db: BlockDB,
-    addr_index_db: Arc<RwLock<AddressIndexDB>>,
     utxo_db: UtxoDB,
-    utxo_server: Arc<RwLock<UtxoServer>>,
-    rich_list: Arc<RwLock<RichList>>,
     rich_list_builder: RichListBuilder,
     rest: bitcoin_rest::Context,
     stop: Arc<RwLock<bool>>,
     block_fetcher: BlockFetcher,
+    pub http_server: HttpServer,
 }
 
 impl Syncer {
     pub async fn new(coin: &str, config: &Config) -> Self {
-        let utxo_db = UtxoDB::new(coin);
         let block_db = BlockDB::new(coin);
         let start_height = match block_db.get_synced_height() {
             Some(h) => h + 1,
@@ -33,20 +30,16 @@ impl Syncer {
         let rest = get_rest(&config.coins[coin]);
         let chaininfo = rest.chaininfo().await.expect("Failed to fetch chaininfo.");
         let stop_height = chaininfo.blocks;
-        let (utxo_server, rich_list_builder) = Self::load_utxo(&format!("{}_init", coin), &utxo_db).await;
-        let rich_list = rich_list_builder.finalize();
         let syncer = Self {
             coin: coin.to_string(),
             config: (*config).clone(),
             block_db,
-            addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin))),
-            utxo_db,
-            utxo_server: Arc::new(RwLock::new(utxo_server)),
-            rich_list: Arc::new(RwLock::new(rich_list)),
-            rich_list_builder,
+            utxo_db: UtxoDB::new(coin),
+            rich_list_builder: RichListBuilder::new(),
             rest,
             stop: Arc::new(RwLock::new(false)),
             block_fetcher: BlockFetcher::new(coin, config, start_height, stop_height),
+            http_server: HttpServer::new(coin),
         };
         // Install Ctrl-C watch.
         let stop = syncer.stop.clone();
@@ -60,19 +53,10 @@ impl Syncer {
     pub async fn is_stopped(&self) -> bool {
         *self.stop.read().await
     }
-    pub fn addr_index_db(&self) -> Arc<RwLock<AddressIndexDB>> {
-        self.addr_index_db.clone()
-    }
-    pub fn utxo_server(&self) -> Arc<RwLock<UtxoServer>> {
-        self.utxo_server.clone()
-    }
-    pub fn rich_list(&self) -> Arc<RwLock<RichList>> {
-        self.rich_list.clone()
-    }
     fn coin_config(&self) -> &CoinConfig {
         &self.config.coins[&self.coin]
     }
-    pub fn synced_height(&self) -> Option<u32> {
+    fn synced_height(&self) -> Option<u32> {
         self.block_db.get_synced_height()
     }
     async fn fetch_block(&mut self, height: u32) -> (BlockHash, Block) {
@@ -90,12 +74,12 @@ impl Syncer {
         let utxo_elapsed = begin_utxo.elapsed();
         // Process for address index.
         let begin_addr_index = Instant::now();
-        self.addr_index_db.write().await.process_block(&block, &previous_utxos);
+        self.http_server.addr_index_db.write().await.process_block(&block, &previous_utxos);
         let addr_index_elapsed = begin_addr_index.elapsed();
         if !initial {
-            self.utxo_server.write().await.process_block(&block, &previous_utxos).await;
+            self.http_server.utxo_server.write().await.process_block(&block, &previous_utxos).await;
             self.rich_list_builder.process_block(&block, &previous_utxos);
-            *self.rich_list.write().await = self.rich_list_builder.finalize();
+            *self.http_server.rich_list.write().await = self.rich_list_builder.finalize();
         }
         // Count vins/vouts.
         let mut vins: usize = 0;
@@ -150,7 +134,7 @@ impl Syncer {
         }
         synced_blocks
     }
-    async fn load_utxo(coin: &str, utxo_db: &UtxoDB) -> (UtxoServer, RichListBuilder) {
+    async fn load_utxo(&mut self) {
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
             if i % 1000 == 0 || force {
@@ -160,13 +144,12 @@ impl Syncer {
         };
         let (utxo_server_tx, mut utxo_server_rx) = channel(1024 * 1024 * 1024);
         let (rich_list_tx, mut rich_list_rx) = channel(1024 * 1024);
-        let coin = coin.to_string();
-        let utxo_server_join = tokio::task::spawn(async move {
-            let mut utxo_server = UtxoServer::new(&coin);
+        let utxo_server = self.http_server.utxo_server.clone();
+        let utxo_server_join = tokio::spawn(async move {
+            let mut utxo_server = utxo_server.write().await;
             while let Some(utxo) = utxo_server_rx.recv().await {
                 utxo_server.push(&utxo).await;
             }
-            utxo_server
         });
         let rich_list_join = tokio::task::spawn(async move {
             let mut rich_list_builder = RichListBuilder::new();
@@ -176,7 +159,7 @@ impl Syncer {
             rich_list_builder
         });
         let mut i = 0;
-        for (key, value) in utxo_db.db.iter() {
+        for (key, value) in self.utxo_db.db.iter() {
             print_stat(i, false);
             i += 1;
             let utxo: UtxoEntry = (key, value).into();
@@ -188,18 +171,13 @@ impl Syncer {
         println!("Loaded all UTXOs in {}ms.", begin.elapsed().as_millis());
         // Wait async tasks to finish.
         drop(utxo_server_tx);
-        let utxo_server = utxo_server_join.await.unwrap();
         drop(rich_list_tx);
+        utxo_server_join.await.unwrap();
         let rich_list_builder = rich_list_join.await.unwrap();
-        println!("Syncer.load_utxo(): executed in {}ms.", begin.elapsed().as_millis());
-        (utxo_server, rich_list_builder)
-    }
-    async fn reload_utxo(&mut self) {
-        let (utxo_server, rich_list_builder) = Self::load_utxo(&self.coin, &self.utxo_db).await;
         let rich_list = rich_list_builder.finalize();
-        *self.utxo_server.write().await = utxo_server;
-        *self.rich_list.write().await = rich_list;
+        *self.http_server.rich_list.write().await = rich_list;
         self.rich_list_builder = rich_list_builder;
+        println!("Syncer.load_utxo(): executed in {}ms.", begin.elapsed().as_millis());
     }
     pub async fn initial_sync(&mut self) -> u32 {
         // Run BlockFetcher.
@@ -217,7 +195,7 @@ impl Syncer {
         let begin_elapsed = begin.elapsed().as_millis();
         println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin_elapsed);
         if !self.is_stopped().await {
-            self.reload_utxo().await;
+            self.load_utxo().await;
         }
         synced_blocks
     }

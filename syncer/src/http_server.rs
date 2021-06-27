@@ -18,20 +18,19 @@ use super::*;
 
 #[derive(Debug, Clone)]
 pub struct HttpServer {
-    addr_index_db: Arc<RwLock<AddressIndexDB>>,
-    utxo_server: Arc<RwLock<UtxoServer>>,
-    rich_list: Arc<RwLock<RichList>>,
+    coin: String,
+    pub addr_index_db: Arc<RwLock<AddressIndexDB>>,
+    pub utxo_server: Arc<RwLock<UtxoServer>>,
+    pub rich_list: Arc<RwLock<RichList>>,
 }
 
 impl HttpServer {
-    pub fn new(
-        addr_index_db: Arc<RwLock<AddressIndexDB>>,
-        utxo_server: Arc<RwLock<UtxoServer>>,
-        rich_list: Arc<RwLock<RichList>>) -> Self {
+    pub fn new(coin: &str) -> Self {
         Self{
-            addr_index_db,
-            utxo_server,
-            rich_list,
+            coin: coin.to_string(),
+            addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin))),
+            utxo_server: Arc::new(RwLock::new(UtxoServer::new(coin))),
+            rich_list: Arc::new(RwLock::new(RichList::new())),
         }
     }
     fn response(status: &StatusCode, body: String) -> Response<Body> {
@@ -126,9 +125,7 @@ impl HttpServer {
             Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
         };
     }
-    pub async fn run(&self, coin: &str, config: &Config) {
-        let ip = &config.http_ip;
-        let port = config.coins[coin].http_port;
+    pub async fn run(&self, ip: &str, port: u16) {
         let addr = SocketAddr::from((
             ip.parse::<std::net::IpAddr>().expect("Failed to parse HTTP IP address."),
             port));

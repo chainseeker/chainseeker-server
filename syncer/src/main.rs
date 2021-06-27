@@ -14,16 +14,13 @@ async fn main() {
     if syncer.is_stopped().await {
         return;
     }
-    let addr_index_db = syncer.addr_index_db();
-    let utxo_server = syncer.utxo_server();
-    let rich_list = syncer.rich_list();
+    let server = syncer.http_server.clone();
     let mut handles = Vec::new();
     handles.push(tokio::spawn(async move {
         syncer.run().await;
     }));
     handles.push(tokio::spawn(async move {
-        let server = HttpServer::new(addr_index_db, utxo_server, rich_list);
-        server.run(&coin, &config).await;
+        server.run(&config.http_ip, config.coins[&coin].http_port).await;
     }));
     // Join for the threads.
     for handle in handles.iter_mut() {
