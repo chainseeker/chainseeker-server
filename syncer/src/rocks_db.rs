@@ -1,5 +1,5 @@
 /// An abstraction struct for key-value store.
-
+use std::fs::remove_dir_all;
 use std::marker::PhantomData;
 use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode};
 
@@ -178,6 +178,11 @@ impl<K, V> RocksDB<K, V>
           V: Serialize + Deserialize + 'static,
 {
     pub fn new(path: String, temporary: bool) -> Self {
+        if temporary {
+            if std::path::Path::new(&path).exists() {
+                remove_dir_all(&path).unwrap();
+            }
+        }
         let db = rocks_db(&path);
         Self {
             temporary,
@@ -212,7 +217,7 @@ impl<K, V> KVS<K, V> for RocksDB<K, V>
         Box::new(RocksDBPrefixIterator::new(&self, prefix))
     }
     fn purge(&self) {
-        std::fs::remove_dir_all(&self.path).unwrap();
+        remove_dir_all(&self.path).unwrap();
     }
 }
 

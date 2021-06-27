@@ -25,8 +25,6 @@ pub struct Syncer {
 impl Syncer {
     pub async fn new(coin: &str, config: &Config) -> Self {
         let utxo_db = UtxoDB::new(coin);
-        let utxo_server = Arc::new(RwLock::new(UtxoServer::new()));
-        let rich_list = Arc::new(RwLock::new(RichList::new()));
         let block_db = BlockDB::new(coin);
         let start_height = match block_db.get_synced_height() {
             Some(h) => h + 1,
@@ -35,20 +33,22 @@ impl Syncer {
         let rest = get_rest(&config.coins[coin]);
         let chaininfo = rest.chaininfo().await.expect("Failed to fetch chaininfo.");
         let stop_height = chaininfo.blocks;
+        let (utxo_server, rich_list_builder) = Self::load_utxo(&format!("{}_init", coin), &utxo_db).await;
+        let rich_list = rich_list_builder.finalize();
         let syncer = Self {
             coin: coin.to_string(),
             config: (*config).clone(),
             block_db,
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin))),
             utxo_db,
-            utxo_server,
-            rich_list,
-            rich_list_builder: RichListBuilder::new(),
+            utxo_server: Arc::new(RwLock::new(utxo_server)),
+            rich_list: Arc::new(RwLock::new(rich_list)),
+            rich_list_builder,
             rest,
             stop: Arc::new(RwLock::new(false)),
             block_fetcher: BlockFetcher::new(coin, config, start_height, stop_height),
         };
-        // Register Ctrl-C watch.
+        // Install Ctrl-C watch.
         let stop = syncer.stop.clone();
         tokio::spawn(async move {
             tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
@@ -150,7 +150,7 @@ impl Syncer {
         }
         synced_blocks
     }
-    async fn reconstruct_utxo(&mut self) {
+    async fn load_utxo(coin: &str, utxo_db: &UtxoDB) -> (UtxoServer, RichListBuilder) {
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
             if i % 1000 == 0 || force {
@@ -161,8 +161,9 @@ impl Syncer {
         const BUFFER_SIZE: usize = 1024 * 1024;
         let (utxo_server_tx, mut utxo_server_rx) = channel(BUFFER_SIZE);
         let (rich_list_tx, mut rich_list_rx) = channel(BUFFER_SIZE);
+        let coin = coin.to_string();
         let utxo_server_join = tokio::task::spawn(async move {
-            let mut utxo_server = UtxoServer::new();
+            let mut utxo_server = UtxoServer::new(&coin);
             while let Some(utxo) = utxo_server_rx.recv().await {
                 utxo_server.push(&utxo).await;
             }
@@ -176,10 +177,7 @@ impl Syncer {
             rich_list_builder
         });
         let mut i = 0;
-        for (key, value) in self.utxo_db.db.iter() {
-            if self.is_stopped().await {
-                return;
-            }
+        for (key, value) in utxo_db.db.iter() {
             print_stat(i, false);
             i += 1;
             let utxo: UtxoEntry = (key, value).into();
@@ -193,10 +191,16 @@ impl Syncer {
         drop(utxo_server_tx);
         let utxo_server = utxo_server_join.await.unwrap();
         drop(rich_list_tx);
-        self.rich_list_builder = rich_list_join.await.unwrap();
+        let rich_list_builder = rich_list_join.await.unwrap();
+        println!("Syncer.load_utxo(): executed in {}ms.", begin.elapsed().as_millis());
+        (utxo_server, rich_list_builder)
+    }
+    async fn reload_utxo(&mut self) {
+        let (utxo_server, rich_list_builder) = Self::load_utxo(&self.coin, &self.utxo_db).await;
+        let rich_list = rich_list_builder.finalize();
         *self.utxo_server.write().await = utxo_server;
-        *self.rich_list.write().await = self.rich_list_builder.finalize();
-        println!("Syncer.reconstruct_utxo(): executed in {}ms.", begin.elapsed().as_millis());
+        *self.rich_list.write().await = rich_list;
+        self.rich_list_builder = rich_list_builder;
     }
     pub async fn initial_sync(&mut self) -> u32 {
         // Run BlockFetcher.
@@ -214,7 +218,7 @@ impl Syncer {
         let begin_elapsed = begin.elapsed().as_millis();
         println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin_elapsed);
         if !self.is_stopped().await {
-            self.reconstruct_utxo().await;
+            self.reload_utxo().await;
         }
         synced_blocks
     }

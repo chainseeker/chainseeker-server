@@ -211,27 +211,16 @@ impl Deserialize for UtxoServerInStorageKey {
 
 #[derive(Debug)]
 pub struct UtxoServerInStorage {
-    path: String,
     db: RocksDBMulti<UtxoServerInStorageKey, UtxoServerValue>,
 }
 
 impl UtxoServerInStorage {
-    fn get_path() -> String {
-        loop {
-            let path = tmp_dir("utxo", 8);
-            if !std::path::Path::new(&path).exists() {
-                return path;
-            }
-        }
+    fn path(coin: &str) -> String {
+        format!("/tmp/chainseeker/{}/utxo", coin)
     }
-    pub fn new() -> Self {
-        let path = Self::get_path();
-        if std::path::Path::new(&path).exists() {
-            std::fs::remove_dir_all(&path).expect("Failed to remove directory.");
-        }
-        let db = RocksDBMulti::new(path.clone(), true);
+    pub fn new(coin: &str) -> Self {
+        let db = RocksDBMulti::new(Self::path(coin), true);
         Self {
-            path,
             db,
         }
     }
@@ -291,27 +280,16 @@ impl UtxoServerInStorage {
 
 #[derive(Debug)]
 pub struct UtxoServerInStorageLazy {
-    path: String,
     db: RocksDBLazy<UtxoServerInStorageKey, UtxoServerValue>,
 }
 
 impl UtxoServerInStorageLazy {
-    fn get_path() -> String {
-        loop {
-            let path = tmp_dir("utxo", 8);
-            if !std::path::Path::new(&path).exists() {
-                return path;
-            }
-        }
+    fn path(coin: &str) -> String {
+        format!("/tmp/chainseeker/{}/utxo", coin)
     }
-    pub fn new() -> Self {
-        let path = Self::get_path();
-        if std::path::Path::new(&path).exists() {
-            std::fs::remove_dir_all(&path).expect("Failed to remove directory.");
-        }
-        let db = RocksDBLazy::new(path.clone(), true);
+    pub fn new(coin: &str) -> Self {
+        let db = RocksDBLazy::new(Self::path(coin), true);
         let server = Self {
-            path,
             db,
         };
         server.run();
