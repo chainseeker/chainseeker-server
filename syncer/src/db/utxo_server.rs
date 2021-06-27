@@ -5,8 +5,8 @@ use bitcoin::{Txid, Script};
 
 use crate::*;
 
-//pub type UtxoServer = UtxoServerInMemory;
-pub type UtxoServer = UtxoServerInStorageLazy;
+pub type UtxoServer = UtxoServerInMemory;
+//pub type UtxoServer = UtxoServerInStorageLazy;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UtxoServerValue {
@@ -112,7 +112,7 @@ pub struct UtxoServerInMemory {
 }
 
 impl UtxoServerInMemory {
-    pub fn new() -> Self {
+    pub fn new(_coin: &str) -> Self {
         Self {
             db: HashMap::new(),
         }

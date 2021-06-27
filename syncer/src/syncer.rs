@@ -116,7 +116,7 @@ impl Syncer {
             self.block_db.put_synced_height(height);
         }
     }
-    async fn sync(&mut self, init: bool) -> u32 {
+    async fn sync(&mut self, initial: bool) -> u32 {
         self.process_reorgs().await;
         let start_height = match self.synced_height() {
             Some(h) => h + 1,
@@ -129,7 +129,7 @@ impl Syncer {
             if self.is_stopped().await {
                 break;
             }
-            self.process_block(height, init).await;
+            self.process_block(height, initial).await;
             synced_blocks += 1;
         }
         synced_blocks
