@@ -21,7 +21,7 @@ impl<K, V> RocksDBLazy<K, V>
     where K: Serialize + Deserialize + Sync + Send + Clone + 'static + Eq + std::hash::Hash,
           V: Serialize + Deserialize + Sync + Send + Clone + 'static + ConstantSize + PartialEq,
 {
-    pub fn new(path: String, temporary: bool) -> Self {
+    pub fn new(path: &str, temporary: bool) -> Self {
         Self {
             buffer: Arc::new(RwLock::new(HashMap::new())),
             db: Arc::new(RwLock::new(RocksDB::new(path, temporary))),

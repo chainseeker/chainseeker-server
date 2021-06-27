@@ -13,7 +13,7 @@ impl<K, V> RocksDBMulti<K, V>
     where K: Serialize + Deserialize + 'static,
           V: Serialize + Deserialize + 'static + ConstantSize + Clone + PartialEq,
 {
-    pub fn new(path: String, temporary: bool) -> Self {
+    pub fn new(path: &str, temporary: bool) -> Self {
         Self {
             db: RocksDB::new(path, temporary),
         }
@@ -41,8 +41,7 @@ mod test {
     use super::*;
     #[test]
     fn rocks_db() {
-        let path = tmp_dir("test", 8);
-        let db = RocksDBMulti::<String, u32>::new(path.clone(), true);
+        let db = RocksDBMulti::<String, u32>::new("/tmp/chainseeker/test_rocks_db_multi", true);
         let key1 = "bar".to_string();
         let key2 = "foo".to_string();
         db.push(&key1, 3939);

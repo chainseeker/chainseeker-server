@@ -219,7 +219,7 @@ impl UtxoServerInStorage {
         format!("/tmp/chainseeker/{}/utxo", coin)
     }
     pub fn new(coin: &str) -> Self {
-        let db = RocksDBMulti::new(Self::path(coin), true);
+        let db = RocksDBMulti::new(&Self::path(coin), true);
         Self {
             db,
         }
@@ -288,7 +288,7 @@ impl UtxoServerInStorageLazy {
         format!("/tmp/chainseeker/{}/utxo", coin)
     }
     pub fn new(coin: &str) -> Self {
-        let db = RocksDBLazy::new(Self::path(coin), true);
+        let db = RocksDBLazy::new(&Self::path(coin), true);
         let server = Self {
             db,
         };

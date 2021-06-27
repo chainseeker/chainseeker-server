@@ -1,5 +1,4 @@
 use std::io::{Read, Write};
-use rand::Rng;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{Script, Txid, BlockHash, Block};
@@ -25,25 +24,6 @@ type RocksDBBase = DBWithThreadMode<MultiThreaded>;
 
 pub fn flush_stdout() {
     std::io::stdout().flush().expect("Failed to flush.");
-}
-
-pub fn random_string(len: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect()
-}
-
-pub fn tmp_dir(prefix: &str, len: usize) -> String {
-    loop {
-        let random_string = random_string(len);
-        let path = format!("/tmp/chainseeker/{}/{}", prefix, random_string);
-        if std::path::Path::new(&path).exists() {
-            continue;
-        }
-        return path;
-    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

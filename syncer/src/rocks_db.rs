@@ -177,16 +177,16 @@ impl<K, V> RocksDB<K, V>
     where K: Serialize + Deserialize + 'static,
           V: Serialize + Deserialize + 'static,
 {
-    pub fn new(path: String, temporary: bool) -> Self {
+    pub fn new(path: &str, temporary: bool) -> Self {
         if temporary {
-            if std::path::Path::new(&path).exists() {
-                remove_dir_all(&path).unwrap();
+            if std::path::Path::new(path).exists() {
+                remove_dir_all(path).unwrap();
             }
         }
-        let db = rocks_db(&path);
+        let db = rocks_db(path);
         Self {
             temporary,
-            path,
+            path: path.to_string(),
             db: db,
             _k: PhantomData,
             _v: PhantomData,
@@ -237,8 +237,7 @@ mod test {
     use super::*;
     #[test]
     fn rocks_db() {
-        let path = tmp_dir("test", 8);
-        let db = RocksDB::<String, Vec<u32>>::new(path.clone(), true);
+        let db = RocksDB::<String, Vec<u32>>::new("/tmp/chainseeker/test_rocks_db", true);
         let key1 = "bar".to_string();
         let value1 = vec![3939, 4649];
         let key2 = "foo".to_string();
