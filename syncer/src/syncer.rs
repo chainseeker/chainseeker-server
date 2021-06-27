@@ -158,9 +158,8 @@ impl Syncer {
                 flush_stdout();
             }
         };
-        const BUFFER_SIZE: usize = 1024 * 1024;
-        let (utxo_server_tx, mut utxo_server_rx) = channel(BUFFER_SIZE);
-        let (rich_list_tx, mut rich_list_rx) = channel(BUFFER_SIZE);
+        let (utxo_server_tx, mut utxo_server_rx) = channel(1024 * 1024 * 1024);
+        let (rich_list_tx, mut rich_list_rx) = channel(1024 * 1024);
         let coin = coin.to_string();
         let utxo_server_join = tokio::task::spawn(async move {
             let mut utxo_server = UtxoServer::new(&coin);
