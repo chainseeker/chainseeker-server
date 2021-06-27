@@ -9,8 +9,8 @@ const MAX_ENTRIES: usize = 1000_000;
 
 #[derive(Debug)]
 pub struct RocksDBLazy<K, V>
-    where K: Serialize + Deserialize,
-          V: Serialize + Deserialize + ConstantSize,
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static + ConstantSize,
 {
     buffer: Arc<RwLock<HashMap<K, Vec<V>>>>,
     db: Arc<RwLock<RocksDB<K, Vec<V>>>>,
@@ -20,10 +20,10 @@ impl<K, V> RocksDBLazy<K, V>
     where K: Serialize + Deserialize + Sync + Send + Clone + 'static + Eq + std::hash::Hash,
           V: Serialize + Deserialize + Sync + Send + Clone + 'static + ConstantSize + PartialEq,
 {
-    pub fn new(path: &str) -> Self {
+    pub fn new(path: String, temporary: bool) -> Self {
         Self {
             buffer: Arc::new(RwLock::new(HashMap::new())),
-            db: Arc::new(RwLock::new(RocksDB::new(path))),
+            db: Arc::new(RwLock::new(RocksDB::new(path, temporary))),
         }
     }
     pub async fn get(&self, key: &K) -> Vec<V> {

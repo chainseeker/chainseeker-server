@@ -83,7 +83,7 @@ impl UtxoDB {
     pub fn new(coin: &str) -> Self {
         let path = Self::get_path(coin);
         Self {
-            db: RocksDB::new(&path),
+            db: RocksDB::new(path, false),
         }
     }
     fn get_path(coin: &str) -> String {

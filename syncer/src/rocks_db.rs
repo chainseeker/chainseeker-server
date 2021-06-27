@@ -6,11 +6,27 @@ use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode};
 use crate::*;
 
 pub trait ConstantSize {
-    fn len() -> usize;
+    const LEN: usize;
+}
+
+impl ConstantSize for u32 {
+    const LEN: usize = 4;
 }
 
 pub trait Serialize {
     fn serialize(&self) -> Vec<u8>;
+}
+
+impl Serialize for String {
+    fn serialize(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
+    }
+}
+
+impl Serialize for u32 {
+    fn serialize(&self) -> Vec<u8> {
+        self.to_le_bytes().to_vec()
+    }
 }
 
 impl<S> Serialize for Vec<S>
@@ -25,30 +41,44 @@ pub trait Deserialize {
     fn deserialize(buf: &[u8]) -> Self;
 }
 
+impl Deserialize for String {
+    fn deserialize(buf: &[u8]) -> Self {
+        Self::from_utf8(buf.to_vec()).unwrap()
+    }
+}
+
+impl Deserialize for u32 {
+    fn deserialize(buf: &[u8]) -> Self {
+        assert_eq!(buf.len(), 4);
+        let buf: [u8; 4] = [buf[0], buf[1], buf[2], buf[3]];
+        u32::from_le_bytes(buf)
+    }
+}
+
 impl<D> Deserialize for Vec<D>
     where D: Deserialize + ConstantSize,
 {
     fn deserialize(buf: &[u8]) -> Self {
-        let len = D::len();
         let mut offset = 0usize;
         let mut ret = Vec::new();
         while offset < buf.len() {
-            ret.push(D::deserialize(&buf[offset..offset+len]));
-            offset += len;
+            ret.push(D::deserialize(&buf[offset..offset+D::LEN]));
+            offset += D::LEN;
         }
         ret
     }
 }
 
 pub trait KVS<K, V>
-    where K: Serialize + Deserialize, V: Serialize + Deserialize,
+    where K: Serialize + Deserialize,
+          V: Serialize + Deserialize,
 {
-    fn new(path: &str) -> Self;
     fn get(&self, key: &K) -> Option<V>;
     fn put(&self, key: &K, value: &V);
     fn delete(&self, key: &K);
     fn iter(&self) -> Box<dyn Iterator<Item = (K, V)> + '_>;
     fn prefix_iter(&self, prefix: Vec<u8>) -> Box<dyn Iterator<Item = (K, V)> + '_>;
+    fn purge(&self);
 }
 
 type Rocks = DBWithThreadMode<MultiThreaded>;
@@ -88,7 +118,8 @@ impl<'a, K, V> Iterator for RocksDBIterator<'a, K, V>
 }
 
 pub struct RocksDBPrefixIterator<'a, K, V>
-    where K: Serialize + Deserialize, V: Serialize + Deserialize,
+    where K: Serialize + Deserialize,
+          V: Serialize + Deserialize,
 {
     base: DBIteratorWithThreadMode<'a, Rocks>,
     prefix: Vec<u8>,
@@ -97,9 +128,11 @@ pub struct RocksDBPrefixIterator<'a, K, V>
 }
 
 impl<'a, K, V> RocksDBPrefixIterator<'a, K, V>
-    where K: Serialize + Deserialize, V: Serialize + Deserialize,
+    where K: Serialize + Deserialize,
+          V: Serialize + Deserialize,
 {
-    pub fn new(rocks_db: &'a RocksDB<K, V>, prefix: Vec<u8>) -> Self {
+    pub fn new(rocks_db: &'a RocksDB<K, V>, prefix: Vec<u8>) -> Self
+    {
         Self {
             base: rocks_db.db.prefix_iterator(prefix.clone()),
             prefix: prefix,
@@ -110,7 +143,8 @@ impl<'a, K, V> RocksDBPrefixIterator<'a, K, V>
 }
 
 impl<'a, K, V> Iterator for RocksDBPrefixIterator<'a, K, V>
-    where K: Serialize + Deserialize, V: Serialize + Deserialize,
+    where K: Serialize + Deserialize,
+          V: Serialize + Deserialize,
 {
     type Item = (K, V);
     fn next(&mut self) -> Option<Self::Item> {
@@ -129,23 +163,36 @@ impl<'a, K, V> Iterator for RocksDBPrefixIterator<'a, K, V>
 
 #[derive(Debug)]
 pub struct RocksDB<K, V>
-    where K: Serialize + Deserialize, V: Serialize + Deserialize,
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
 {
+    temporary: bool,
+    path: String,
     db: Rocks,
     _k: PhantomData<fn() -> K>,
     _v: PhantomData<fn() -> V>,
 }
 
-impl<K, V> KVS<K, V> for RocksDB<K, V>
-    where K: Serialize + Deserialize + 'static, V: Serialize + Deserialize + 'static,
+impl<K, V> RocksDB<K, V>
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
 {
-    fn new(path: &str) -> Self {
+    pub fn new(path: String, temporary: bool) -> Self {
+        let db = rocks_db(&path);
         Self {
-            db: rocks_db(path),
+            temporary,
+            path,
+            db: db,
             _k: PhantomData,
             _v: PhantomData,
         }
     }
+}
+
+impl<K, V> KVS<K, V> for RocksDB<K, V>
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
+{
     fn get(&self, key: &K) -> Option<V> {
         match self.db.get(key.serialize()).unwrap() {
             Some(value) => Some(V::deserialize(&value)),
@@ -163,5 +210,45 @@ impl<K, V> KVS<K, V> for RocksDB<K, V>
     }
     fn prefix_iter(&self, prefix: Vec<u8>) -> Box<dyn Iterator<Item = (K, V)> + '_> {
         Box::new(RocksDBPrefixIterator::new(&self, prefix))
+    }
+    fn purge(&self) {
+        std::fs::remove_dir_all(&self.path).unwrap();
+    }
+}
+
+impl<K, V> Drop for RocksDB<K, V>
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
+{
+    fn drop(&mut self) {
+        if self.temporary {
+            self.purge();
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn rocks_db() {
+        let path = tmp_dir("test", 8);
+        let db = RocksDB::<String, Vec<u32>>::new(path.clone(), true);
+        let key1 = "bar".to_string();
+        let value1 = vec![3939, 4649];
+        let key2 = "foo".to_string();
+        let value2 = vec![1234, 5678];
+        db.put(&key1, &value1);
+        db.put(&key2, &value2);
+        assert_eq!(db.get(&key1), Some(value1.clone()));
+        assert_eq!(db.get(&key2), Some(value2.clone()));
+        assert_eq!(
+            db.iter().collect::<Vec<(String, Vec<u32>)>>(),
+            vec![(key1.clone(), value1.clone()), (key2.clone(), value2.clone())]);
+        assert_eq!(
+            db.prefix_iter(key1.as_bytes().to_vec()).collect::<Vec<(String, Vec<u32>)>>(),
+            vec![(key1.clone(), value1.clone())]);
+        db.delete(&key1);
+        assert_eq!(db.get(&key1), None);
     }
 }

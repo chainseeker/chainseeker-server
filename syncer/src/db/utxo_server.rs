@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use rand::Rng;
 
 use serde::ser::{Serializer, SerializeStruct};
 use bitcoin::{Txid, Script};
@@ -17,9 +16,7 @@ pub struct UtxoServerValue {
 }
 
 impl ConstantSize for UtxoServerValue {
-    fn len() -> usize {
-        44
-    }
+    const LEN: usize = 44;
 }
 
 impl serde::ser::Serialize for UtxoServerValue {
@@ -219,17 +216,9 @@ pub struct UtxoServerInStorage {
 }
 
 impl UtxoServerInStorage {
-    fn get_random_path() -> String {
-        let rand_string: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(8)
-            .map(char::from)
-            .collect();
-        format!("/tmp/chainseeker/utxo/{}", rand_string)
-    }
     fn get_path() -> String {
         loop {
-            let path = Self::get_random_path();
+            let path = tmp_dir("utxo", 8);
             if !std::path::Path::new(&path).exists() {
                 return path;
             }
@@ -240,7 +229,7 @@ impl UtxoServerInStorage {
         if std::path::Path::new(&path).exists() {
             std::fs::remove_dir_all(&path).expect("Failed to remove directory.");
         }
-        let db = RocksDBLazy::new(&path);
+        let db = RocksDBLazy::new(path.clone(), true);
         let server = Self {
             path,
             db,
