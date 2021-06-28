@@ -70,45 +70,8 @@ impl Deserialize for UtxoServerValue {
 }
 
 #[derive(Debug, Clone)]
-pub struct UtxoServerElement {
-    pub values: Vec<UtxoServerValue>
-}
-
-impl UtxoServerElement {
-    pub fn new() -> Self {
-        Self {
-            values: Vec::new(),
-        }
-    }
-}
-
-impl From<&UtxoServerElement> for Vec<u8> {
-    fn from(element: &UtxoServerElement) -> Self {
-        let mut vec = Vec::new();
-        for value in element.values.iter() {
-            let ser = Vec::<u8>::from(value);
-            vec.push(ser);
-        }
-        vec.concat()
-    }
-}
-
-impl From<&[u8]> for UtxoServerElement {
-    fn from(buf: &[u8]) -> Self {
-        let mut values = Vec::new();
-        for i in 0..(buf.len() / 44) {
-            let buf = &buf[(44 * i)..(44 * (i + 1))];
-            values.push(buf.into());
-        }
-        Self {
-            values
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct UtxoServerInMemory {
-    db: HashMap<Script, UtxoServerElement>,
+    db: HashMap<Script, Vec<UtxoServerValue>>,
 }
 
 impl UtxoServerInMemory {
@@ -117,25 +80,17 @@ impl UtxoServerInMemory {
             db: HashMap::new(),
         }
     }
-    pub async fn get(&self, script_pubkey: &Script) -> UtxoServerElement {
+    pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         match self.db.get(script_pubkey) {
-            Some(element) => (*element).clone(),
-            None => UtxoServerElement::new(),
+            Some(values) => (*values).clone(),
+            None => Vec::new(),
         }
-    }
-    pub async fn balance(&self, script_pubkey: &Script) -> u64 {
-        let element = self.get(script_pubkey).await;
-        let mut value = 0u64;
-        for v in element.values.iter() {
-            value += v.value;
-        }
-        value
     }
     pub async fn push(&mut self, utxo: &UtxoEntry) {
-        let element = match self.db.get_mut(&utxo.script_pubkey) {
-            Some(element) => element,
+        let values = match self.db.get_mut(&utxo.script_pubkey) {
+            Some(values) => values,
             None => {
-                self.db.insert(utxo.script_pubkey.clone(), UtxoServerElement::new());
+                self.db.insert(utxo.script_pubkey.clone(), Vec::new());
                 self.db.get_mut(&utxo.script_pubkey).unwrap()
             },
         };
@@ -144,11 +99,11 @@ impl UtxoServerInMemory {
             vout: utxo.vout,
             value: utxo.value,
         };
-        element.values.push(v);
+        values.push(v);
     }
     pub fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
-        let element = self.db.get_mut(script_pubkey).unwrap();
-        element.values = element.values.iter().filter(|&utxo_value| {
+        let values = self.db.get_mut(script_pubkey).unwrap();
+        *values = values.iter().filter(|&utxo_value| {
             !(utxo_value.txid == *txid && utxo_value.vout == vout)
         }).cloned().collect();
     }
@@ -224,10 +179,8 @@ impl UtxoServerInStorage {
             db,
         }
     }
-    pub async fn get(&self, script_pubkey: &Script) -> UtxoServerElement {
-        UtxoServerElement {
-            values: self.db.get(&script_pubkey.into()),
-        }
+    pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
+        self.db.get(&script_pubkey.into())
     }
     pub async fn push(&mut self, utxo: &UtxoEntry) {
         let value = UtxoServerValue {
@@ -301,10 +254,8 @@ impl UtxoServerInStorageLazy {
     pub async fn stop(&self) {
         self.db.stop().await;
     }
-    pub async fn get(&self, script_pubkey: &Script) -> UtxoServerElement {
-        UtxoServerElement {
-            values: self.db.get(&script_pubkey.into()).await,
-        }
+    pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
+        self.db.get(&script_pubkey.into()).await
     }
     pub async fn push(&mut self, utxo: &UtxoEntry) {
         let value = UtxoServerValue {
