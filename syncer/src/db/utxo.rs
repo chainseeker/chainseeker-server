@@ -141,7 +141,7 @@ impl UtxoDB {
             self.db.put(&insert.0, &insert.1);
         }
         // Process vins.
-        let keys = block.txdata.iter().map(|tx| {
+        let keys = block.txdata.par_iter().map(|tx| {
             let mut keys = Vec::new();
             for vin in tx.input.iter() {
                 if vin.previous_output.is_null() {
