@@ -23,7 +23,7 @@ export const configs = {
 			endpoint: 'http://localhost:8332/rest',
 		},
 		syncer: {
-			endpoint: 'http://localhost:8080',
+			endpoint: 'http://localhost:6000',
 		},
 		endpoint: {
 			apiLocal: "http://localhost:7001/api",
