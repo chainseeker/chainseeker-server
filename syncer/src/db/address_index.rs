@@ -11,7 +11,10 @@ pub struct AddressIndexDBKey {
 
 impl Serialize for AddressIndexDBKey {
     fn serialize(&self) -> Vec<u8> {
-        AddressIndexDB::serialize_key(&self.script_pubkey, &self.txid)
+        let mut buf = Vec::new();
+        buf.push(serialize_script(&self.script_pubkey));
+        buf.push(serialize_txid(&self.txid).to_vec());
+        buf.concat()
     }
 }
 
@@ -64,12 +67,6 @@ impl AddressIndexDB {
             db: rocks_db(&path),
         }
     }
-    fn serialize_key(script: &Script, txid: &Txid) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(serialize_script(script));
-        buf.push(serialize_txid(&txid).to_vec());
-        buf.concat()
-    }
     pub fn get(&self, script: &Script) -> Vec<Txid> {
         let mut ret = Vec::new();
         let script_vec = serialize_script(script);
@@ -85,8 +82,11 @@ impl AddressIndexDB {
         }
         ret
     }
-    pub fn put(&self, script: &Script, txid: &Txid) {
-        let key = Self::serialize_key(script, txid);
+    pub fn put(&self, script_pubkey: &Script, txid: &Txid) {
+        let key = AddressIndexDBKey::serialize(&AddressIndexDBKey {
+            script_pubkey: (*script_pubkey).clone(),
+            txid: (*txid).clone(),
+        });
         self.db.put(key, Vec::new()).expect("Failed to put a database element.");
     }
     pub fn process_block(&self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
@@ -113,7 +113,10 @@ impl AddressIndexDB {
             }
         }
         let elems: Vec<Vec<u8>> = elems.par_iter().map(|elem| {
-            Self::serialize_key(elem.0, elem.1)
+            AddressIndexDBKey::serialize(&AddressIndexDBKey {
+                script_pubkey: (*elem.0).clone(),
+                txid: (*elem.1).clone(),
+            })
         }).collect();
         for elem in elems.iter() {
             self.db.put(elem, Vec::new()).unwrap();
