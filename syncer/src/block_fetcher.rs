@@ -67,7 +67,6 @@ impl BlockFetcher {
             let stop = self.stop.clone();
             tokio::spawn(async move {
                 tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
-                println!("Ctrl-C was pressed. Exiting BlockFetcher...");
                 *stop.write().await = true;
             });
         }

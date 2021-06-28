@@ -32,7 +32,6 @@ impl Syncer {
         let stop = syncer.stop.clone();
         tokio::spawn(async move {
             tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
-            println!("Ctrl-C was pressed. Exiting Syncer...");
             *stop.write().await = true;
         });
         syncer
@@ -228,7 +227,6 @@ impl Syncer {
         println!("Waiting for a ZeroMQ message...");
         loop {
             if *self.stop.read().await {
-                println!("Exiting Syncer...");
                 break;
             }
             match socket.recv_multipart(1) {

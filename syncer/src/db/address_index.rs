@@ -3,10 +3,10 @@ use bitcoin::{Block, Txid, Script};
 
 use super::super::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AddressIndexDBKey {
-    script_pubkey: Script,
-    txid: Txid,
+    pub script_pubkey: Script,
+    pub txid: Txid,
 }
 
 impl Serialize for AddressIndexDBKey {
@@ -118,5 +118,41 @@ impl AddressIndexDB {
         for elem in elems.iter() {
             self.db.put(elem, Vec::new()).unwrap();
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[allow(dead_code)]
+    fn print_addr_index_db(addr_index_db: &AddressIndexDB) {
+        let mut entries = addr_index_db.db.iterator(rocksdb::IteratorMode::Start).map(|(key, _value)| {
+            AddressIndexDBKey::deserialize(&key)
+        }).collect::<Vec<AddressIndexDBKey>>();
+        entries.sort();
+        for entry in entries.iter() {
+            println!("        AddressIndexDBKey {{ script_pubkey: deserialize_script(&hex::decode(\"{}\").unwrap()), txid: deserialize_txid(&hex::decode(\"{}\").unwrap()), }},",
+            hex::encode(serialize_script(&entry.script_pubkey)),
+            hex::encode(serialize_txid(&entry.txid)));
+        }
+    }
+    #[test]
+    fn addr_index_db() {
+        let blocks = test_fixtures::regtest_blocks().to_vec();
+        let addr_index_db = AddressIndexDB::new("test");
+        let mut utxo_db = UtxoDB::new("test", true);
+        for h in 0..(blocks.len()-1) {
+            let block = &blocks[h];
+            let prev_utxos = utxo_db.process_block(&block, false);
+            addr_index_db.process_block(&block, &prev_utxos);
+        }
+        //print_addr_index_db(&addr_index_db);
+        let mut entries_test = addr_index_db.db.iterator(rocksdb::IteratorMode::Start).map(|(key, _value)| {
+            AddressIndexDBKey::deserialize(&key)
+        }).collect::<Vec<AddressIndexDBKey>>();
+        entries_test.sort();
+        let mut entries = test_fixtures::addr_index_db();
+        entries.sort();
+        assert_eq!(entries_test, entries);
     }
 }
