@@ -19,7 +19,7 @@ use super::*;
 #[derive(Debug, Clone)]
 pub struct HttpServer {
     coin: String,
-    //pub block_db: Arc<RwLock<BlockDB>>,
+    pub block_db: Arc<RwLock<BlockDB>>,
     pub addr_index_db: Arc<RwLock<AddressIndexDB>>,
     pub utxo_server: Arc<RwLock<UtxoServer>>,
     pub rich_list: Arc<RwLock<RichList>>,
@@ -29,7 +29,7 @@ impl HttpServer {
     pub fn new(coin: &str) -> Self {
         Self{
             coin: coin.to_string(),
-            //block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
+            block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin, false))),
             utxo_server: Arc::new(RwLock::new(UtxoServer::new(coin))),
             rich_list: Arc::new(RwLock::new(RichList::new())),
@@ -56,6 +56,46 @@ impl HttpServer {
     }
     fn ok(json: String) -> Response<Body> {
         Self::response(&StatusCode::OK, json)
+    }
+    /// `/block/:block_hash` endpoint.
+    async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        let block_hash = Vec::from_hex(req.param("block_hash").unwrap());
+        if block_hash.is_err() {
+            return Ok(Self::not_found("Failed to decode input block hash."));
+        }
+        let mut block_hash = block_hash.unwrap();
+        if block_hash.len() != 32 {
+            return Ok(Self::not_found("Block hash has an invalid length."));
+        }
+        block_hash.reverse();
+        let block_hash = consensus_decode(&block_hash[..]);
+        let block_content = server.block_db.read().await.get_by_hash(&block_hash);
+        if block_content.is_none() {
+            return Ok(Self::not_found("Block not found."));
+        }
+        let json = serde_json::to_string(&block_content);
+        match json {
+            Ok(json) => return Ok(Self::ok(json)),
+            Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
+        };
+    }
+    /// `/blockbyheight/:height` endpoint.
+    async fn blockbyheight_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        let height = req.param("height").unwrap().parse();
+        if height.is_err() {
+            return Ok(Self::not_found("Failed to decode input block height."));
+        }
+        let block_content = server.block_db.read().await.get(height.unwrap());
+        if block_content.is_none() {
+            return Ok(Self::not_found("Block not found."));
+        }
+        let json = serde_json::to_string(&block_content);
+        match json {
+            Ok(json) => return Ok(Self::ok(json)),
+            Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
+        };
     }
     /// `/addr_index/:script` endpoint.
     async fn addr_index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -137,8 +177,8 @@ impl HttpServer {
                 req.set_context(Instant::now());
                 Ok(req)
             }))
-            //.get("/blockbyheight/:height", Self::blockbyheight_handler)
-            //.get("/block/:block_hash", Self::block_handler)
+            .get("/blockbyheight/:height", Self::blockbyheight_handler)
+            .get("/block/:block_hash", Self::block_handler)
             .get("/addr_index/:script", Self::addr_index_handler)
             .get("/utxo/:script", Self::utxo_handler)
             .get("/rich_list/count", Self::rich_list_count_handler)

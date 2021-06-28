@@ -9,7 +9,6 @@ pub struct Syncer {
     coin: String,
     config: Config,
     synced_height_db: SyncedHeightDB,
-    block_db: BlockDB,
     utxo_db: UtxoDB,
     rich_list_builder: RichListBuilder,
     rest: bitcoin_rest::Context,
@@ -23,7 +22,6 @@ impl Syncer {
             coin: coin.to_string(),
             config: (*config).clone(),
             synced_height_db: SyncedHeightDB::new(coin),
-            block_db: BlockDB::new(coin, false),
             utxo_db: UtxoDB::new(coin, false),
             rich_list_builder: RichListBuilder::new(),
             rest: get_rest(&config.coins[coin]),
@@ -81,7 +79,7 @@ impl Syncer {
             vouts += tx.output.len();
         }
         // Put best block information.
-        self.block_db.put(height, &block);
+        self.http_server.block_db.write().await.put(height, &block);
         self.put_synced_height(height);
         println!(
             "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms){}",
@@ -98,7 +96,7 @@ impl Syncer {
         loop {
             let block_hash_rest = self.rest.blockhashbyheight(height).await
                 .expect(&format!("Failed to fetch block at height = {}.", height));
-            let block_me = self.block_db.get(height).unwrap();
+            let block_me = self.http_server.block_db.read().await.get(height).unwrap();
             let block_hash_me = block_me.block_header.block_hash();
             if block_hash_rest == block_hash_me {
                 break;

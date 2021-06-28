@@ -1,3 +1,5 @@
+use serde::ser::{Serializer, SerializeStruct};
+use bitcoin_hashes::hex::ToHex;
 use bitcoin::{Txid, Block, BlockHeader, BlockHash};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 
@@ -23,6 +25,7 @@ impl Deserialize for BlockHashDBValue {
     }
 }
 
+#[derive(Debug)]
 pub struct BlockHashDB {
     /// Stores (block_height, block_hash).
     db: RocksDB<u32, BlockHashDBValue>,
@@ -75,6 +78,20 @@ impl BlockContentDBValue {
     }
 }
 
+impl serde::ser::Serialize for BlockContentDBValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let mut state = serializer.serialize_struct("BlockContentDBValue", 5)?;
+        state.serialize_field("block_header", &hex::encode(consensus_encode(&self.block_header)))?;
+        state.serialize_field("size", &self.size)?;
+        state.serialize_field("strippedsize", &self.strippedsize)?;
+        state.serialize_field("weight", &self.weight)?;
+        state.serialize_field("txids", &self.txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>())?;
+        state.end()
+    }
+}
+
 impl Serialize for BlockContentDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut ret = Vec::new();
@@ -119,6 +136,7 @@ impl Deserialize for BlockContentDBValue {
     }
 }
 
+#[derive(Debug)]
 pub struct BlockContentDB {
     db: RocksDB<BlockHashDBValue, BlockContentDBValue>,
 }
@@ -141,6 +159,7 @@ impl BlockContentDB {
     }
 }
 
+#[derive(Debug)]
 pub struct BlockDB {
     hash_db: BlockHashDB,
     content_db: BlockContentDB,
@@ -162,7 +181,10 @@ impl BlockDB {
             Some(block_hash) => block_hash,
             None => return None,
         };
-        self.content_db.get(&block_hash)
+        self.get_by_hash(&block_hash)
+    }
+    pub fn get_by_hash(&self, block_hash: &BlockHash) -> Option<BlockContentDBValue> {
+        self.content_db.get(block_hash)
     }
 }
 
