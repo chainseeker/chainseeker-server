@@ -28,7 +28,7 @@ impl Serialize for UtxoDBKey {
 
 impl Deserialize for UtxoDBKey {
     fn deserialize(buf: &[u8]) -> Self {
-        let txid = deserialize_txid(&buf[0..32]);
+        let txid = consensus_decode(&buf[0..32]);
         let vout = bytes_to_u32(&buf[32..36]);
         Self {
             txid,
@@ -46,7 +46,7 @@ pub struct UtxoDBValue {
 impl Serialize for UtxoDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        buf.push(self.script_pubkey.to_bytes());
+        buf.push(consensus_encode(&self.script_pubkey));
         buf.push(self.value.to_le_bytes().to_vec());
         buf.concat()
     }
@@ -55,7 +55,7 @@ impl Serialize for UtxoDBValue {
 impl Deserialize for UtxoDBValue {
     fn deserialize(buf: &[u8]) -> Self {
         let script_pubkey_len = buf.len() - 8;
-        let script_pubkey = deserialize_script(&buf[0..script_pubkey_len]);
+        let script_pubkey = consensus_decode(&buf[0..script_pubkey_len]);
         let value = bytes_to_u64(&buf[script_pubkey_len..]);
         Self {
             script_pubkey,
@@ -228,9 +228,9 @@ mod test {
             if utxo.value == 0 {
                 continue;
             }
-            println!("        UtxoEntry {{ script_pubkey: deserialize_script(&hex::decode(\"{}\").unwrap()), txid: deserialize_txid(&hex::decode(\"{}\").unwrap()), vout: {}, value: {}u64, }},",
-            hex::encode(serialize_script(&utxo.script_pubkey)),
-            hex::encode(serialize_txid(&utxo.txid)),
+            println!("        UtxoEntry {{ script_pubkey: consensus_decode(&Vec::from_hex(\"{}\").unwrap()), txid: consensus_decode(&Vec::from_hex(\"{}\").unwrap()), vout: {}, value: {}u64, }},",
+            hex::encode(consensus_encode(&utxo.script_pubkey)),
+            hex::encode(consensus_encode(&utxo.txid)),
             utxo.vout,
             utxo.value);
         }

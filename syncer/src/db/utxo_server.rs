@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::ser::{Serializer, SerializeStruct};
-use bitcoin::{Txid, Script};
+use bitcoin::{Txid, Script, Block};
 
 use crate::*;
 
@@ -24,7 +24,7 @@ impl serde::ser::Serialize for UtxoServerValue {
         where S: Serializer
     {
         let mut state = serializer.serialize_struct("UtxoServerValue", 3)?;
-        let mut txid = serialize_txid(&self.txid);
+        let mut txid = consensus_encode(&self.txid);
         txid.reverse();
         state.serialize_field("txid", &hex::encode(txid))?;
         state.serialize_field("vout", &self.vout)?;
@@ -52,7 +52,7 @@ impl Serialize for UtxoServerValue {
 impl From<&[u8]> for UtxoServerValue {
     fn from(buf: &[u8]) -> UtxoServerValue {
         assert_eq!(buf.len(), 44);
-        let txid = deserialize_txid(&buf[0..32]);
+        let txid = consensus_decode(&buf[0..32]);
         let vout = bytes_to_u32(&buf[32..36]);
         let value = bytes_to_u64(&buf[36..44]);
         UtxoServerValue {
@@ -152,14 +152,14 @@ impl From<&Script> for UtxoServerInStorageKey {
 
 impl Serialize for UtxoServerInStorageKey {
     fn serialize(&self) -> Vec<u8> {
-        serialize_script(&self.script_pubkey)
+        consensus_encode(&self.script_pubkey)
     }
 }
 
 impl Deserialize for UtxoServerInStorageKey {
     fn deserialize(buf: &[u8]) -> Self {
         Self {
-            script_pubkey: deserialize_script(buf),
+            script_pubkey: consensus_decode(buf),
         }
     }
 }

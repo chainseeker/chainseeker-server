@@ -65,7 +65,7 @@ impl HttpServer {
             Ok(script) => {
                 let txids = addr_index_db.read().await.get(&script);
                 let txids: Vec<String> = txids.iter().map(|txid| {
-                    let mut txid = serialize_txid(&txid);
+                    let mut txid = consensus_encode(&txid);
                     txid.reverse();
                     hex::encode(txid)
                 }).collect();

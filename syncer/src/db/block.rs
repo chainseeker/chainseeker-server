@@ -1,4 +1,4 @@
-use bitcoin::BlockHeader;
+use bitcoin::{Txid, Block, BlockHeader};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 
 use crate::*;
@@ -32,7 +32,7 @@ impl BlockDBValue {
 impl Serialize for BlockDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut ret = Vec::new();
-        let block_header = serialize_block_header(&self.block_header);
+        let block_header = consensus_encode(&self.block_header);
         let block_header_len: u16 = block_header.len() as u16;
         ret.push(block_header_len.to_le_bytes().to_vec());
         ret.push(block_header);
@@ -40,7 +40,7 @@ impl Serialize for BlockDBValue {
         ret.push(self.strippedsize.to_le_bytes().to_vec());
         ret.push(self.weight.to_le_bytes().to_vec());
         for txid in self.txids.iter() {
-            ret.push(serialize_txid(txid).to_vec());
+            ret.push(consensus_encode(txid));
         }
         ret.concat()
     }
@@ -50,7 +50,7 @@ impl Deserialize for BlockDBValue {
     fn deserialize(buf: &[u8]) -> Self {
         let block_header_len = bytes_to_u16(&buf[0..2]) as usize;
         let mut offset = 2usize;
-        let block_header = deserialize_block_header(&buf[offset..block_header_len+offset]);
+        let block_header = consensus_decode(&buf[offset..block_header_len+offset]);
         offset += block_header_len as usize;
         let size = bytes_to_u32(&buf[offset..offset+4]);
         offset += 4;
@@ -60,7 +60,7 @@ impl Deserialize for BlockDBValue {
         offset += 4;
         let mut txids = Vec::new();
         while offset < buf.len() {
-            txids.push(deserialize_txid(&buf[offset..offset+32]));
+            txids.push(consensus_decode(&buf[offset..offset+32]));
             offset += 32;
         }
         Self {
@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn put_and_get_block() {
         let height = 123456;
-        let block = deserialize_block(BLOCK);
+        let block = consensus_decode(BLOCK);
         let block_db = BlockDB::new("test/block", true);
         block_db.put(height, &block);
         let value_test = block_db.get(height);

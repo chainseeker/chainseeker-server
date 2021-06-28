@@ -1,7 +1,6 @@
 use std::io::{Read, Write};
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
-use bitcoin::{Script, Txid, BlockHash, Block, BlockHeader};
 
 pub mod rocks_db;
 pub use rocks_db::*;
@@ -59,46 +58,18 @@ pub fn load_config() -> Config {
     toml::from_str(&config_str).expect("Failed to parse config file.")
 }
 
-pub fn serialize_script(script: &Script) -> Vec<u8> {
-    script.to_bytes()
+pub fn consensus_encode<E>(enc: &E) -> Vec<u8>
+    where E: Encodable,
+{
+    let mut vec = Vec::new();
+    enc.consensus_encode(&mut vec).unwrap();
+    vec
 }
 
-pub fn deserialize_script(script_vec: &[u8]) -> Script {
-    Script::from(script_vec.to_vec())
-}
-
-pub fn serialize_txid(txid: &Txid) -> [u8; 32] {
-    let mut txid_vec: [u8; 32] = [0; 32];
-    txid.consensus_encode(&mut txid_vec as &mut [u8]).expect("Failed to encode txid.");
-    txid_vec
-}
-
-pub fn deserialize_txid(txid_vec: &[u8]) -> Txid {
-    Txid::consensus_decode(&txid_vec[..]).expect("Failed to decode txid.")
-}
-
-pub fn deserialize_block(block_vec: &[u8]) -> Block {
-    Block::consensus_decode(block_vec).unwrap()
-}
-
-pub fn serialize_block_hash(block_hash: &BlockHash) -> [u8; 32] {
-    let mut block_hash_vec: [u8; 32] = [0; 32];
-    block_hash.consensus_encode(&mut block_hash_vec as &mut [u8]).expect("Failed to encode block hash.");
-    block_hash_vec
-}
-
-pub fn deserialize_block_hash(block_hash_vec: &[u8]) -> BlockHash {
-    BlockHash::consensus_decode(&block_hash_vec[..]).expect("Failed to decode block hash.")
-}
-
-pub fn serialize_block_header(block_header: &BlockHeader) -> Vec<u8> {
-    let mut block_header_vec = Vec::new();
-    block_header.consensus_encode(&mut block_header_vec).expect("Failed to encode block header.");
-    block_header_vec
-}
-
-pub fn deserialize_block_header(block_header_vec: &[u8]) -> BlockHeader {
-    BlockHeader::consensus_decode(&block_header_vec[..]).expect("Failed to decode block hash.")
+pub fn consensus_decode<D>(dec: &[u8]) -> D
+    where D: Decodable,
+{
+    D::consensus_decode(dec).unwrap()
 }
 
 pub fn bytes_to_u16(buf: &[u8]) -> u16 {

@@ -1,9 +1,8 @@
 use core::ops::Range;
 use std::collections::HashMap;
-
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 use rayon::prelude::*;
-use bitcoin::Script;
+use bitcoin::{Block, Script};
 
 use crate::*;
 
@@ -18,7 +17,7 @@ impl Serialize for RichListEntry {
         where S: Serializer
     {
         let mut state = serializer.serialize_struct("RichListEntry", 2)?;
-        state.serialize_field("script_pubkey", &hex::encode(serialize_script(&self.script_pubkey)))?;
+        state.serialize_field("script_pubkey", &hex::encode(consensus_encode(&self.script_pubkey)))?;
         state.serialize_field("value", &self.value)?;
         state.end()
     }

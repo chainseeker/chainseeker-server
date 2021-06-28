@@ -12,16 +12,16 @@ pub struct AddressIndexDBKey {
 impl Serialize for AddressIndexDBKey {
     fn serialize(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        buf.push(serialize_script(&self.script_pubkey));
-        buf.push(serialize_txid(&self.txid).to_vec());
+        buf.push(consensus_encode(&self.script_pubkey));
+        buf.push(consensus_encode(&self.txid));
         buf.concat()
     }
 }
 
 impl Deserialize for AddressIndexDBKey {
     fn deserialize(buf: &[u8]) -> Self {
-        let script_pubkey = deserialize_script(&buf[0..buf.len()-32]);
-        let txid = deserialize_txid(&buf[buf.len()-32..]);
+        let script_pubkey = consensus_decode(&buf[0..buf.len()-32]);
+        let txid = consensus_decode(&buf[buf.len()-32..]);
         AddressIndexDBKey {
             script_pubkey,
             txid,
@@ -68,7 +68,7 @@ impl AddressIndexDB {
         }
     }
     pub fn get(&self, script_pubkey: &Script) -> Vec<Txid> {
-        let script_pubkey = serialize_script(script_pubkey);
+        let script_pubkey = consensus_encode(script_pubkey);
         self.db.prefix_iter(script_pubkey).map(|(key, _value)| key.txid).collect()
     }
     pub fn put(&self, script_pubkey: &Script, txid: &Txid) {
@@ -121,9 +121,9 @@ mod test {
         let mut entries = addr_index_db.db.iter().map(|(key, _value)| key).collect::<Vec<AddressIndexDBKey>>();
         entries.sort();
         for entry in entries.iter() {
-            println!("        AddressIndexDBKey {{ script_pubkey: deserialize_script(&hex::decode(\"{}\").unwrap()), txid: deserialize_txid(&hex::decode(\"{}\").unwrap()), }},",
-            hex::encode(serialize_script(&entry.script_pubkey)),
-            hex::encode(serialize_txid(&entry.txid)));
+            println!("        AddressIndexDBKey {{ script_pubkey: consensus_decode(&hex::decode(\"{}\").unwrap()), txid: consensus_decode(&hex::decode(\"{}\").unwrap()), }},",
+            hex::encode(consensus_encode(&entry.script_pubkey)),
+            hex::encode(consensus_encode(&entry.txid)));
         }
     }
     #[test]
