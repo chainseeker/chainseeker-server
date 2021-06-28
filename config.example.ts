@@ -1,6 +1,6 @@
 
 export const configs = {
-	bitcoin: {
+	btc: {
 		google_analytics: "UA-000000000-0",
 		coin: {
 			network: "bitcoin",

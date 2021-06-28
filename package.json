@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "description": "chainseeker: A fast, reliable and open-source cryptocurrency blockexplorer.",
   "scripts": {
+    "syncer": "cargo run --release",
     "api": "ts-node ./api/src/index.ts",
     "web": "ts-node ./web/src/index.ts",
     "test": "jest"
