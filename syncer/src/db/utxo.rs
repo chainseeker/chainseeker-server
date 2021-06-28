@@ -125,10 +125,6 @@ impl UtxoDB {
             let txid = tx.txid();
             for vout in 0..tx.output.len() {
                 let output = &tx.output[vout];
-                // Ignore zero-value outputs.
-                if output.value <= 0 {
-                    continue;
-                }
                 let key = UtxoDBKey {
                     txid,
                     vout: vout as u32,
@@ -214,11 +210,6 @@ impl UtxoDB {
         for tx in block.txdata.iter() {
             let txid = tx.txid();
             for vout in 0..tx.output.len() {
-                let output = &tx.output[vout];
-                // Ignore zero-value outputs.
-                if output.value <= 0 {
-                    continue;
-                }
                 let key = UtxoDBKey {
                     txid,
                     vout: vout as u32,
@@ -265,7 +256,7 @@ mod test {
             utxo_db.process_block(&blocks[h], false);
         }
         // Test UTXO database BEFORE reorg.
-        let mut utxos_test = utxo_db.iter().collect::<Vec<UtxoEntry>>();
+        let mut utxos_test = utxo_db.iter().filter(|utxo| utxo.value != 0).collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
         let mut utxos = test_fixtures::utxos_before_reorg();
         utxos.sort();
@@ -285,7 +276,7 @@ mod test {
         }
         utxo_db.reorg_block(&blocks[blocks.len()-2], &prev_txs);
         utxo_db.process_block(&blocks[blocks.len()-1], false);
-        let mut utxos_test = utxo_db.iter().collect::<Vec<UtxoEntry>>();
+        let mut utxos_test = utxo_db.iter().filter(|utxo| utxo.value != 0).collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
         let mut utxos = test_fixtures::utxos_after_reorg();
         utxos.sort();
