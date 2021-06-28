@@ -33,11 +33,11 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
-    - name: Install criterion
-      run: cargo install cargo-criterion
-
-    - name: Run benchmark
-      run: cargo criterion
+#    - name: Install criterion
+#      run: cargo install cargo-criterion
+#
+#    - name: Run benchmark
+#      run: cargo criterion
 
     - name: Install stable toolchain
       uses: actions-rs/toolchain@v1
