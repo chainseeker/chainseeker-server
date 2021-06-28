@@ -144,7 +144,7 @@ impl Syncer {
                 flush_stdout();
             }
         };
-        let (utxo_server_tx, mut utxo_server_rx) = channel(1024 * 1024 * 1024);
+        let (utxo_server_tx, mut utxo_server_rx) = channel(1024 * 1024);
         let (rich_list_tx, mut rich_list_rx) = channel(1024 * 1024);
         let utxo_server = self.http_server.utxo_server.clone();
         let utxo_server_join = tokio::spawn(async move {
@@ -167,8 +167,12 @@ impl Syncer {
             }
             print_stat(i, false);
             i += 1;
+            // Ignore UTXO entries with zero value.
+            if utxo.value <= 0 {
+                continue;
+            }
             utxo_server_tx.send(utxo.clone()).await.unwrap();
-            rich_list_tx.send(utxo.clone()).await.unwrap();
+            rich_list_tx.send(utxo).await.unwrap();
         }
         print_stat(i, true);
         println!("");
