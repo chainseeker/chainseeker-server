@@ -34,7 +34,7 @@ impl Syncer {
             coin: coin.to_string(),
             config: (*config).clone(),
             block_db,
-            utxo_db: UtxoDB::new(coin),
+            utxo_db: UtxoDB::new(coin, false),
             rich_list_builder: RichListBuilder::new(),
             rest,
             stop: Arc::new(RwLock::new(false)),
@@ -159,10 +159,9 @@ impl Syncer {
             rich_list_builder
         });
         let mut i = 0;
-        for (key, value) in self.utxo_db.db.iter() {
+        for utxo in self.utxo_db.iter() {
             print_stat(i, false);
             i += 1;
-            let utxo: UtxoEntry = (key, value).into();
             utxo_server_tx.send(utxo.clone()).await.unwrap();
             rich_list_tx.send(utxo.clone()).await.unwrap();
         }

@@ -3,7 +3,7 @@ use bitcoin::{Block, Txid, Script};
 
 use crate::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UtxoEntry {
     pub script_pubkey: Script,
     pub txid: Txid,
@@ -75,6 +75,24 @@ impl From<(UtxoDBKey, UtxoDBValue)> for UtxoEntry {
     }
 }
 
+pub struct UtxoDBIterator<'a> {
+    iter: RocksDBIterator<'a, UtxoDBKey, UtxoDBValue>,
+}
+
+impl<'a> Iterator for UtxoDBIterator<'a> {
+    type Item = UtxoEntry;
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.iter.next();
+        match next {
+            Some((key, value)) => {
+                let utxo: UtxoEntry = (key, value).into();
+                Some(utxo)
+            },
+            None => None,
+        }
+    }
+}
+
 pub struct UtxoDB {
     /// Stores:
     ///     key   = txid || vout
@@ -83,10 +101,10 @@ pub struct UtxoDB {
 }
 
 impl UtxoDB {
-    pub fn new(coin: &str) -> Self {
+    pub fn new(coin: &str, temporary: bool) -> Self {
         let path = Self::get_path(coin);
         Self {
-            db: RocksDB::new(&path, false),
+            db: RocksDB::new(&path, temporary),
         }
     }
     fn get_path(coin: &str) -> String {
@@ -95,6 +113,11 @@ impl UtxoDB {
     pub fn len(&self) -> usize {
         self.db.iter().count()
     }
+    pub fn iter(&self) -> UtxoDBIterator {
+        UtxoDBIterator {
+            iter: self.db.iter(),
+        }
+    }
     pub fn process_block(&mut self, block: &Block, no_panic: bool) -> Vec<UtxoEntry> {
         // Process vouts.
         let inserts = block.txdata.par_iter().map(|tx| {
@@ -102,6 +125,10 @@ impl UtxoDB {
             let txid = tx.txid();
             for vout in 0..tx.output.len() {
                 let output = &tx.output[vout];
+                // Ignore zero-value outputs.
+                if output.value <= 0 {
+                    continue;
+                }
                 let key = UtxoDBKey {
                     txid,
                     vout: vout as u32,
@@ -185,6 +212,11 @@ impl UtxoDB {
         for tx in block.txdata.iter() {
             let txid = tx.txid();
             for vout in 0..tx.output.len() {
+                let output = &tx.output[vout];
+                // Ignore zero-value outputs.
+                if output.value <= 0 {
+                    continue;
+                }
                 let key = UtxoDBKey {
                     txid,
                     vout: vout as u32,
@@ -192,5 +224,48 @@ impl UtxoDB {
                 self.db.delete(&key);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[allow(dead_code)]
+    fn print_utxo_db(utxo_db: &UtxoDB) {
+        for utxo in utxo_db.iter() {
+            if utxo.value == 0 {
+                continue;
+            }
+            println!("UtxoEntry {{ script_pubkey: deserialize_script(&hex::decode(\"{}\").unwrap()), txid: deserialize_txid(&hex::decode(\"{}\").unwrap()), vout: {}, value: {}u64, }},",
+            hex::encode(serialize_script(&utxo.script_pubkey)),
+            hex::encode(serialize_txid(&utxo.txid)),
+            utxo.vout,
+            utxo.value);
+        }
+    }
+    #[test]
+    fn utxo_db() {
+        let blocks = test_fixtures::regtest_blocks();
+        let mut utxo_db = UtxoDB::new("test", true);
+        for h in 0..(blocks.len()-1) {
+            utxo_db.process_block(&blocks[h], false);
+        }
+        // Test UTXO database BEFORE reorg.
+        let mut utxos_test = utxo_db.iter().collect::<Vec<UtxoEntry>>();
+        utxos_test.sort();
+        let mut utxos = test_fixtures::utxos_before_reorg();
+        utxos.sort();
+        assert_eq!(utxos_test, utxos);
+        // Test UTXO database AFTER reorg.
+        /*
+        utxo_db.reorg_block(&blocks[blocks.len()-2]);
+        utxo_db.process_block(&blocks[blocks.len()-1], false);
+        let mut utxos_test = utxo_db.iter().collect::<Vec<UtxoEntry>>();
+        utxos_test.sort();
+        let mut utxos = test_fixtures::utxos_before_reorg();
+        utxos.sort();
+        print_utxo_db(&utxo_db);
+        assert_eq!(utxos_test, utxos);
+        */
     }
 }

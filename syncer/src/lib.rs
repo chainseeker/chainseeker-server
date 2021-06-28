@@ -17,6 +17,8 @@ pub mod syncer;
 pub use syncer::*;
 pub mod http_server;
 pub use http_server::*;
+#[cfg(test)]
+pub mod test_fixtures;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 

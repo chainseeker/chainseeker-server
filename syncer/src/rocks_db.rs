@@ -69,18 +69,6 @@ impl<D> Deserialize for Vec<D>
     }
 }
 
-pub trait KVS<K, V>
-    where K: Serialize + Deserialize,
-          V: Serialize + Deserialize,
-{
-    fn get(&self, key: &K) -> Option<V>;
-    fn put(&self, key: &K, value: &V);
-    fn delete(&self, key: &K);
-    fn iter(&self) -> Box<dyn Iterator<Item = (K, V)> + '_>;
-    fn prefix_iter(&self, prefix: Vec<u8>) -> Box<dyn Iterator<Item = (K, V)> + '_>;
-    fn purge(&self);
-}
-
 type Rocks = DBWithThreadMode<MultiThreaded>;
 
 pub struct RocksDBIterator<'a, K, V>
@@ -192,31 +180,25 @@ impl<K, V> RocksDB<K, V>
             _v: PhantomData,
         }
     }
-}
-
-impl<K, V> KVS<K, V> for RocksDB<K, V>
-    where K: Serialize + Deserialize + 'static,
-          V: Serialize + Deserialize + 'static,
-{
-    fn get(&self, key: &K) -> Option<V> {
+    pub fn get(&self, key: &K) -> Option<V> {
         match self.db.get(key.serialize()).unwrap() {
             Some(value) => Some(V::deserialize(&value)),
             None => None,
         }
     }
-    fn put(&self, key: &K, value: &V) {
+    pub fn put(&self, key: &K, value: &V) {
         self.db.put(key.serialize(), value.serialize()).unwrap();
     }
-    fn delete(&self, key: &K) {
+    pub fn delete(&self, key: &K) {
         self.db.delete(key.serialize()).unwrap();
     }
-    fn iter(&self) -> Box<dyn Iterator<Item = (K, V)> + '_> {
-        Box::new(RocksDBIterator::new(&self))
+    pub fn iter(&self) -> RocksDBIterator<'_, K, V> {
+        RocksDBIterator::new(&self)
     }
-    fn prefix_iter(&self, prefix: Vec<u8>) -> Box<dyn Iterator<Item = (K, V)> + '_> {
+    pub fn prefix_iter(&self, prefix: Vec<u8>) -> Box<dyn Iterator<Item = (K, V)> + '_> {
         Box::new(RocksDBPrefixIterator::new(&self, prefix))
     }
-    fn purge(&self) {
+    pub fn purge(&self) {
         remove_dir_all(&self.path).unwrap();
     }
 }
