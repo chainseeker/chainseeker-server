@@ -16,10 +16,12 @@ pub struct BlockFetcher {
     /// The next block height the workers should fetch for.
     next_height: Arc<RwLock<u32>>,
     stop_height: u32,
+    stop: Arc<RwLock<bool>>,
+    handles: Vec<tokio::task::JoinHandle<()>>,
 }
 
 impl BlockFetcher {
-    async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
+    pub async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
         let block_hash = rest.blockhashbyheight(height).await
             .expect(&format!("Failed to fetch block at height = {}.", height));
         let block = rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
@@ -32,6 +34,8 @@ impl BlockFetcher {
             current_height: start_height,
             next_height: Arc::new(RwLock::new(start_height)),
             stop_height,
+            stop: Arc::new(RwLock::new(false)),
+            handles: Vec::new(),
         }
     }
     pub async fn len(&self) -> usize {
@@ -57,11 +61,10 @@ impl BlockFetcher {
             },
         }
     }
-    pub fn run(&self, n_threads: Option<usize>) {
+    pub fn run(&mut self, n_threads: Option<usize>) {
         // Register Ctrl-C handler.
-        let stop = Arc::new(RwLock::new(false));
         {
-            let stop = stop.clone();
+            let stop = self.stop.clone();
             tokio::spawn(async move {
                 tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
                 println!("Ctrl-C was pressed. Exiting BlockFetcher...");
@@ -73,10 +76,10 @@ impl BlockFetcher {
             let rest = self.rest.clone();
             let blocks = self.blocks.clone();
             let next_height = self.next_height.clone();
-            let stop = stop.clone();
+            let stop = self.stop.clone();
             let stop_height = self.stop_height;
             // Launch a worker.
-            tokio::spawn(async move{
+            let handle = tokio::spawn(async move{
                 loop {
                     if *stop.read().await {
                         break;
@@ -98,6 +101,13 @@ impl BlockFetcher {
                     blocks.write().await.insert(height, (block_hash, block));
                 }
             });
+            self.handles.push(handle);
+        }
+    }
+    pub async fn stop(&mut self) {
+        *self.stop.write().await = true;
+        for handle in self.handles.iter_mut() {
+            handle.await.unwrap();
         }
     }
 }
