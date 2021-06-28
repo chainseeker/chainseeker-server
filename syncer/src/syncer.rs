@@ -99,7 +99,7 @@ impl Syncer {
             let block_hash_rest = self.rest.blockhashbyheight(height).await
                 .expect(&format!("Failed to fetch block at height = {}.", height));
             let block_me = self.block_db.get(height).unwrap();
-            let block_hash_me = block_me.block_hash;
+            let block_hash_me = block_me.block_header.block_hash();
             if block_hash_rest == block_hash_me {
                 break;
             }

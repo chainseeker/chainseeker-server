@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
-use bitcoin::{Script, Txid, BlockHash, Block};
+use bitcoin::{Script, Txid, BlockHash, Block, BlockHeader};
 
 pub mod rocks_db;
 pub use rocks_db::*;
@@ -89,6 +89,23 @@ pub fn serialize_block_hash(block_hash: &BlockHash) -> [u8; 32] {
 
 pub fn deserialize_block_hash(block_hash_vec: &[u8]) -> BlockHash {
     BlockHash::consensus_decode(&block_hash_vec[..]).expect("Failed to decode block hash.")
+}
+
+pub fn serialize_block_header(block_header: &BlockHeader) -> Vec<u8> {
+    let mut block_header_vec = Vec::new();
+    block_header.consensus_encode(&mut block_header_vec).expect("Failed to encode block header.");
+    block_header_vec
+}
+
+pub fn deserialize_block_header(block_header_vec: &[u8]) -> BlockHeader {
+    BlockHeader::consensus_decode(&block_header_vec[..]).expect("Failed to decode block hash.")
+}
+
+pub fn bytes_to_u16(buf: &[u8]) -> u16 {
+    assert_eq!(buf.len(), 2);
+    let mut tmp: [u8; 2] = [0; 2];
+    tmp.copy_from_slice(&buf);
+    u16::from_le_bytes(tmp)
 }
 
 pub fn bytes_to_u32(buf: &[u8]) -> u32 {
