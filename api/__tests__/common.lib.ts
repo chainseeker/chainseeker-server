@@ -1,8 +1,7 @@
 
-import * as cs from 'chainseeker-lib';
-cs.setApiEndPoint('http://localhost:7001/api');
+import { Chainseeker } from 'chainseeker';
 
 export const getCS = () => {
-	return cs;
+	return new Chainseeker('http://localhost:7001/api');
 }
 
