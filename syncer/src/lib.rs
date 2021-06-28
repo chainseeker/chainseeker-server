@@ -37,13 +37,6 @@ pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
     bitcoin_rest::new(&config.rest_endpoint)
 }
 
-pub fn rocks_db(path: &str) -> RocksDBBase {
-    let mut opts = Options::default();
-    opts.set_max_open_files(100);
-    opts.create_if_missing(true);
-    RocksDBBase::open(&opts, path).expect("Failed to open the database.")
-}
-
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CoinConfig {
     pub rest_endpoint: String,

@@ -171,7 +171,10 @@ impl<K, V> RocksDB<K, V>
                 remove_dir_all(path).unwrap();
             }
         }
-        let db = rocks_db(path);
+        let mut opts = Options::default();
+        opts.set_max_open_files(100);
+        opts.create_if_missing(true);
+        let db = RocksDBBase::open(&opts, path).expect("Failed to open the database.");
         Self {
             temporary,
             path: path.to_string(),
