@@ -1,9 +1,6 @@
-use std::convert::TryInto;
 use bitcoin::BlockHash;
 
 use crate::*;
-
-const SYNCED_HEIGHT_KEY: &str = "synced_height";
 
 pub struct BlockDB {
     db: RocksDBBase,
@@ -32,19 +29,6 @@ impl BlockDB {
             None => None,
         }
     }
-    pub fn get_synced_height(&self) -> Option<u32> {
-        match self.db.get(SYNCED_HEIGHT_KEY).expect("Failed to get the synced height.") {
-            Some(synced_height) => {
-                let buf: [u8; 4] = synced_height.try_into().unwrap();
-                Some(u32::from_le_bytes(buf))
-            },
-            None => None,
-        }
-    }
-    pub fn put_synced_height(&self, height: u32) {
-        let height = height.to_le_bytes();
-        self.db.put(SYNCED_HEIGHT_KEY, height).expect("Failed to put the synced height.");
-    }
 }
 
 #[cfg(test)]
@@ -66,16 +50,6 @@ mod tests {
         block_db.put_block_hash(height, &block_hash);
         let block_hash_test = block_db.get_block_hash(height).unwrap();
         assert_eq!(block_hash_test, block_hash);
-        remove_dir_all(BlockDB::path(&coin)).unwrap();
-    }
-    #[test]
-    fn put_and_get_synced_height() {
-        let height = 123456;
-        let coin = "test/synced_height";
-        let block_db = BlockDB::new(&coin);
-        block_db.put_synced_height(height);
-        let height_test = block_db.get_synced_height().unwrap();
-        assert_eq!(height_test, height);
         remove_dir_all(BlockDB::path(&coin)).unwrap();
     }
 }

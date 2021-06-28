@@ -8,6 +8,7 @@ use super::*;
 pub struct Syncer {
     coin: String,
     config: Config,
+    synced_height_db: SyncedHeightDB,
     block_db: BlockDB,
     utxo_db: UtxoDB,
     rich_list_builder: RichListBuilder,
@@ -21,6 +22,7 @@ impl Syncer {
         let syncer = Self {
             coin: coin.to_string(),
             config: (*config).clone(),
+            synced_height_db: SyncedHeightDB::new(coin),
             block_db: BlockDB::new(coin),
             utxo_db: UtxoDB::new(coin, false),
             rich_list_builder: RichListBuilder::new(),
@@ -43,7 +45,10 @@ impl Syncer {
         &self.config.coins[&self.coin]
     }
     fn synced_height(&self) -> Option<u32> {
-        self.block_db.get_synced_height()
+        self.synced_height_db.get()
+    }
+    fn put_synced_height(&self, height: u32) {
+        self.synced_height_db.put(height);
     }
     async fn process_block(&mut self, block_fetcher: &mut Option<&mut BlockFetcher>, height: u32) {
         let begin = Instant::now();
@@ -77,7 +82,7 @@ impl Syncer {
         }
         // Put best block information.
         self.block_db.put_block_hash(height, &block_hash);
-        self.block_db.put_synced_height(height);
+        self.put_synced_height(height);
         println!(
             "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms){}",
             height, block.txdata.len(), vins, vouts,
@@ -114,7 +119,7 @@ impl Syncer {
             }
             self.utxo_db.reorg_block(&block, &prev_txs);
             height -= 1;
-            self.block_db.put_synced_height(height);
+            self.put_synced_height(height);
         }
     }
     async fn sync(&mut self, block_fetcher: &mut Option<&mut BlockFetcher>) -> u32 {
