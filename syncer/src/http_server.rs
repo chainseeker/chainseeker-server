@@ -28,7 +28,7 @@ impl HttpServer {
     pub fn new(coin: &str) -> Self {
         Self{
             coin: coin.to_string(),
-            addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin))),
+            addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin, false))),
             utxo_server: Arc::new(RwLock::new(UtxoServer::new(coin))),
             rich_list: Arc::new(RwLock::new(RichList::new())),
         }
