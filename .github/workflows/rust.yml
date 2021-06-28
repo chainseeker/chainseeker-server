@@ -27,12 +27,12 @@ jobs:
     - name: Configure sccache
       uses: visvirial/sccache-action@v1
 
-    - name: Build
-      run: cargo build --verbose
-
-    - name: Run tests
-      run: cargo test --verbose
-
+#    - name: Build
+#      run: cargo build --verbose
+#
+#    - name: Run tests
+#      run: cargo test --verbose
+#
 #    - name: Install criterion
 #      run: cargo install cargo-criterion
 #
