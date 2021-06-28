@@ -248,7 +248,7 @@ mod test {
     #[test]
     fn utxo_db() {
         let blocks = test_fixtures::regtest_blocks().to_vec();
-        let mut utxo_db = UtxoDB::new("test", true);
+        let mut utxo_db = UtxoDB::new("test/utxo", true);
         for h in 0..(blocks.len()-1) {
             utxo_db.process_block(&blocks[h], false);
         }
