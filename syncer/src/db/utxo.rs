@@ -232,11 +232,13 @@ mod test {
     use super::*;
     #[allow(dead_code)]
     fn print_utxo_db(utxo_db: &UtxoDB) {
-        for utxo in utxo_db.iter() {
+        let mut utxos = utxo_db.iter().collect::<Vec<UtxoEntry>>();
+        utxos.sort();
+        for utxo in utxos.iter() {
             if utxo.value == 0 {
                 continue;
             }
-            println!("UtxoEntry {{ script_pubkey: deserialize_script(&hex::decode(\"{}\").unwrap()), txid: deserialize_txid(&hex::decode(\"{}\").unwrap()), vout: {}, value: {}u64, }},",
+            println!("        UtxoEntry {{ script_pubkey: deserialize_script(&hex::decode(\"{}\").unwrap()), txid: deserialize_txid(&hex::decode(\"{}\").unwrap()), vout: {}, value: {}u64, }},",
             hex::encode(serialize_script(&utxo.script_pubkey)),
             hex::encode(serialize_txid(&utxo.txid)),
             utxo.vout,
@@ -256,15 +258,15 @@ mod test {
         let mut utxos = test_fixtures::utxos_before_reorg();
         utxos.sort();
         assert_eq!(utxos_test, utxos);
-        // Test UTXO database AFTER reorg.
         /*
+        // Test UTXO database AFTER reorg.
         utxo_db.reorg_block(&blocks[blocks.len()-2]);
         utxo_db.process_block(&blocks[blocks.len()-1], false);
+        print_utxo_db(&utxo_db);
         let mut utxos_test = utxo_db.iter().collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
         let mut utxos = test_fixtures::utxos_before_reorg();
         utxos.sort();
-        print_utxo_db(&utxo_db);
         assert_eq!(utxos_test, utxos);
         */
     }
