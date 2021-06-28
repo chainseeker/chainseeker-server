@@ -110,8 +110,21 @@ impl Syncer {
                 break;
             }
             println!("Reorg detected at block height = {}.", height);
+            // Fetch the reorged block.
             let block = self.rest.block(&block_hash_me).await.expect("Failed to fetch the reorged block from REST.");
-            self.utxo_db.reorg_block(&self.rest, &block).await;
+            // Fetch previous transactions.
+            let mut prev_txs = Vec::new();
+            for tx in block.txdata.iter() {
+                for vin in tx.input.iter() {
+                    if vin.previous_output.is_null() {
+                        continue;
+                    }
+                    let txid = &vin.previous_output.txid;
+                    let prev_tx = self.rest.tx(txid).await.expect("Failed to fetch the previous transaction.");
+                    prev_txs.push(prev_tx);
+                }
+            }
+            self.utxo_db.reorg_block(&block, &prev_txs);
             height -= 1;
             self.block_db.put_synced_height(height);
         }

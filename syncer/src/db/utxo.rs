@@ -1,5 +1,5 @@
 use rayon::prelude::*;
-use bitcoin::{Block, Txid, Script};
+use bitcoin::{Block, Txid, Script, Transaction};
 
 use crate::*;
 
@@ -184,8 +184,9 @@ impl UtxoDB {
         }
         previous_utxos
     }
-    pub async fn reorg_block(&mut self, rest: &bitcoin_rest::Context, block: &Block) {
+    pub fn reorg_block(&mut self, block: &Block, prev_txs: &Vec<Transaction>) {
         // Process vins.
+        let mut prev_tx_offset = 0;
         for tx in block.txdata.iter() {
             for vin in tx.input.iter() {
                 if vin.previous_output.is_null() {
@@ -197,7 +198,8 @@ impl UtxoDB {
                     txid: *txid,
                     vout,
                 };
-                let prev_tx = rest.tx(txid).await.expect("Failed to fetch the previous transaction.");
+                let prev_tx = &prev_txs[prev_tx_offset];
+                prev_tx_offset += 1;
                 let prev_out = &prev_tx.output[vout as usize];
                 let script_pubkey = &prev_out.script_pubkey;
                 let value = prev_out.value;
@@ -245,9 +247,19 @@ mod test {
             utxo.value);
         }
     }
+    fn find_tx(blocks: &Vec<Block>, txid: &Txid) -> Transaction {
+        for block in blocks.iter() {
+            for tx in block.txdata.iter() {
+                if tx.txid() == *txid {
+                    return (*tx).clone();
+                }
+            }
+        }
+        panic!("Failed to find the transaction with txid = {}.", txid);
+    }
     #[test]
     fn utxo_db() {
-        let blocks = test_fixtures::regtest_blocks();
+        let blocks = test_fixtures::regtest_blocks().to_vec();
         let mut utxo_db = UtxoDB::new("test", true);
         for h in 0..(blocks.len()-1) {
             utxo_db.process_block(&blocks[h], false);
@@ -258,16 +270,25 @@ mod test {
         let mut utxos = test_fixtures::utxos_before_reorg();
         utxos.sort();
         assert_eq!(utxos_test, utxos);
-        /*
         // Test UTXO database AFTER reorg.
-        utxo_db.reorg_block(&blocks[blocks.len()-2]);
+        // Find previous transactions.
+        let mut prev_txs = Vec::new();
+        for tx in blocks[blocks.len()-2].txdata.iter() {
+            for vin in tx.input.iter() {
+                if vin.previous_output.is_null() {
+                    continue;
+                }
+                let txid = &vin.previous_output.txid;
+                let prev_tx = find_tx(&blocks, txid);
+                prev_txs.push(prev_tx);
+            }
+        }
+        utxo_db.reorg_block(&blocks[blocks.len()-2], &prev_txs);
         utxo_db.process_block(&blocks[blocks.len()-1], false);
-        print_utxo_db(&utxo_db);
         let mut utxos_test = utxo_db.iter().collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
-        let mut utxos = test_fixtures::utxos_before_reorg();
+        let mut utxos = test_fixtures::utxos_after_reorg();
         utxos.sort();
         assert_eq!(utxos_test, utxos);
-        */
     }
 }
