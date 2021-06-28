@@ -2,6 +2,7 @@ use serde::ser::{Serializer, SerializeStruct};
 use bitcoin_hashes::hex::ToHex;
 use bitcoin::{Txid, Block, BlockHeader, BlockHash};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
+use bitcoin::network::constants::Network;
 
 use crate::*;
 
@@ -64,17 +65,15 @@ pub struct BlockContentDBValue {
 
 impl BlockContentDBValue {
     fn new(height: u32, block: &Block) -> Self {
+        let size = block.get_size() as u32;
+        let weight = block.get_weight() as u32;
         Self {
             height,
             block_header: block.header,
-            size: block.get_size() as u32,
+            size,
             //strippedsize: block.get_strippedsize() as u32,
-            strippedsize: block.txdata.iter().map(|tx| {
-                let size = tx.get_size();
-                let weight = tx.get_weight();
-                (weight - size) / (WITNESS_SCALE_FACTOR - 1)
-            }).sum::<usize>() as u32,
-            weight: block.get_weight() as u32,
+            strippedsize: (weight - size) / ((WITNESS_SCALE_FACTOR - 1) as u32),
+            weight,
             txids: block.txdata.iter().map(|tx| tx.txid()).collect(),
         }
     }
@@ -84,13 +83,28 @@ impl serde::ser::Serialize for BlockContentDBValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        let mut state = serializer.serialize_struct("BlockContentDBValue", 6)?;
-        state.serialize_field("height", &self.height)?;
-        state.serialize_field("block_header", &hex::encode(consensus_encode(&self.block_header)))?;
-        state.serialize_field("size", &self.size)?;
-        state.serialize_field("strippedsize", &self.strippedsize)?;
-        state.serialize_field("weight", &self.weight)?;
-        state.serialize_field("txids", &self.txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>())?;
+        let mut state = serializer.serialize_struct("BlockContentDBValue", 14)?;
+        state.serialize_field("height"           , &self.height)?;
+        let block_header = &self.block_header;
+        state.serialize_field("header"           , &hex::encode(consensus_encode(&block_header)))?;
+        let mut hash = consensus_encode(&block_header.block_hash());
+        hash.reverse();
+        state.serialize_field("hash"             , &hex::encode(&hash))?;
+        state.serialize_field("version"          , &block_header.version)?;
+        let mut prev_blockhash = consensus_encode(&block_header.prev_blockhash);
+        prev_blockhash.reverse();
+        state.serialize_field("previousblockhash", &hex::encode(&prev_blockhash))?;
+        let mut merkle_root = consensus_encode(&block_header.merkle_root);
+        merkle_root.reverse();
+        state.serialize_field("merkle_root"      , &hex::encode(&merkle_root))?;
+        state.serialize_field("time"             , &block_header.time)?;
+        state.serialize_field("bits"             , &format!("{:x}", block_header.bits))?;
+        state.serialize_field("difficulty"       , &block_header.difficulty(Network::Bitcoin))?;
+        state.serialize_field("nonce"            , &block_header.nonce)?;
+        state.serialize_field("size"             , &self.size)?;
+        state.serialize_field("strippedsize"     , &self.strippedsize)?;
+        state.serialize_field("weight"           , &self.weight)?;
+        state.serialize_field("txids"            , &self.txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>())?;
         state.end()
     }
 }

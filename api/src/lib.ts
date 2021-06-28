@@ -6,7 +6,7 @@ import * as xcp from 'counterjs';
 import * as cs from 'chainseeker/dist/types';
 
 import { RestClient } from './RestClient';
-import { SyncerClient, SyncerBlock } from './SyncerClient';
+import { SyncerClient } from './SyncerClient';
 
 export const resolveAddress = (script: Buffer, network: bitcoin.Network): string|null => {
 	try {
@@ -108,39 +108,11 @@ export const fetchTransaction = async (syncer: SyncerClient, rest: RestClient, t
 	};
 }
 
-type RawBlockHeader = {
-	header: Buffer;
-	size: number;
-	strippedsize: number;
-	weight: number;
-	txhashes: Buffer[];
-};
-
-const convertBlock = (syncerBlock: SyncerBlock): cs.Block => {
-	const block = bitcoin.Block.fromHex(syncerBlock.block_header);
-	return {
-		header: syncerBlock.block_header,
-		hash: block.getId(),
-		version: (<any>block).version,
-		previousblockhash: ((<any>block).prevHash.reverse() as Buffer).toString('hex'),
-		merkleroot: ((<any>block).merkleRoot.reverse() as Buffer).toString('hex'),
-		time: (<any>block).timestamp,
-		bits: (<any>block).bits.toString(16),
-		difficulty: (Math.pow(2., 8 * (0x1d - ((<any>block).bits>>24))) * 0x00ffff / ((<any>block).bits & 0x00ffffff)),
-		nonce: (<any>block).nonce,
-		size:         syncerBlock.size,
-		strippedsize: syncerBlock.strippedsize,
-		weight:       syncerBlock.weight,
-		height:       syncerBlock.height,
-		txids:        syncerBlock.txids,
-	};
-};
-
 export const fetchBlockByHeight = async (syncer: SyncerClient, height: number): Promise<cs.Block> => {
-	return convertBlock(await syncer.getBlockByHeight(height));
+	return await syncer.getBlockByHeight(height);
 };
 
 export const fetchBlockByHash = async (syncer: SyncerClient, hash: string): Promise<cs.Block> => {
-	return convertBlock(await syncer.getBlock(hash));
+	return await syncer.getBlock(hash);
 };
 

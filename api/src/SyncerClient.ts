@@ -1,14 +1,7 @@
 
 import fetch from 'node-fetch';
+import * as cs from 'chainseeker/dist/types';
 
-export type SyncerBlock = {
-	height: number,
-	block_header: string,
-	size: number,
-	strippedsize: number,
-	weight: number,
-	txids: string[],
-};
 export type SyncerAddressIndex = string[];
 export type SyncerUtxoEntry = {
 	txid: string,
@@ -31,11 +24,11 @@ export class SyncerClient {
 		const json = await response.json() as T;
 		return json;
 	}
-	async getBlock(blockid: string): Promise<SyncerBlock> {
-		return await this.call<SyncerBlock>('block', blockid);
+	async getBlock(blockid: string): Promise<cs.Block> {
+		return await this.call<cs.Block>('block', blockid);
 	}
-	async getBlockByHeight(height: number): Promise<SyncerBlock> {
-		return await this.call<SyncerBlock>('blockbyheight', height.toString());
+	async getBlockByHeight(height: number): Promise<cs.Block> {
+		return await this.call<cs.Block>('blockbyheight', height.toString());
 	}
 	async getAddressIndex(script: Buffer): Promise<SyncerAddressIndex> {
 		return await this.call<SyncerAddressIndex>('addr_index', script.toString('hex'));
