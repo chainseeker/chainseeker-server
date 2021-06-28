@@ -1,10 +1,56 @@
-use bitcoin::{Txid, Block, BlockHeader};
+use bitcoin::{Txid, Block, BlockHeader, BlockHash};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 
 use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BlockDBValue {
+pub struct BlockHashDBValue {
+    pub block_hash: BlockHash,
+}
+
+impl Serialize for BlockHashDBValue {
+    fn serialize(&self) -> Vec<u8> {
+        consensus_encode(&self.block_hash)
+    }
+}
+
+impl Deserialize for BlockHashDBValue {
+    fn deserialize(buf: &[u8]) -> Self {
+        let block_hash = consensus_decode(buf);
+        Self {
+            block_hash,
+        }
+    }
+}
+
+pub struct BlockHashDB {
+    /// Stores (block_height, block_hash).
+    db: RocksDB<u32, BlockHashDBValue>,
+}
+
+impl BlockHashDB {
+    pub fn path(coin: &str) -> String {
+        format!("{}/{}/block_hash", data_dir(), coin)
+    }
+    pub fn new(coin: &str, temporary: bool) -> Self {
+        let path = Self::path(coin);
+        Self {
+            db: RocksDB::new(&path, temporary),
+        }
+    }
+    pub fn put(&self, height: u32, block: &Block) {
+        self.db.put(&height, &BlockHashDBValue { block_hash: block.block_hash() });
+    }
+    pub fn get(&self, height: u32) -> Option<BlockHash> {
+        match self.db.get(&height) {
+            Some(value) => Some(value.block_hash),
+            None => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockContentDBValue {
     pub block_header: BlockHeader,
     pub size: u32,
     pub strippedsize: u32,
@@ -12,7 +58,7 @@ pub struct BlockDBValue {
     pub txids: Vec<Txid>,
 }
 
-impl BlockDBValue {
+impl BlockContentDBValue {
     fn new(block: &Block) -> Self {
         Self {
             block_header: block.header,
@@ -29,7 +75,7 @@ impl BlockDBValue {
     }
 }
 
-impl Serialize for BlockDBValue {
+impl Serialize for BlockContentDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut ret = Vec::new();
         let block_header = consensus_encode(&self.block_header);
@@ -46,7 +92,7 @@ impl Serialize for BlockDBValue {
     }
 }
 
-impl Deserialize for BlockDBValue {
+impl Deserialize for BlockContentDBValue {
     fn deserialize(buf: &[u8]) -> Self {
         let block_header_len = bytes_to_u16(&buf[0..2]) as usize;
         let mut offset = 2usize;
@@ -73,11 +119,11 @@ impl Deserialize for BlockDBValue {
     }
 }
 
-pub struct BlockDB {
-    db: RocksDB<u32, BlockDBValue>,
+pub struct BlockContentDB {
+    db: RocksDB<BlockHashDBValue, BlockContentDBValue>,
 }
 
-impl BlockDB {
+impl BlockContentDB {
     pub fn path(coin: &str) -> String {
         format!("{}/{}/block", data_dir(), coin)
     }
@@ -87,11 +133,36 @@ impl BlockDB {
             db: RocksDB::new(&path, temporary),
         }
     }
-    pub fn put(&self, height: u32, block: &Block) {
-        self.db.put(&height, &BlockDBValue::new(&block));
+    pub fn put(&self, block: &Block) {
+        self.db.put(&BlockHashDBValue { block_hash: block.block_hash() }, &BlockContentDBValue::new(&block));
     }
-    pub fn get(&self, height: u32) -> Option<BlockDBValue> {
-        self.db.get(&height)
+    pub fn get(&self, block_hash: &BlockHash) -> Option<BlockContentDBValue> {
+        self.db.get(&BlockHashDBValue { block_hash: (*block_hash).clone() })
+    }
+}
+
+pub struct BlockDB {
+    hash_db: BlockHashDB,
+    content_db: BlockContentDB,
+}
+
+impl BlockDB {
+    pub fn new(coin: &str, temporary: bool) -> Self {
+        Self {
+            hash_db: BlockHashDB::new(coin, temporary),
+            content_db: BlockContentDB::new(coin, temporary),
+        }
+    }
+    pub fn put(&self, height: u32, block: &Block) {
+        self.hash_db.put(height, block);
+        self.content_db.put(block);
+    }
+    pub fn get(&self, height: u32) -> Option<BlockContentDBValue> {
+        let block_hash = match self.hash_db.get(height) {
+            Some(block_hash) => block_hash,
+            None => return None,
+        };
+        self.content_db.get(&block_hash)
     }
 }
 
@@ -100,17 +171,12 @@ mod tests {
     use super::*;
     const BLOCK: &[u8] = include_bytes!("../../fixtures/mainnet/block_500000.bin");
     #[test]
-    fn path() {
-        let path = BlockDB::path("test");
-        assert_eq!(path, format!("{}/.chainseeker/test/block", std::env::var("HOME").unwrap()));
-    }
-    #[test]
     fn put_and_get_block() {
         let height = 123456;
         let block = consensus_decode(BLOCK);
         let block_db = BlockDB::new("test/block", true);
         block_db.put(height, &block);
         let value_test = block_db.get(height);
-        assert_eq!(value_test, Some(BlockDBValue::new(&block)));
+        assert_eq!(value_test, Some(BlockContentDBValue::new(&block)));
     }
 }

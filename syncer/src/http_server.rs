@@ -19,6 +19,7 @@ use super::*;
 #[derive(Debug, Clone)]
 pub struct HttpServer {
     coin: String,
+    //pub block_db: Arc<RwLock<BlockDB>>,
     pub addr_index_db: Arc<RwLock<AddressIndexDB>>,
     pub utxo_server: Arc<RwLock<UtxoServer>>,
     pub rich_list: Arc<RwLock<RichList>>,
@@ -28,6 +29,7 @@ impl HttpServer {
     pub fn new(coin: &str) -> Self {
         Self{
             coin: coin.to_string(),
+            //block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin, false))),
             utxo_server: Arc::new(RwLock::new(UtxoServer::new(coin))),
             rich_list: Arc::new(RwLock::new(RichList::new())),
@@ -135,6 +137,8 @@ impl HttpServer {
                 req.set_context(Instant::now());
                 Ok(req)
             }))
+            //.get("/blockbyheight/:height", Self::blockbyheight_handler)
+            //.get("/block/:block_hash", Self::block_handler)
             .get("/addr_index/:script", Self::addr_index_handler)
             .get("/utxo/:script", Self::utxo_handler)
             .get("/rich_list/count", Self::rich_list_count_handler)
