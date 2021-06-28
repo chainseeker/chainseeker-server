@@ -2,54 +2,72 @@ use bitcoin::BlockHash;
 
 use crate::*;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockDBValue {
+    pub block_hash: BlockHash,
+}
+
+impl BlockDBValue {
+    fn new(block: &Block) -> Self {
+        Self {
+            block_hash: block.block_hash(),
+        }
+    }
+}
+
+impl Serialize for BlockDBValue {
+    fn serialize(&self) -> Vec<u8> {
+        serialize_block_hash(&self.block_hash).to_vec()
+    }
+}
+
+impl Deserialize for BlockDBValue {
+    fn deserialize(buf: &[u8]) -> Self {
+        let block_hash = deserialize_block_hash(buf);
+        Self {
+            block_hash,
+        }
+    }
+}
+
 pub struct BlockDB {
-    db: RocksDBBase,
+    db: RocksDB<u32, BlockDBValue>,
 }
 
 impl BlockDB {
     pub fn path(coin: &str) -> String {
         format!("{}/{}/block", data_dir(), coin)
     }
-    pub fn new(coin: &str) -> Self {
+    pub fn new(coin: &str, temporary: bool) -> Self {
         let path = Self::path(coin);
         Self {
-            db: rocks_db(&path),
+            db: RocksDB::new(&path, temporary),
         }
     }
-    pub fn put_block_hash(&self, height: u32, block_hash: &BlockHash) {
-        let height = height.to_le_bytes();
-        let block_hash = serialize_block_hash(block_hash);
-        self.db.put(height, &block_hash).expect("Failed to put block hash.");
+    pub fn put(&self, height: u32, block: &Block) {
+        self.db.put(&height, &BlockDBValue::new(&block));
     }
-    pub fn get_block_hash(&self, height: u32) -> Option<BlockHash> {
-        let height = height.to_le_bytes();
-        let block_hash = self.db.get(height).expect("Failed to get block hash");
-        match block_hash {
-            Some(block_hash) => Some(deserialize_block_hash(&block_hash)),
-            None => None,
-        }
+    pub fn get(&self, height: u32) -> Option<BlockDBValue> {
+        self.db.get(&height)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs::remove_dir_all;
     use super::*;
+    const BLOCK: &[u8] = include_bytes!("../../fixtures/mainnet/block_500000.bin");
     #[test]
     fn path() {
         let path = BlockDB::path("test");
         assert_eq!(path, format!("{}/.chainseeker/test/block", std::env::var("HOME").unwrap()));
     }
     #[test]
-    fn put_and_get_block_hash() {
+    fn put_and_get_block() {
         let height = 123456;
-        let block_hash_arr = hex::decode("00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048").unwrap();
-        let block_hash = deserialize_block_hash(&block_hash_arr);
-        let coin = "test/block_hash";
-        let block_db = BlockDB::new(&coin);
-        block_db.put_block_hash(height, &block_hash);
-        let block_hash_test = block_db.get_block_hash(height).unwrap();
-        assert_eq!(block_hash_test, block_hash);
-        remove_dir_all(BlockDB::path(&coin)).unwrap();
+        let block = deserialize_block(BLOCK);
+        let block_db = BlockDB::new("test", true);
+        block_db.put(height, &block);
+        let value_test = block_db.get(height);
+        assert_eq!(value_test, Some(BlockDBValue::new(&block)));
     }
 }

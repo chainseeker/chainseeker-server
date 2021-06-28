@@ -1,10 +1,6 @@
 use bitcoin::Block;
 use crate::*;
 
-fn deserialize_block(block_vec: &[u8]) -> Block {
-    Block::consensus_decode(block_vec).unwrap()
-}
-
 pub fn regtest_blocks() -> [Block; 104] {
     [
         deserialize_block(include_bytes!("../fixtures/regtest/block_0.bin")),

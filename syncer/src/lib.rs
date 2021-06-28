@@ -84,6 +84,10 @@ pub fn deserialize_txid(txid_vec: &[u8]) -> Txid {
     Txid::consensus_decode(&txid_vec[..]).expect("Failed to decode txid.")
 }
 
+pub fn deserialize_block(block_vec: &[u8]) -> Block {
+    Block::consensus_decode(block_vec).unwrap()
+}
+
 pub fn serialize_block_hash(block_hash: &BlockHash) -> [u8; 32] {
     let mut block_hash_vec: [u8; 32] = [0; 32];
     block_hash.consensus_encode(&mut block_hash_vec as &mut [u8]).expect("Failed to encode block hash.");

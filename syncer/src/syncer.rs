@@ -23,7 +23,7 @@ impl Syncer {
             coin: coin.to_string(),
             config: (*config).clone(),
             synced_height_db: SyncedHeightDB::new(coin),
-            block_db: BlockDB::new(coin),
+            block_db: BlockDB::new(coin, false),
             utxo_db: UtxoDB::new(coin, false),
             rich_list_builder: RichListBuilder::new(),
             rest: get_rest(&config.coins[coin]),
@@ -54,7 +54,7 @@ impl Syncer {
         let begin = Instant::now();
         // Fetch block from REST.
         let begin_rest = Instant::now();
-        let (block_hash, block) = match block_fetcher {
+        let (_block_hash, block) = match block_fetcher {
             Some(block_fetcher) => block_fetcher.get(height).await,
             None => BlockFetcher::fetch_block(&self.rest, height).await,
         };
@@ -81,7 +81,7 @@ impl Syncer {
             vouts += tx.output.len();
         }
         // Put best block information.
-        self.block_db.put_block_hash(height, &block_hash);
+        self.block_db.put(height, &block);
         self.put_synced_height(height);
         println!(
             "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms){}",
@@ -98,7 +98,8 @@ impl Syncer {
         loop {
             let block_hash_rest = self.rest.blockhashbyheight(height).await
                 .expect(&format!("Failed to fetch block at height = {}.", height));
-            let block_hash_me = self.block_db.get_block_hash(height).unwrap();
+            let block_me = self.block_db.get(height).unwrap();
+            let block_hash_me = block_me.block_hash;
             if block_hash_rest == block_hash_me {
                 break;
             }
