@@ -1,6 +1,14 @@
 
 import fetch from 'node-fetch';
 
+export type SyncerBlock = {
+	height: number,
+	block_header: string,
+	size: number,
+	strippedsize: number,
+	weight: number,
+	txids: string[],
+};
 export type SyncerAddressIndex = string[];
 export type SyncerUtxoEntry = {
 	txid: string,
@@ -22,6 +30,12 @@ export class SyncerClient {
 		const response = await fetch(url);
 		const json = await response.json() as T;
 		return json;
+	}
+	async getBlock(blockid: string): Promise<SyncerBlock> {
+		return await this.call<SyncerBlock>('block', blockid);
+	}
+	async getBlockByHeight(height: number): Promise<SyncerBlock> {
+		return await this.call<SyncerBlock>('blockbyheight', height.toString());
 	}
 	async getAddressIndex(script: Buffer): Promise<SyncerAddressIndex> {
 		return await this.call<SyncerAddressIndex>('addr_index', script.toString('hex'));

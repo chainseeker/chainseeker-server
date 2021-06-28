@@ -6,6 +6,7 @@ import * as xcp from 'counterjs';
 import * as cs from 'chainseeker/dist/types';
 
 import { RestClient } from './RestClient';
+import { SyncerClient, SyncerBlock } from './SyncerClient';
 
 export const resolveAddress = (script: Buffer, network: bitcoin.Network): string|null => {
 	try {
@@ -20,14 +21,14 @@ export type RawTransaction = {
 	rawtx: Buffer;
 };
 
-const fetchTransactionWithConfirmedHeight = async (rest: RestClient, txhash: string):
+const fetchTransactionWithConfirmedHeight = async (syncer: SyncerClient, rest: RestClient, txhash: string):
 	Promise<{ tx: bitcoin.Transaction, confirmed_height: number | null }> => {
 	const restTx = await rest.getTxJson(txhash);
 	const tx = bitcoin.Transaction.fromBuffer(Buffer.from(restTx.hex, 'hex'));
 	if(restTx.blockhash) {
-		const restBlock = await rest.getBlockNoTxDetailsJson(restTx.blockhash);
+		const syncerBlock = await syncer.getBlock(restTx.blockhash);
 		return {
-			confirmed_height: restBlock.height,
+			confirmed_height: syncerBlock.height,
 			tx,
 		};
 	} else {
@@ -38,8 +39,9 @@ const fetchTransactionWithConfirmedHeight = async (rest: RestClient, txhash: str
 	}
 };
 
-export const fetchTransaction = async (rest: RestClient, txhash: string, network: bitcoin.Network): Promise<cs.Transaction> => {
-	const { confirmed_height, tx } = await fetchTransactionWithConfirmedHeight(rest, txhash);
+export const fetchTransaction = async (syncer: SyncerClient, rest: RestClient, txhash: string, network: bitcoin.Network):
+	Promise<cs.Transaction> => {
+	const { confirmed_height, tx } = await fetchTransactionWithConfirmedHeight(syncer, rest, txhash);
 	// Fetch input tx information.
 	let isCoinbase = false;
 	const previousTxs = await Promise.all(tx.ins.map((input) => {
@@ -114,26 +116,10 @@ type RawBlockHeader = {
 	txhashes: Buffer[];
 };
 
-const _fetchRawBlockHeader = async (rest: RestClient, hash: string): Promise<RawBlockHeader> => {
-	const restBlockJson = await rest.getBlockJson(hash);
-	const restBlockBin = await rest.getBlockBin(hash);
-	const block = bitcoin.Block.fromBuffer(restBlockBin);
+const convertBlock = (syncerBlock: SyncerBlock): cs.Block => {
+	const block = bitcoin.Block.fromHex(syncerBlock.block_header);
 	return {
-		header      : block.toBuffer(true),
-		size        : restBlockJson.size,
-		strippedsize: restBlockJson.strippedsize,
-		weight      : restBlockJson.weight,
-		txhashes    : block.transactions!.map((tx) => Buffer.from(tx.getId(), 'hex')),
-	};
-};
-
-const _fetchBlock = async (rest: RestClient, hash: string, height: number): Promise<cs.Block> => {
-	// Get block header.
-	const rawBlockHeader: RawBlockHeader = await _fetchRawBlockHeader(rest, hash);
-	const block = bitcoin.Block.fromBuffer(rawBlockHeader.header);
-	// Construct final object.
-	const ret = {
-		header: rawBlockHeader.header.toString('hex'),
+		header: syncerBlock.block_header,
 		hash: block.getId(),
 		version: (<any>block).version,
 		previousblockhash: ((<any>block).prevHash.reverse() as Buffer).toString('hex'),
@@ -142,23 +128,19 @@ const _fetchBlock = async (rest: RestClient, hash: string, height: number): Prom
 		bits: (<any>block).bits.toString(16),
 		difficulty: (Math.pow(2., 8 * (0x1d - ((<any>block).bits>>24))) * 0x00ffff / ((<any>block).bits & 0x00ffffff)),
 		nonce: (<any>block).nonce,
-		size:         rawBlockHeader.size,
-		strippedsize: rawBlockHeader.strippedsize,
-		weight:       rawBlockHeader.weight,
-		height: height,
-		txids: rawBlockHeader.txhashes.map((txhash) => txhash.toString('hex')),
+		size:         syncerBlock.size,
+		strippedsize: syncerBlock.strippedsize,
+		weight:       syncerBlock.weight,
+		height:       syncerBlock.height,
+		txids:        syncerBlock.txids,
 	};
-	return ret;
-}
-
-export const fetchBlockByHeight = async (rest: RestClient, height: number): Promise<cs.Block> => {
-	const blockhash = await rest.getBlockHashByHeightBin(height);
-	return _fetchBlock(rest, (blockhash.reverse() as Buffer).toString('hex'), height);
 };
 
-export const fetchBlockByHash = async (rest: RestClient, hash: string): Promise<cs.Block> => {
-	const restBlock = await rest.getBlockNoTxDetailsJson(hash);
-	const height = restBlock.height;
-	return _fetchBlock(rest, hash, height);
+export const fetchBlockByHeight = async (syncer: SyncerClient, height: number): Promise<cs.Block> => {
+	return convertBlock(await syncer.getBlockByHeight(height));
+};
+
+export const fetchBlockByHash = async (syncer: SyncerClient, hash: string): Promise<cs.Block> => {
+	return convertBlock(await syncer.getBlock(hash));
 };
 

@@ -83,9 +83,9 @@ const main = async () => {
 			block: async (args: {id: string}): Promise<cs.Block|null> => {
 				try {
 					if(args.id.match(/[0-9]+/)) {
-						return await fetchBlockByHeight(rest, Number.parseInt(args.id));
+						return await fetchBlockByHeight(syncer, Number.parseInt(args.id));
 					} else {
-						return await fetchBlockByHash(rest, args.id);
+						return await fetchBlockByHash(syncer, args.id);
 					}
 				} catch(e) {
 					if(config.debug) console.log(e);
@@ -94,7 +94,7 @@ const main = async () => {
 			},
 			tx: async (args: {id: string}): Promise<cs.Transaction|null> => {
 				try {
-					return await fetchTransaction(rest, args.id, NETWORK);
+					return await fetchTransaction(syncer, rest, args.id, NETWORK);
 				} catch(e) {
 					if(config.debug) console.log(e);
 					return null;
@@ -172,7 +172,7 @@ const main = async () => {
 	// /block/[blockid]
 	app.get(`${config.server.api.prefix}/${API_VERSION}/block/:blockid([0-9a-fA-F]{64})`, async (req, res, next) => {
 		try {
-			res.json(await fetchBlockByHash(rest, req.params.blockid));
+			res.json(await fetchBlockByHash(syncer, req.params.blockid));
 		} catch(e) {
 			if(config.debug) console.log(e);
 			res.status(404).json({ error: 'Block not found.' });
@@ -182,7 +182,7 @@ const main = async () => {
 	// /block/[height]
 	app.get(`${config.server.api.prefix}/${API_VERSION}/block/:height([0-9]+)`, async (req, res, next) => {
 		try {
-			res.json(await fetchBlockByHeight(rest, Number.parseInt(req.params.height)));
+			res.json(await fetchBlockByHeight(syncer, Number.parseInt(req.params.height)));
 		} catch(e) {
 			if(config.debug) console.log(e);
 			res.status(404).json({ error: 'Block not found.' })
@@ -192,7 +192,7 @@ const main = async () => {
 	// /tx/[txid]
 	app.get(`${config.server.api.prefix}/${API_VERSION}/tx/:txid([0-9a-fA-F]{64})`, async (req, res, next) => {
 		try {
-			res.json(await fetchTransaction(rest, req.params.txid, NETWORK));
+			res.json(await fetchTransaction(syncer, rest, req.params.txid, NETWORK));
 		} catch(e) {
 			if(config.debug) console.log(e);
 			res.status(404).json({ error: 'Transaction not found.' })
@@ -226,7 +226,7 @@ const main = async () => {
 				res.status(400).json({ error: 'Failed to broadcast transaction.', message: err.toString() });
 				return;
 			}
-			res.json(await fetchTransaction(rest, result, NETWORK));
+			res.json(await fetchTransaction(syncer, rest, result, NETWORK));
 		});
 	});
 	
