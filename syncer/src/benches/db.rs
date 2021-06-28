@@ -6,7 +6,7 @@ use bitcoin::Block;
 use chainseeker_syncer::*;
 
 const COIN: &str = "bench";
-const BLOCK: &[u8] = include_bytes!("block_500000.bin");
+const BLOCK: &[u8] = include_bytes!("../../fixtures/mainnet/block_500000.bin");
 
 async fn run_utxo_server_in_memory_push(utxos: &Vec<UtxoEntry>) {
     let _print_gag = gag::Gag::stdout().unwrap();
@@ -28,7 +28,7 @@ async fn run_utxo_server_in_storage_push(utxos: &Vec<UtxoEntry>) {
 fn bench_db(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let block = Block::consensus_decode(BLOCK).expect("Failed to decode block.");
-    let mut utxo_db = UtxoDB::new(COIN);
+    let mut utxo_db = UtxoDB::new(COIN, true);
     c.bench_function("UtxoDB.process_block()", |b| b.iter(|| {
         utxo_db.process_block(&block, true);
     }));
