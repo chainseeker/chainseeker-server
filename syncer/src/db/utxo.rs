@@ -110,9 +110,6 @@ impl UtxoDB {
     fn get_path(coin: &str) -> String {
         format!("{}/{}/utxo", data_dir(), coin)
     }
-    pub fn len(&self) -> usize {
-        self.db.iter().count()
-    }
     pub fn iter(&self) -> UtxoDBIterator {
         UtxoDBIterator {
             iter: self.db.iter(),
