@@ -1,5 +1,6 @@
 
 import fetch from 'node-fetch';
+import * as bitcoin from 'bitcoinjs-lib';
 import { Semaphore } from 'await-semaphore';
 
 export type RestVin = {
@@ -96,6 +97,13 @@ export class RestClient {
 	}
 	async getTxJson(txid: string): Promise<RestTx> {
 		return await this.callJson<RestTx>('tx', txid);
+	}
+	async getTxBin(txid: string): Promise<Buffer> {
+		return await this.callBin('tx', txid);
+	}
+	async getTx(txid: string): Promise<bitcoin.Transaction> {
+		const rawtx = await this.getTxBin(txid);
+		return bitcoin.Transaction.fromBuffer(rawtx);
 	}
 	async getBlockHashByHeightBin(height: number): Promise<Buffer> {
 		return await this.callBin('blockhashbyheight', height.toString());

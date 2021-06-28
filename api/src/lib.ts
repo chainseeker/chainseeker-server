@@ -20,47 +20,46 @@ export type RawTransaction = {
 	rawtx: Buffer;
 };
 
-export const fetchRawTransaction = async (rest: RestClient, txhash: string): Promise<RawTransaction> => {
+const fetchTransactionWithConfirmedHeight = async (rest: RestClient, txhash: string):
+	Promise<{ tx: bitcoin.Transaction, confirmed_height: number | null }> => {
 	const restTx = await rest.getTxJson(txhash);
+	const tx = bitcoin.Transaction.fromBuffer(Buffer.from(restTx.hex, 'hex'));
 	if(restTx.blockhash) {
-		const restBlock = await rest.getBlockJson(restTx.blockhash);
+		const restBlock = await rest.getBlockNoTxDetailsJson(restTx.blockhash);
 		return {
 			confirmed_height: restBlock.height,
-			rawtx: Buffer.from(restTx.hex, 'hex'),
+			tx,
 		};
 	} else {
 		return {
-			confirmed_height: -1,
-			rawtx: Buffer.from(restTx.hex, 'hex'),
+			confirmed_height: null,
+			tx,
 		};
 	}
-}
+};
 
 export const fetchTransaction = async (rest: RestClient, txhash: string, network: bitcoin.Network): Promise<cs.Transaction> => {
-	const data = await fetchRawTransaction(rest, txhash);
-	const tx = bitcoin.Transaction.fromBuffer(data.rawtx);
-	const height = data.confirmed_height < 0 ? null : data.confirmed_height;
+	const { confirmed_height, tx } = await fetchTransactionWithConfirmedHeight(rest, txhash);
 	// Fetch input tx information.
 	let isCoinbase = false;
-	for(let i in tx.ins) {
-		const input = tx.ins[i];
+	const previousTxs = await Promise.all(tx.ins.map((input) => {
 		const txhash = Buffer.from(input.hash);
 		// Coinbase transaction.
 		if(txhash.toString('hex') == '0000000000000000000000000000000000000000000000000000000000000000') {
 			isCoinbase = true;
-			continue;
+			return undefined;
 		}
 		// Fetch raw transaction for this input.
-		const txInput = await fetchRawTransaction(rest, (txhash.reverse() as Buffer).toString('hex'));
-		(<any>tx.ins[i]).previousTx = {
-			tx: bitcoin.Transaction.fromBuffer(txInput.rawtx),
-			height: (txInput.confirmed_height < 0 ? null : txInput.confirmed_height),
-		};
-	}
+		return rest.getTx((txhash.reverse() as Buffer).toString('hex'))
+	}));
 	// Compute transaction fee.
-	let fee = 0;
-	tx.ins.forEach((input) => { fee += (<any>input).previousTx ? (<any>input).previousTx.tx.outs[input.index].value : 0; });
-	(<bitcoin.TxOutput[]>tx.outs).forEach((output) => { fee -= output.value; });
+	const inputValue = tx.ins.reduce((acc, input, i) => {
+		const previousTx = previousTxs[i];
+		const val = (typeof previousTx === 'undefined' ? 0 : previousTx.outs[input.index].value);
+		return acc + val;
+	}, 0);
+	const outputValue = tx.outs.reduce((acc, output) => acc + output.value, 0);
+	const fee = inputValue - outputValue;
 	// Parse Counterparty.
 	let counterparty = undefined;
 	try {
@@ -79,7 +78,7 @@ export const fetchTransaction = async (rest: RestClient, txhash: string, network
 		vsize: tx.virtualSize(),
 		version: tx.version,
 		locktime: tx.locktime,
-		confirmed_height: height,
+		confirmed_height,
 		counterparty: counterparty,
 		vin: tx.ins.map((input: bitcoin.TxInput) => ({
 			txid: (Buffer.from(input.hash).reverse() as Buffer).toString('hex'),
@@ -90,8 +89,8 @@ export const fetchTransaction = async (rest: RestClient, txhash: string, network
 			},
 			txinwitness: input.witness.map((witness: Buffer) => witness.toString('hex')),
 			sequence: input.sequence,
-			value: (<any>input).previousTx ? (<any>input).previousTx.tx.outs[input.index].value : 0,
-			address: (<any>input).previousTx ? resolveAddress((<any>input).previousTx.tx.outs[input.index].script, network) : 'coinbase',
+			value: (<any>input).previousTx ? (<any>input).previousTx.outs[input.index].value : 0,
+			address: (<any>input).previousTx ? resolveAddress((<any>input).previousTx.outs[input.index].script, network) : 'coinbase',
 		})),
 		vout: (<bitcoin.TxOutput[]>tx.outs).map((output: bitcoin.TxOutput, n: number) => ({
 			value: output.value,
