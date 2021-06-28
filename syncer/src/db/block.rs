@@ -54,6 +54,7 @@ impl BlockHashDB {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockContentDBValue {
+    pub height: u32,
     pub block_header: BlockHeader,
     pub size: u32,
     pub strippedsize: u32,
@@ -62,8 +63,9 @@ pub struct BlockContentDBValue {
 }
 
 impl BlockContentDBValue {
-    fn new(block: &Block) -> Self {
+    fn new(height: u32, block: &Block) -> Self {
         Self {
+            height,
             block_header: block.header,
             size: block.get_size() as u32,
             //strippedsize: block.get_strippedsize() as u32,
@@ -82,7 +84,8 @@ impl serde::ser::Serialize for BlockContentDBValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        let mut state = serializer.serialize_struct("BlockContentDBValue", 5)?;
+        let mut state = serializer.serialize_struct("BlockContentDBValue", 6)?;
+        state.serialize_field("height", &self.height)?;
         state.serialize_field("block_header", &hex::encode(consensus_encode(&self.block_header)))?;
         state.serialize_field("size", &self.size)?;
         state.serialize_field("strippedsize", &self.strippedsize)?;
@@ -95,6 +98,7 @@ impl serde::ser::Serialize for BlockContentDBValue {
 impl Serialize for BlockContentDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut ret = Vec::new();
+        ret.push(self.height.to_le_bytes().to_vec());
         let block_header = consensus_encode(&self.block_header);
         let block_header_len: u16 = block_header.len() as u16;
         ret.push(block_header_len.to_le_bytes().to_vec());
@@ -111,8 +115,9 @@ impl Serialize for BlockContentDBValue {
 
 impl Deserialize for BlockContentDBValue {
     fn deserialize(buf: &[u8]) -> Self {
-        let block_header_len = bytes_to_u16(&buf[0..2]) as usize;
-        let mut offset = 2usize;
+        let height = bytes_to_u32(&buf[0..4]);
+        let block_header_len = bytes_to_u16(&buf[4..6]) as usize;
+        let mut offset = 6usize;
         let block_header = consensus_decode(&buf[offset..block_header_len+offset]);
         offset += block_header_len as usize;
         let size = bytes_to_u32(&buf[offset..offset+4]);
@@ -127,6 +132,7 @@ impl Deserialize for BlockContentDBValue {
             offset += 32;
         }
         Self {
+            height,
             block_header,
             size,
             strippedsize,
@@ -151,8 +157,8 @@ impl BlockContentDB {
             db: RocksDB::new(&path, temporary),
         }
     }
-    pub fn put(&self, block: &Block) {
-        self.db.put(&BlockHashDBValue { block_hash: block.block_hash() }, &BlockContentDBValue::new(&block));
+    pub fn put(&self, height: u32, block: &Block) {
+        self.db.put(&BlockHashDBValue { block_hash: block.block_hash() }, &BlockContentDBValue::new(height, &block));
     }
     pub fn get(&self, block_hash: &BlockHash) -> Option<BlockContentDBValue> {
         self.db.get(&BlockHashDBValue { block_hash: (*block_hash).clone() })
@@ -174,7 +180,7 @@ impl BlockDB {
     }
     pub fn put(&self, height: u32, block: &Block) {
         self.hash_db.put(height, block);
-        self.content_db.put(block);
+        self.content_db.put(height, block);
     }
     pub fn get(&self, height: u32) -> Option<BlockContentDBValue> {
         let block_hash = match self.hash_db.get(height) {
@@ -191,14 +197,14 @@ impl BlockDB {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const HEIGHT: u32 = 500000;
     const BLOCK: &[u8] = include_bytes!("../../fixtures/mainnet/block_500000.bin");
     #[test]
     fn put_and_get_block() {
-        let height = 123456;
         let block = consensus_decode(BLOCK);
         let block_db = BlockDB::new("test/block", true);
-        block_db.put(height, &block);
-        let value_test = block_db.get(height);
-        assert_eq!(value_test, Some(BlockContentDBValue::new(&block)));
+        block_db.put(HEIGHT, &block);
+        let value_test = block_db.get(HEIGHT);
+        assert_eq!(value_test, Some(BlockContentDBValue::new(HEIGHT, &block)));
     }
 }
