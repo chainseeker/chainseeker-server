@@ -120,21 +120,7 @@ const main = async () => {
 				try {
 					if(args.limit <= 0) throw new Error('the parameter "limit" should be greater than zero.');
 					if(args.offset < 0) throw new Error('the parameter "offset" should be positive.');
-					const ret = [];
-					for(let height=args.offset; height<args.offset+args.limit; height++) {
-						const blockid = await rest.getBlockHashByHeightBin(height);
-						const block = await rest.getBlockJson((blockid.reverse() as Buffer).toString('hex'));
-						ret.push({
-							hash        : block.hash,
-							time        : block.time,
-							nonce       : block.nonce,
-							size        : block.size,
-							strippedsize: block.strippedsize,
-							weight      : block.weight,
-							txcount     : block.tx.length,
-						});
-					}
-					return ret;
+					return await syncer.getBlockSummary(args.offset, args.limit);
 				} catch(e) {
 					if(config.debug) console.log(e);
 				}

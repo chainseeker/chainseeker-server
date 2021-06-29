@@ -3,6 +3,8 @@ use std::time::Instant;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::collections::HashMap;
+use serde::Serialize;
 use tokio::sync::RwLock;
 use hyper::{Body, Request, Response, Server, StatusCode};
 use routerify::prelude::*;
@@ -12,9 +14,40 @@ use bitcoin::Script;
 
 use super::*;
 
+#[derive(Debug, Clone, Serialize)]
+pub struct RestBlockSummary {
+    hash        : String,
+    time        : u32,
+    nonce       : u32,
+    size        : u32,
+    strippedsize: u32,
+    weight      : u32,
+    txcount     : usize,
+}
+
+impl RestBlockSummary {
+    pub fn new(block: &BlockContentDBValue) -> Self {
+        let block_header = &block.block_header;
+        let mut hash = consensus_encode(&block_header.block_hash());
+        hash.reverse();
+        let hash = hex::encode(hash);
+        Self {
+            hash,
+            time        : block_header.time,
+            nonce       : block_header.nonce,
+            size        : block.size,
+            strippedsize: block.strippedsize,
+            weight      : block.weight,
+            txcount     : block.txids.len(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HttpServer {
     coin: String,
+    // (height, RestBlockSummary)
+    block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
     pub block_db: Arc<RwLock<BlockDB>>,
     pub addr_index_db: Arc<RwLock<AddressIndexDB>>,
     pub utxo_server: Arc<RwLock<UtxoServer>>,
@@ -25,6 +58,7 @@ impl HttpServer {
     pub fn new(coin: &str) -> Self {
         Self{
             coin: coin.to_string(),
+            block_summary_cache: Arc::new(RwLock::new(HashMap::new())),
             block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin, false))),
             utxo_server: Arc::new(RwLock::new(UtxoServer::new(coin))),
@@ -61,6 +95,37 @@ impl HttpServer {
             Ok(json) => Self::ok(json),
             Err(_) => Self::internal_error("Failed to encode to JSON."),
         }
+    }
+    /// `/block_summary/:offset/:limit` endpoint.
+    async fn block_summary_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let offset: u32 = match req.param("offset").unwrap().parse() {
+            Ok(offset) => offset,
+            Err(_) => return Ok(Self::bad_request("Cannot parse \"offset\" as an integer.")),
+        };
+        let limit: u32 = match req.param("limit").unwrap().parse() {
+            Ok(limit) => limit,
+            Err(_) => return Ok(Self::bad_request("Cannot parse \"limit\" as an integer.")),
+        };
+        let server = req.data::<HttpServer>().unwrap();
+        let mut ret = Vec::new();
+        for height in offset..offset+limit {
+            {
+                let block_summary_cache = server.block_summary_cache.read().await;
+                let summary = block_summary_cache.get(&height);
+                if summary.is_some() {
+                    ret.push((*summary.unwrap()).clone());
+                    continue;
+                }
+            }
+            let block = server.block_db.read().await.get(height);
+            if block.is_none() {
+                break;
+            }
+            let summary = RestBlockSummary::new(&block.unwrap());
+            server.block_summary_cache.write().await.insert(height, summary.clone());
+            ret.push(summary);
+        }
+        Ok(Self::json(&ret))
     }
     /// `/block/:hash_or_height` endpoint.
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -148,6 +213,7 @@ impl HttpServer {
                 req.set_context(Instant::now());
                 Ok(req)
             }))
+            .get("/block_summary/:offset/:limit", Self::block_summary_handler)
             .get("/block/:hash_or_height", Self::block_handler)
             .get("/addr_index/:script", Self::addr_index_handler)
             .get("/utxo/:script", Self::utxo_handler)
@@ -158,7 +224,7 @@ impl HttpServer {
             })
             .middleware(Middleware::post_with_info(|res, req_info| async move {
                 let begin = req_info.context::<Instant>().unwrap();
-                println!("HTTP: {} {} {} ({}us)",
+                println!("HTTP: {} {} {} ({}ms)",
                     req_info.method(), req_info.uri().path(), res.status(), begin.elapsed().as_millis());
                 Ok(res)
             }))
@@ -171,6 +237,19 @@ impl HttpServer {
         let service = RouterService::new(router).unwrap();
         let server = Server::bind(&addr).serve(service);
         println!("HTTP server is listening on http://{}:{}/", ip, port);
+        // Fill BlockSummary cache.
+        /*
+        let mut height = 0;
+        loop {
+            let block = self.block_db.read().await.get(height);
+            if block.is_none() {
+                break;
+            }
+            let summary = RestBlockSummary::new(&block.unwrap());
+            self.block_summary_cache.write().await.insert(height, summary);
+            height += 1;
+        }
+        */
         let graceful = server.with_graceful_shutdown(async {
             tokio::signal::ctrl_c().await.expect("Failed to install Ctrl+C signal handler.");
         });

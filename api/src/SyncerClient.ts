@@ -14,6 +14,15 @@ export type SyncerRichListEntry = {
 	value: number,
 };
 export type SyncerRichList = SyncerRichListEntry[];
+export type SyncerBlockSummary = {
+	hash: string,
+	time: number,
+	nonce: number,
+	size: number,
+	strippedsize: number,
+	weight: number,
+	txcount: number,
+};
 
 export class SyncerClient {
 	constructor(private endpoint: string) {
@@ -23,6 +32,9 @@ export class SyncerClient {
 		const response = await fetch(url);
 		const json = await response.json() as T;
 		return json;
+	}
+	async getBlockSummary(offset: number, limit: number): Promise<SyncerBlockSummary> {
+		return await this.call<SyncerBlockSummary>('block_summary', offset.toString(), limit.toString());
 	}
 	async getBlock(blockid: string): Promise<cs.Block> {
 		return await this.call<cs.Block>('block', blockid);
