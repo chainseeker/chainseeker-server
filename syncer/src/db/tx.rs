@@ -23,15 +23,19 @@ impl Deserialize for TxDBKey {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TxDBValue {
-    confirmed_height: u32,
-    tx: Transaction,
-    previous_txouts: Vec<TxOut>,
+    pub confirmed_height: Option<u32>,
+    pub tx: Transaction,
+    pub previous_txouts: Vec<TxOut>,
 }
 
 impl Serialize for TxDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut ret = Vec::new();
-        ret.push(self.confirmed_height.to_le_bytes().to_vec());
+        let confirmed_height = match self.confirmed_height {
+            Some(confirmed_height) => confirmed_height as i32,
+            None => -1i32,
+        };
+        ret.push(confirmed_height.to_le_bytes().to_vec());
         let tx = consensus_encode(&self.tx);
         let tx_len = tx.len() as u32;
         ret.push(tx_len.to_le_bytes().to_vec());
@@ -48,7 +52,12 @@ impl Serialize for TxDBValue {
 
 impl Deserialize for TxDBValue {
     fn deserialize(buf: &[u8]) -> Self {
-        let confirmed_height = bytes_to_u32(&buf[0..4]);
+        let confirmed_height = bytes_to_i32(&buf[0..4]);
+        let confirmed_height = if confirmed_height >= 0 {
+            Some(confirmed_height as u32)
+        } else {
+            None
+        };
         let tx_len = bytes_to_u32(&buf[4..8]) as usize;
         let tx = consensus_decode(&buf[8..tx_len+8]);
         let mut offset: usize = tx_len + 8;
@@ -106,7 +115,7 @@ impl TxDB {
                 previous_utxo_index += 1;
             }
             let value = TxDBValue {
-                confirmed_height,
+                confirmed_height: Some(confirmed_height),
                 tx: (*tx).clone(),
                 previous_txouts,
             };

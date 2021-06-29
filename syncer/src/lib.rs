@@ -86,6 +86,13 @@ pub fn bytes_to_u32(buf: &[u8]) -> u32 {
     u32::from_le_bytes(tmp)
 }
 
+pub fn bytes_to_i32(buf: &[u8]) -> i32 {
+    assert_eq!(buf.len(), 4);
+    let mut tmp: [u8; 4] = [0; 4];
+    tmp.copy_from_slice(&buf);
+    i32::from_le_bytes(tmp)
+}
+
 pub fn bytes_to_u64(buf: &[u8]) -> u64 {
     assert_eq!(buf.len(), 8);
     let mut tmp: [u8; 8] = [0; 8];

@@ -208,6 +208,43 @@ impl RestTx {
             .expect(&format!("Failed to decode transaction for {}.", core_tx.hex)));
         Some(Self::new(rest, &tx, confirmed_height, network).await)
     }
+    pub fn from_tx_db_value(value: &TxDBValue, network: Network) -> Self {
+        let tx = &value.tx;
+        let mut txid = consensus_encode(&tx.txid());
+        txid.reverse();
+        let mut hash = consensus_encode(&tx.wtxid());
+        hash.reverse();
+        let mut input_value = 0;
+        let mut vin = Vec::new();
+        let mut previous_txout_index = 0;
+        for input in tx.input.iter() {
+            if input.previous_output.is_null() {
+                vin.push(RestVin::new(input, &None, network));
+            } else {
+                input_value += value.previous_txouts[previous_txout_index].value;
+                vin.push(RestVin::new(input, &Some(value.previous_txouts[previous_txout_index].clone()), network));
+                previous_txout_index += 1;
+            }
+        }
+        let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
+        Self {
+            confirmed_height: value.confirmed_height,
+            hex: hex::encode(consensus_encode(tx)),
+            txid: hex::encode(txid),
+            hash: hex::encode(hash),
+            size: tx.get_size(),
+            // TODO: waiting for upstream merge.
+            //vsize: tx.get_vsize(),
+            vsize: (tx.get_weight() + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR,
+            weight: tx.get_weight(),
+            version: tx.version,
+            locktime: tx.lock_time,
+            vin,
+            vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, network)).collect(),
+            // TODO: compute for coinbase transactions!
+            fee: (input_value as i64) - (output_value as i64),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -299,7 +336,10 @@ impl HttpServer {
     /// `/tx/:txid` endpoint.
     async fn tx_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        let txid = req.param("txid").unwrap();
+        let txid = match req.param("txid").unwrap().parse() {
+            Ok(txid) => txid,
+            Err(_) => return Ok(Self::not_found("Failed to decode txid.")),
+        };
         let network = match server.coin.as_str() {
             "btc"  => Network::Bitcoin,
             "tbtc" => Network::Testnet,
@@ -307,8 +347,8 @@ impl HttpServer {
             "sbtc" => Network::Signet,
             _ => panic!("Coin not supported."),
         };
-        match RestTx::fetch(&server.block_db, &server.rest, &txid, network).await {
-            Some(tx) => Ok(Self::json(tx)),
+        match server.tx_db.read().await.get(&txid) {
+            Some(value) => Ok(Self::json(RestTx::from_tx_db_value(&value, network))),
             None => Ok(Self::not_found("Transaction not found.")),
         }
     }
