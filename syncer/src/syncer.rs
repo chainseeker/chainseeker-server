@@ -8,7 +8,6 @@ use super::*;
 pub struct Syncer {
     coin: String,
     config: Config,
-    synced_height_db: SyncedHeightDB,
     utxo_db: UtxoDB,
     rich_list_builder: RichListBuilder,
     rest: bitcoin_rest::Context,
@@ -22,7 +21,6 @@ impl Syncer {
         let syncer = Self {
             coin: coin.to_string(),
             config: (*config).clone(),
-            synced_height_db: SyncedHeightDB::new(coin),
             utxo_db: UtxoDB::new(coin, false),
             rich_list_builder: RichListBuilder::new(),
             rest: rest,
@@ -42,12 +40,6 @@ impl Syncer {
     }
     fn coin_config(&self) -> &CoinConfig {
         &self.config.coins[&self.coin]
-    }
-    fn synced_height(&self) -> Option<u32> {
-        self.synced_height_db.get()
-    }
-    fn put_synced_height(&self, height: u32) {
-        self.synced_height_db.put(height);
     }
     async fn process_block(&mut self, block_fetcher: &mut Option<&mut BlockFetcher>, height: u32) {
         let begin = Instant::now();
@@ -85,7 +77,7 @@ impl Syncer {
         }
         // Put best block information.
         self.http_server.block_db.write().await.put(height, &block);
-        self.put_synced_height(height);
+        put_synced_height(&self.coin, height);
         println!(
             "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:2}ms, tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms){}",
             height, block.txdata.len(), vins, vouts,
@@ -94,7 +86,7 @@ impl Syncer {
             match block_fetcher { Some(bf) => format!(" [b:{:3}]", bf.len().await), None => "".to_string(), });
     }
     async fn process_reorgs(&mut self) {
-        let mut height = match self.synced_height() {
+        let mut height = match get_synced_height(&self.coin) {
             Some(h) => h,
             None => return (),
         };
@@ -123,12 +115,12 @@ impl Syncer {
             }
             self.utxo_db.reorg_block(&block, &prev_txs);
             height -= 1;
-            self.put_synced_height(height);
+            put_synced_height(&self.coin, height);
         }
     }
     async fn sync(&mut self, block_fetcher: &mut Option<&mut BlockFetcher>) -> u32 {
         self.process_reorgs().await;
-        let start_height = match self.synced_height() {
+        let start_height = match get_synced_height(&self.coin) {
             Some(h) => h + 1,
             None => 0,
         };
@@ -196,7 +188,7 @@ impl Syncer {
         println!("Syncer.load_utxo(): executed in {}ms.", begin.elapsed().as_millis());
     }
     async fn block_fetcher(&self) -> BlockFetcher {
-        let start_height = match self.synced_height() {
+        let start_height = match get_synced_height(&self.coin) {
             Some(h) => h + 1,
             None => 0,
         };

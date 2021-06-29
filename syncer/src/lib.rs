@@ -36,6 +36,21 @@ pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
     bitcoin_rest::new(&config.rest_endpoint)
 }
 
+fn synced_height_path(coin: &str) -> String {
+    format!("{}/{}/synced_height.txt", data_dir(), coin)
+}
+
+pub fn get_synced_height(coin: &str) -> Option<u32> {
+    match std::fs::read_to_string(&synced_height_path(coin)) {
+        Ok(s) => Some(s.parse().unwrap()),
+        Err(_) => None,
+    }
+}
+
+pub fn put_synced_height(coin: &str, height: u32) {
+    std::fs::write(&synced_height_path(coin), height.to_string()).unwrap()
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CoinConfig {
     pub rest_endpoint: String,
@@ -156,4 +171,14 @@ pub fn read_vec<R>(r: &mut R, len: usize) -> Vec<u8>
     vec.resize(len, 0);
     r.read_exact(&mut vec).expect("Failed to read vec.");
     vec
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn synced_height() {
+        put_synced_height("test", 123456);
+        assert_eq!(get_synced_height(), Some(123456));
+    }
 }

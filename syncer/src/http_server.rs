@@ -251,6 +251,14 @@ impl HttpServer {
             Err(_) => Self::internal_error("Failed to encode to JSON."),
         }
     }
+    /// `/status` endpoint.
+    async fn status_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        Ok(Self::ok(format!("{{\"blocks\":{}}}", match get_synced_height(&server.coin) {
+            Some(synced_height) => synced_height as i32,
+            None => -1,
+        })))
+    }
     /// `/tx/:txid` endpoint.
     async fn tx_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
@@ -387,6 +395,7 @@ impl HttpServer {
                 req.set_context(Instant::now());
                 Ok(req)
             }))
+            .get("/status", Self::status_handler)
             .get("/tx/:txid", Self::tx_handler)
             .get("/block_summary/:offset/:limit", Self::block_summary_handler)
             .get("/block/:hash_or_height", Self::block_handler)
