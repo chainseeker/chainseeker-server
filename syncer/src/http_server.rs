@@ -171,6 +171,7 @@ impl RestTx {
             txid: hex::encode(txid),
             hash: hex::encode(hash),
             size: tx.get_size(),
+            // TODO: waiting for upstream merge.
             //vsize: tx.get_vsize(),
             vsize: (tx.get_weight() + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR,
             weight: tx.get_weight(),
@@ -178,6 +179,7 @@ impl RestTx {
             locktime: tx.lock_time,
             vin,
             vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, network)).collect(),
+            // TODO: compute for coinbase transactions!
             fee: (input_value as i64) - (output_value as i64),
         }
     }

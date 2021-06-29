@@ -71,6 +71,7 @@ impl BlockContentDBValue {
             height,
             block_header: block.header,
             size,
+            // TODO: wating for upstream merge.
             //strippedsize: block.get_strippedsize() as u32,
             strippedsize: (weight - size) / ((WITNESS_SCALE_FACTOR - 1) as u32),
             weight,
