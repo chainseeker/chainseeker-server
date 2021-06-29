@@ -25,7 +25,7 @@ impl Syncer {
             rich_list_builder: RichListBuilder::new(),
             rest: rest,
             stop: Arc::new(RwLock::new(false)),
-            http_server: HttpServer::new(coin),
+            http_server: HttpServer::new(coin, config),
         };
         // Install Ctrl-C watch.
         let stop = syncer.stop.clone();

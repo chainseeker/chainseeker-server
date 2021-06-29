@@ -53,6 +53,9 @@ pub fn put_synced_height(coin: &str, height: u32) {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CoinConfig {
+    pub rpc_endpoint: String,
+    pub rpc_user: String,
+    pub rpc_pass: String,
     pub rest_endpoint: String,
     pub zmq_endpoint: String,
     pub http_port: u16,

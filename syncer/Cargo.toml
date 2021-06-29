@@ -21,6 +21,7 @@ rocksdb = "0.16"
 bitcoin = "0.26"
 bitcoin_hashes = "0.9"
 bitcoin-rest = "0.0.7"
+bitcoincore-rpc = "0.13"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = [] }

@@ -12,6 +12,7 @@ use routerify::{Middleware, Router, RouterService};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin::{Script, TxIn, TxOut, Address, Network, AddressType};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
+use bitcoincore_rpc::{Auth, Client, RpcApi};
 
 use super::*;
 
@@ -199,6 +200,7 @@ impl RestBlockSummary {
 #[derive(Debug, Clone)]
 pub struct HttpServer {
     coin: String,
+    config: Config,
     // (height, RestBlockSummary)
     block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
     pub block_db: Arc<RwLock<BlockDB>>,
@@ -209,9 +211,10 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(coin: &str) -> Self {
+    pub fn new(coin: &str, config: &Config) -> Self {
         Self{
             coin: coin.to_string(),
+            config: (*config).clone(),
             block_summary_cache: Arc::new(RwLock::new(HashMap::new())),
             block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
             tx_db: Arc::new(RwLock::new(TxDB::new(coin, false))),
@@ -276,6 +279,22 @@ impl HttpServer {
         match server.tx_db.read().await.get(&txid) {
             Some(value) => Ok(Self::json(RestTx::from_tx_db_value(&value, network))),
             None => Ok(Self::not_found("Transaction not found.")),
+        }
+    }
+    /// `/tx/broadcast` endpoint.
+    async fn tx_broadcast_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        let coin_config = &server.config.coins[&server.coin];
+        let auth = Auth::UserPass(coin_config.rpc_user.clone(), coin_config.rpc_pass.clone());
+        let rpc = Client::new(coin_config.rpc_endpoint.clone(), auth).unwrap();
+        let hex = hyper::body::to_bytes(req.into_body()).await.unwrap();
+        let hex = String::from_utf8(hex.to_vec());
+        if hex.is_err() {
+            return Ok(Self::bad_request("Failed to parse input."));
+        }
+        match rpc.send_raw_transaction(hex.unwrap()) {
+            Ok(txid) => Ok(Self::json(format!("{{\"txid\":\"{}\"}}", txid))),
+            Err(_) => Ok(Self::bad_request(&format!("Failed to broadcast transaction."))),
         }
     }
     /// `/block_summary/:offset/:limit` endpoint.
@@ -397,6 +416,7 @@ impl HttpServer {
             }))
             .get("/status", Self::status_handler)
             .get("/tx/:txid", Self::tx_handler)
+            .put("/tx/broadcast", Self::tx_broadcast_handler)
             .get("/block_summary/:offset/:limit", Self::block_summary_handler)
             .get("/block/:hash_or_height", Self::block_handler)
             .get("/addr_index/:script", Self::addr_index_handler)
