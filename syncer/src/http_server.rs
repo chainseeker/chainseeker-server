@@ -4,22 +4,16 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
 use tokio::sync::RwLock;
 use hyper::{Body, Request, Response, Server, StatusCode};
 use routerify::prelude::*;
 use routerify::{Middleware, Router, RouterService};
 use bitcoin_hashes::hex::{FromHex, ToHex};
-use bitcoin::{Script, Transaction, TxIn, TxOut, Address, Network, AddressType};
+use bitcoin::{Script, TxIn, TxOut, Address, Network, AddressType};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 
 use super::*;
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct BitcoinCoreTx {
-    blockhash: Option<String>,
-    hex: String,
-}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RestScriptSig {
@@ -31,7 +25,7 @@ impl RestScriptSig {
     pub fn new(script: &Script) -> Self {
         Self {
             asm: script.asm(),
-            hex: hex::encode(script.as_bytes()),
+            hex: script.to_string(),
         }
     }
 }
@@ -50,13 +44,11 @@ pub struct RestVin {
 
 impl RestVin {
     pub fn new(txin: &TxIn, previous_txout: &Option<TxOut>, network: Network) -> Self {
-        let mut txid = consensus_encode(&txin.previous_output.txid);
-        txid.reverse();
         Self {
-            txid: hex::encode(txid),
+            txid: txin.previous_output.txid.to_string(),
             vout: txin.previous_output.vout,
             script_sig: RestScriptSig::new(&txin.script_sig),
-            txinwitness: txin.witness.iter().map(|witness| hex::encode(witness)).collect(),
+            txinwitness: txin.witness.iter().map(|witness| hex::encode(consensus_encode(witness))).collect(),
             sequence: txin.sequence,
             value: match previous_txout {
                 Some(pt) => pt.value,
@@ -86,7 +78,7 @@ impl RestScriptPubKey {
         let address = Address::from_script(&script_pubkey, network);
         Self {
             asm: script_pubkey.asm(),
-            hex: hex::encode(script_pubkey.as_bytes()),
+            hex: script_pubkey.to_string(),
             r#type: match address.clone() {
                 Some(address) => match address.address_type() {
                     Some(address_type) => match address_type {
@@ -144,76 +136,8 @@ pub struct RestTx {
 }
 
 impl RestTx {
-    pub async fn new(rest: &bitcoin_rest::Context, tx: &Transaction, confirmed_height: Option<u32>, network: Network) -> Self {
-        let rawtx = consensus_encode(tx);
-        let mut txid = consensus_encode(&tx.txid());
-        txid.reverse();
-        let mut hash = consensus_encode(&tx.wtxid());
-        hash.reverse();
-        let mut vin = Vec::new();
-        let mut input_value = 0;
-        for n in 0..tx.input.len() {
-            let input = &tx.input[n];
-            let previous_txout = if input.previous_output.is_null() {
-                None
-            } else {
-                let previous_tx = rest.tx(&input.previous_output.txid).await
-                    .expect(&format!("Failed to fetch previous transaction for {}.", input.previous_output.txid));
-                input_value += previous_tx.output[n].value;
-                Some(previous_tx.output[n].clone())
-            };
-            vin.push(RestVin::new(input, &previous_txout, network));
-        }
-        let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
-        Self {
-            confirmed_height: confirmed_height,
-            hex: hex::encode(&rawtx),
-            txid: hex::encode(txid),
-            hash: hex::encode(hash),
-            size: tx.get_size(),
-            // TODO: waiting for upstream merge.
-            //vsize: tx.get_vsize(),
-            vsize: (tx.get_weight() + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR,
-            weight: tx.get_weight(),
-            version: tx.version,
-            locktime: tx.lock_time,
-            vin,
-            vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, network)).collect(),
-            // TODO: compute for coinbase transactions!
-            fee: (input_value as i64) - (output_value as i64),
-        }
-    }
-    pub async fn fetch(block_db: &Arc<RwLock<BlockDB>>, rest: &bitcoin_rest::Context, txid: &str, network: Network) -> Option<Self> {
-        let core_tx = rest.call_json(&format!("tx/{}", txid)).await;
-        if core_tx.is_err() {
-            return None;
-        }
-        let core_tx: BitcoinCoreTx = core_tx.unwrap();
-        let confirmed_height = match core_tx.blockhash {
-            Some(blockhash) => {
-                let mut blockhash_vec = Vec::from_hex(&blockhash)
-                    .expect(&format!("Failed to decode block hash for {}.", blockhash));
-                blockhash_vec.reverse();
-                let confirmed_block = block_db.read().await.get_by_hash(&consensus_decode(&blockhash_vec));
-                if confirmed_block.is_none() {
-                    eprintln!("Failed to find a block: {}.", blockhash);
-                    None
-                } else {
-                    Some(confirmed_block.unwrap().height)
-                }
-            },
-            None => None,
-        };
-        let tx = consensus_decode(&Vec::from_hex(&core_tx.hex)
-            .expect(&format!("Failed to decode transaction for {}.", core_tx.hex)));
-        Some(Self::new(rest, &tx, confirmed_height, network).await)
-    }
     pub fn from_tx_db_value(value: &TxDBValue, network: Network) -> Self {
         let tx = &value.tx;
-        let mut txid = consensus_encode(&tx.txid());
-        txid.reverse();
-        let mut hash = consensus_encode(&tx.wtxid());
-        hash.reverse();
         let mut input_value = 0;
         let mut vin = Vec::new();
         let mut previous_txout_index = 0;
@@ -229,9 +153,9 @@ impl RestTx {
         let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
         Self {
             confirmed_height: value.confirmed_height,
-            hex: hex::encode(consensus_encode(tx)),
-            txid: hex::encode(txid),
-            hash: hex::encode(hash),
+            hex: hex::encode(&consensus_encode(tx)),
+            txid: tx.txid().to_string(),
+            hash: tx.wtxid().to_string(),
             size: tx.get_size(),
             // TODO: waiting for upstream merge.
             //vsize: tx.get_vsize(),
@@ -260,14 +184,10 @@ pub struct RestBlockSummary {
 
 impl RestBlockSummary {
     pub fn new(block: &BlockContentDBValue) -> Self {
-        let block_header = &block.block_header;
-        let mut hash = consensus_encode(&block_header.block_hash());
-        hash.reverse();
-        let hash = hex::encode(hash);
         Self {
-            hash,
-            time        : block_header.time,
-            nonce       : block_header.nonce,
+            hash        : block.block_header.block_hash().to_string(),
+            time        : block.block_header.time,
+            nonce       : block.block_header.nonce,
             size        : block.size,
             strippedsize: block.strippedsize,
             weight      : block.weight,
@@ -279,7 +199,6 @@ impl RestBlockSummary {
 #[derive(Debug, Clone)]
 pub struct HttpServer {
     coin: String,
-    rest: bitcoin_rest::Context,
     // (height, RestBlockSummary)
     block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
     pub block_db: Arc<RwLock<BlockDB>>,
@@ -290,10 +209,9 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(coin: &str, rest: bitcoin_rest::Context) -> Self {
+    pub fn new(coin: &str) -> Self {
         Self{
             coin: coin.to_string(),
-            rest,
             block_summary_cache: Arc::new(RwLock::new(HashMap::new())),
             block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
             tx_db: Arc::new(RwLock::new(TxDB::new(coin, false))),

@@ -25,9 +25,9 @@ impl Syncer {
             synced_height_db: SyncedHeightDB::new(coin),
             utxo_db: UtxoDB::new(coin, false),
             rich_list_builder: RichListBuilder::new(),
-            rest: rest.clone(),
+            rest: rest,
             stop: Arc::new(RwLock::new(false)),
-            http_server: HttpServer::new(coin, rest),
+            http_server: HttpServer::new(coin),
         };
         // Install Ctrl-C watch.
         let stop = syncer.stop.clone();
