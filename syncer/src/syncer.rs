@@ -41,14 +41,11 @@ impl Syncer {
     fn coin_config(&self) -> &CoinConfig {
         &self.config.coins[&self.coin]
     }
-    async fn process_block(&mut self, block_fetcher: &mut Option<&mut BlockFetcher>, height: u32) {
+    async fn process_block(&mut self, initial: bool, height: u32) {
         let begin = Instant::now();
         // Fetch block from REST.
         let begin_rest = Instant::now();
-        let (_block_hash, block) = match block_fetcher {
-            Some(block_fetcher) => block_fetcher.get(height).await,
-            None => BlockFetcher::fetch_block(&self.rest, height).await,
-        };
+        let (_block_hash, block) = fetch_block(&self.rest, height).await;
         let rest_elapsed = begin_rest.elapsed();
         // Process for UTXOs.
         let begin_utxo = Instant::now();
@@ -63,7 +60,7 @@ impl Syncer {
         self.http_server.addr_index_db.write().await.process_block(&block, &previous_utxos);
         let addr_index_elapsed = begin_addr_index.elapsed();
         // Process if non initial-sync.
-        if block_fetcher.is_none() {
+        if !initial {
             self.http_server.utxo_server.write().await.process_block(&block, &previous_utxos).await;
             self.rich_list_builder.process_block(&block, &previous_utxos);
             *self.http_server.rich_list.write().await = self.rich_list_builder.finalize();
@@ -79,11 +76,10 @@ impl Syncer {
         self.http_server.block_db.write().await.put(height, &block);
         put_synced_height(&self.coin, height);
         println!(
-            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:2}ms, tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms){}",
+            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:2}ms, tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
             height, block.txdata.len(), vins, vouts,
             rest_elapsed.as_millis(), tx_elapsed.as_millis(), utxo_elapsed.as_millis(),
-            addr_index_elapsed.as_millis(), begin.elapsed().as_millis(),
-            match block_fetcher { Some(bf) => format!(" [b:{:3}]", bf.len().await), None => "".to_string(), });
+            addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
     }
     async fn process_reorgs(&mut self) {
         let mut height = match get_synced_height(&self.coin) {
@@ -118,7 +114,7 @@ impl Syncer {
             put_synced_height(&self.coin, height);
         }
     }
-    async fn sync(&mut self, block_fetcher: &mut Option<&mut BlockFetcher>) -> u32 {
+    async fn sync(&mut self, initial: bool) -> u32 {
         self.process_reorgs().await;
         let start_height = match get_synced_height(&self.coin) {
             Some(h) => h + 1,
@@ -131,7 +127,7 @@ impl Syncer {
             if self.is_stopped().await {
                 break;
             }
-            self.process_block(block_fetcher, height).await;
+            self.process_block(initial, height).await;
             synced_blocks += 1;
         }
         synced_blocks
@@ -187,29 +183,16 @@ impl Syncer {
         self.rich_list_builder = rich_list_builder;
         println!("Syncer.load_utxo(): executed in {}ms.", begin.elapsed().as_millis());
     }
-    async fn block_fetcher(&self) -> BlockFetcher {
-        let start_height = match get_synced_height(&self.coin) {
-            Some(h) => h + 1,
-            None => 0,
-        };
-        let chaininfo = self.rest.chaininfo().await.expect("Failed to fetch chaininfo.");
-        let stop_height = chaininfo.blocks;
-        BlockFetcher::new(&self.coin, &self.config, start_height, stop_height)
-    }
     pub async fn initial_sync(&mut self) -> u32 {
         // Do initial sync.
         let begin = Instant::now();
         let mut synced_blocks = 0;
         loop {
-            // Run BlockFetcher.
-            let mut block_fetcher = self.block_fetcher().await;
-            block_fetcher.run(None);
-            let synced_blocks_now = self.sync(&mut Some(&mut block_fetcher)).await;
+            let synced_blocks_now = self.sync(true).await;
             synced_blocks += synced_blocks_now;
             if synced_blocks_now == 0 {
                 break;
             }
-            block_fetcher.stop().await;
         }
         let begin_elapsed = begin.elapsed().as_millis();
         println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin_elapsed);
@@ -242,7 +225,7 @@ impl Syncer {
                     continue;
                 },
             }
-            self.sync(&mut None).await;
+            self.sync(false).await;
         }
         println!("Syncer stopped.");
     }

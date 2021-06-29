@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
+use bitcoin::{BlockHash, Block};
 
 pub mod rocks_db;
 pub use rocks_db::*;
@@ -10,8 +11,6 @@ pub mod rocks_db_lazy;
 pub use rocks_db_lazy::*;
 pub mod db;
 pub use db::*;
-pub mod block_fetcher;
-pub use block_fetcher::*;
 pub mod syncer;
 pub use syncer::*;
 pub mod http_server;
@@ -38,6 +37,13 @@ pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
 
 fn synced_height_path(coin: &str) -> String {
     format!("{}/{}/synced_height.txt", data_dir(), coin)
+}
+
+pub async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
+    let block_hash = rest.blockhashbyheight(height).await
+        .expect(&format!("Failed to fetch block at height = {}.", height));
+    let block = rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
+    (block_hash, block)
 }
 
 pub fn get_synced_height(coin: &str) -> Option<u32> {
