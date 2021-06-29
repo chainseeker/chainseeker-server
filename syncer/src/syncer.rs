@@ -18,15 +18,16 @@ pub struct Syncer {
 
 impl Syncer {
     pub async fn new(coin: &str, config: &Config) -> Self {
+        let rest = get_rest(&config.coins[coin]);
         let syncer = Self {
             coin: coin.to_string(),
             config: (*config).clone(),
             synced_height_db: SyncedHeightDB::new(coin),
             utxo_db: UtxoDB::new(coin, false),
             rich_list_builder: RichListBuilder::new(),
-            rest: get_rest(&config.coins[coin]),
+            rest: rest.clone(),
             stop: Arc::new(RwLock::new(false)),
-            http_server: HttpServer::new(coin),
+            http_server: HttpServer::new(coin, rest),
         };
         // Install Ctrl-C watch.
         let stop = syncer.stop.clone();

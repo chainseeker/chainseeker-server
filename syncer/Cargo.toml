@@ -20,7 +20,7 @@ routerify = "2.1"
 rocksdb = "0.16"
 bitcoin = "0.26"
 bitcoin_hashes = "0.9"
-bitcoin-rest = "0.0.6"
+bitcoin-rest = "0.0.7"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = [] }

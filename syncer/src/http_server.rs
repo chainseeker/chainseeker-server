@@ -4,15 +4,209 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::collections::HashMap;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use hyper::{Body, Request, Response, Server, StatusCode};
 use routerify::prelude::*;
 use routerify::{Middleware, Router, RouterService};
 use bitcoin_hashes::hex::{FromHex, ToHex};
-use bitcoin::Script;
+use bitcoin::{Script, Transaction, TxIn, TxOut, Address, Network, AddressType};
+use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 
 use super::*;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BitcoinCoreTx {
+    blockhash: Option<String>,
+    hex: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RestScriptSig {
+    asm: String,
+    hex: String,
+}
+
+impl RestScriptSig {
+    pub fn new(script: &Script) -> Self {
+        Self {
+            asm: script.asm(),
+            hex: hex::encode(script.as_bytes()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestVin {
+    txid: String,
+    vout: u32,
+    script_sig: RestScriptSig,
+    txinwitness: Vec<String>,
+    sequence: u32,
+    value: u64,
+    address: Option<String>,
+}
+
+impl RestVin {
+    pub fn new(txin: &TxIn, previous_txout: &Option<TxOut>, network: Network) -> Self {
+        let mut txid = consensus_encode(&txin.previous_output.txid);
+        txid.reverse();
+        Self {
+            txid: hex::encode(txid),
+            vout: txin.previous_output.vout,
+            script_sig: RestScriptSig::new(&txin.script_sig),
+            txinwitness: txin.witness.iter().map(|witness| hex::encode(witness)).collect(),
+            sequence: txin.sequence,
+            value: match previous_txout {
+                Some(pt) => pt.value,
+                None => 0,
+            },
+            address: match previous_txout {
+                Some(previous_txout) => match Address::from_script(&previous_txout.script_pubkey, network) {
+                    Some(address) => Some(format!("{}", address)),
+                    None => None,
+                },
+                None => None,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RestScriptPubKey {
+    asm: String,
+    hex: String,
+    r#type: String,
+    address: Option<String>,
+}
+
+impl RestScriptPubKey {
+    pub fn new(script_pubkey: &Script, network: Network) -> Self {
+        let address = Address::from_script(&script_pubkey, network);
+        Self {
+            asm: script_pubkey.asm(),
+            hex: hex::encode(script_pubkey.as_bytes()),
+            r#type: match address.clone() {
+                Some(address) => match address.address_type() {
+                    Some(address_type) => match address_type {
+                        AddressType::P2pkh  => "pubkeyhash",
+                        AddressType::P2sh   => "scripthash",
+                        AddressType::P2wpkh => "witnesspubkeyhash",
+                        AddressType::P2wsh  => "witnessscripthash",
+                    },
+                    None => "unknown",
+                }
+                None => "unknown",
+            }.to_string(),
+            address: match address {
+                Some(address) => Some(format!("{}", address)),
+                None => None,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestVout {
+    value: u64,
+    n: usize,
+    script_pub_key: RestScriptPubKey,
+}
+
+impl RestVout {
+    pub fn new(txout: &TxOut, n: usize, network: Network) -> Self {
+        Self {
+            value: txout.value,
+            n,
+            script_pub_key: RestScriptPubKey::new(&txout.script_pubkey, network),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+//#[serde(rename_all = "camelCase")]
+pub struct RestTx {
+    confirmed_height: Option<u32>,
+    hex: String,
+    txid: String,
+    hash: String,
+    size: usize,
+    vsize: usize,
+    weight: usize,
+    version: i32,
+    locktime: u32,
+    vin: Vec<RestVin>,
+    vout: Vec<RestVout>,
+    fee: i64,
+    //counterparty: ,
+}
+
+impl RestTx {
+    pub async fn new(rest: &bitcoin_rest::Context, tx: &Transaction, confirmed_height: Option<u32>, network: Network) -> Self {
+        let rawtx = consensus_encode(tx);
+        let mut txid = consensus_encode(&tx.txid());
+        txid.reverse();
+        let mut hash = consensus_encode(&tx.wtxid());
+        hash.reverse();
+        let mut vin = Vec::new();
+        let mut input_value = 0;
+        for n in 0..tx.input.len() {
+            let input = &tx.input[n];
+            let previous_txout = if input.previous_output.is_null() {
+                None
+            } else {
+                let previous_tx = rest.tx(&input.previous_output.txid).await
+                    .expect(&format!("Failed to fetch previous transaction for {}.", input.previous_output.txid));
+                input_value += previous_tx.output[n].value;
+                Some(previous_tx.output[n].clone())
+            };
+            vin.push(RestVin::new(input, &previous_txout, network));
+        }
+        let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
+        Self {
+            confirmed_height: confirmed_height,
+            hex: hex::encode(&rawtx),
+            txid: hex::encode(txid),
+            hash: hex::encode(hash),
+            size: tx.get_size(),
+            //vsize: tx.get_vsize(),
+            vsize: (tx.get_weight() + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR,
+            weight: tx.get_weight(),
+            version: tx.version,
+            locktime: tx.lock_time,
+            vin,
+            vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, network)).collect(),
+            fee: (input_value as i64) - (output_value as i64),
+        }
+    }
+    pub async fn fetch(block_db: &Arc<RwLock<BlockDB>>, rest: &bitcoin_rest::Context, txid: &str, network: Network) -> Option<Self> {
+        let core_tx = rest.call_json(&format!("tx/{}", txid)).await;
+        if core_tx.is_err() {
+            return None;
+        }
+        let core_tx: BitcoinCoreTx = core_tx.unwrap();
+        let confirmed_height = match core_tx.blockhash {
+            Some(blockhash) => {
+                let mut blockhash_vec = Vec::from_hex(&blockhash)
+                    .expect(&format!("Failed to decode block hash for {}.", blockhash));
+                blockhash_vec.reverse();
+                let confirmed_block = block_db.read().await.get_by_hash(&consensus_decode(&blockhash_vec));
+                if confirmed_block.is_none() {
+                    eprintln!("Failed to find a block: {}.", blockhash);
+                    None
+                } else {
+                    Some(confirmed_block.unwrap().height)
+                }
+            },
+            None => None,
+        };
+        let tx = consensus_decode(&Vec::from_hex(&core_tx.hex)
+            .expect(&format!("Failed to decode transaction for {}.", core_tx.hex)));
+        Some(Self::new(rest, &tx, confirmed_height, network).await)
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RestBlockSummary {
@@ -46,6 +240,7 @@ impl RestBlockSummary {
 #[derive(Debug, Clone)]
 pub struct HttpServer {
     coin: String,
+    rest: bitcoin_rest::Context,
     // (height, RestBlockSummary)
     block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
     pub block_db: Arc<RwLock<BlockDB>>,
@@ -55,9 +250,10 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(coin: &str) -> Self {
+    pub fn new(coin: &str, rest: bitcoin_rest::Context) -> Self {
         Self{
             coin: coin.to_string(),
+            rest,
             block_summary_cache: Arc::new(RwLock::new(HashMap::new())),
             block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin, false))),
@@ -94,6 +290,22 @@ impl HttpServer {
         match json {
             Ok(json) => Self::ok(json),
             Err(_) => Self::internal_error("Failed to encode to JSON."),
+        }
+    }
+    /// `/tx/:txid` endpoint.
+    async fn tx_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        let txid = req.param("txid").unwrap();
+        let network = match server.coin.as_str() {
+            "btc"  => Network::Bitcoin,
+            "tbtc" => Network::Testnet,
+            "rbtc" => Network::Regtest,
+            "sbtc" => Network::Signet,
+            _ => panic!("Coin not supported."),
+        };
+        match RestTx::fetch(&server.block_db, &server.rest, &txid, network).await {
+            Some(tx) => Ok(Self::json(tx)),
+            None => Ok(Self::not_found("Transaction not found.")),
         }
     }
     /// `/block_summary/:offset/:limit` endpoint.
@@ -213,6 +425,7 @@ impl HttpServer {
                 req.set_context(Instant::now());
                 Ok(req)
             }))
+            .get("/tx/:txid", Self::tx_handler)
             .get("/block_summary/:offset/:limit", Self::block_summary_handler)
             .get("/block/:hash_or_height", Self::block_handler)
             .get("/addr_index/:script", Self::addr_index_handler)
