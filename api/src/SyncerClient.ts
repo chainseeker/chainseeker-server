@@ -28,7 +28,7 @@ export class SyncerClient {
 		return await this.call<cs.Block>('block', blockid);
 	}
 	async getBlockByHeight(height: number): Promise<cs.Block> {
-		return await this.call<cs.Block>('blockbyheight', height.toString());
+		return await this.call<cs.Block>('block', height.toString());
 	}
 	async getAddressIndex(script: Buffer): Promise<SyncerAddressIndex> {
 		return await this.call<SyncerAddressIndex>('addr_index', script.toString('hex'));

@@ -82,18 +82,21 @@ export const fetchTransaction = async (syncer: SyncerClient, rest: RestClient, t
 		locktime: tx.locktime,
 		confirmed_height,
 		counterparty: counterparty,
-		vin: tx.ins.map((input: bitcoin.TxInput) => ({
-			txid: (Buffer.from(input.hash).reverse() as Buffer).toString('hex'),
-			vout: input.index,
-			scriptSig: {
-				asm: isCoinbase ? '' : bitcoin.script.toASM(input.script),
-				hex: input.script.toString('hex'),
-			},
-			txinwitness: input.witness.map((witness: Buffer) => witness.toString('hex')),
-			sequence: input.sequence,
-			value: (<any>input).previousTx ? (<any>input).previousTx.outs[input.index].value : 0,
-			address: (<any>input).previousTx ? resolveAddress((<any>input).previousTx.outs[input.index].script, network) : 'coinbase',
-		})),
+		vin: tx.ins.map((input: bitcoin.TxInput, i) => {
+			const previousTx = previousTxs[i];
+			return {
+				txid: (Buffer.from(input.hash).reverse() as Buffer).toString('hex'),
+				vout: input.index,
+				scriptSig: {
+					asm: isCoinbase ? '' : bitcoin.script.toASM(input.script),
+					hex: input.script.toString('hex'),
+				},
+				txinwitness: input.witness.map((witness: Buffer) => witness.toString('hex')),
+				sequence: input.sequence,
+				value: previousTx ? previousTx.outs[input.index].value : 0,
+				address: previousTx ? resolveAddress(previousTx.outs[input.index].script, network) : 'coinbase',
+			};
+		}),
 		vout: (<bitcoin.TxOutput[]>tx.outs).map((output: bitcoin.TxOutput, n: number) => ({
 			value: output.value,
 			n: n,

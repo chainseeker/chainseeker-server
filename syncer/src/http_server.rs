@@ -62,33 +62,29 @@ impl HttpServer {
             Err(_) => Self::internal_error("Failed to encode to JSON."),
         }
     }
-    /// `/block/:block_hash` endpoint.
+    /// `/block/:hash_or_height` endpoint.
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        let block_hash = Vec::from_hex(req.param("block_hash").unwrap());
-        if block_hash.is_err() {
-            return Ok(Self::not_found("Failed to decode input block hash."));
-        }
-        let mut block_hash = block_hash.unwrap();
-        if block_hash.len() != 32 {
-            return Ok(Self::not_found("Block hash has an invalid length."));
-        }
-        block_hash.reverse();
-        let block_hash = consensus_decode(&block_hash[..]);
-        let block_content = server.block_db.read().await.get_by_hash(&block_hash);
-        if block_content.is_none() {
-            return Ok(Self::not_found("Block not found."));
-        }
-        Ok(Self::json(&block_content))
-    }
-    /// `/blockbyheight/:height` endpoint.
-    async fn blockbyheight_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let server = req.data::<HttpServer>().unwrap();
-        let height = req.param("height").unwrap().parse();
-        if height.is_err() {
-            return Ok(Self::not_found("Failed to decode input block height."));
-        }
-        let block_content = server.block_db.read().await.get(height.unwrap());
+        let hash_or_height = req.param("hash_or_height").unwrap();
+        let block_content = if hash_or_height.len() == 64 {
+            let block_hash = Vec::from_hex(hash_or_height);
+            if block_hash.is_err() {
+                return Ok(Self::not_found("Failed to decode input block hash."));
+            }
+            let mut block_hash = block_hash.unwrap();
+            if block_hash.len() != 32 {
+                return Ok(Self::not_found("Block hash has an invalid length."));
+            }
+            block_hash.reverse();
+            let block_hash = consensus_decode(&block_hash[..]);
+            server.block_db.read().await.get_by_hash(&block_hash)
+        } else {
+            let height = hash_or_height.parse();
+            if height.is_err() {
+                return Ok(Self::not_found("Failed to decode input block height."));
+            }
+            server.block_db.read().await.get(height.unwrap())
+        };
         if block_content.is_none() {
             return Ok(Self::not_found("Block not found."));
         }
@@ -152,8 +148,7 @@ impl HttpServer {
                 req.set_context(Instant::now());
                 Ok(req)
             }))
-            .get("/blockbyheight/:height", Self::blockbyheight_handler)
-            .get("/block/:block_hash", Self::block_handler)
+            .get("/block/:hash_or_height", Self::block_handler)
             .get("/addr_index/:script", Self::addr_index_handler)
             .get("/utxo/:script", Self::utxo_handler)
             .get("/rich_list/count", Self::rich_list_count_handler)

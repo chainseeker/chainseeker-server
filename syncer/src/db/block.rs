@@ -96,7 +96,7 @@ impl serde::ser::Serialize for BlockContentDBValue {
         state.serialize_field("previousblockhash", &hex::encode(&prev_blockhash))?;
         let mut merkle_root = consensus_encode(&block_header.merkle_root);
         merkle_root.reverse();
-        state.serialize_field("merkle_root"      , &hex::encode(&merkle_root))?;
+        state.serialize_field("merkleroot"       , &hex::encode(&merkle_root))?;
         state.serialize_field("time"             , &block_header.time)?;
         state.serialize_field("bits"             , &format!("{:x}", block_header.bits))?;
         state.serialize_field("difficulty"       , &block_header.difficulty(Network::Bitcoin))?;
