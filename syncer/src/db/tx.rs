@@ -142,7 +142,7 @@ mod tests {
             let mut previous_utxo_index = 0;
             for tx in blocks[height].txdata.iter() {
                 let value = tx_db.get(&tx.txid()).unwrap();
-                assert_eq!(value.confirmed_height, height as u32);
+                assert_eq!(value.confirmed_height, Some(height as u32));
                 assert_eq!(value.tx, *tx);
                 for vin in tx.input.iter() {
                     if vin.previous_output.is_null() {

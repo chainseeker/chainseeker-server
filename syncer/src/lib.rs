@@ -179,6 +179,6 @@ mod test {
     #[test]
     fn synced_height() {
         put_synced_height("test", 123456);
-        assert_eq!(get_synced_height(), Some(123456));
+        assert_eq!(get_synced_height("test"), Some(123456));
     }
 }
