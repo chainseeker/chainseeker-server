@@ -62,6 +62,10 @@ impl Syncer {
         let begin_utxo = Instant::now();
         let previous_utxos = self.utxo_db.process_block(&block, false);
         let utxo_elapsed = begin_utxo.elapsed();
+        // Process for TxDB.
+        let begin_tx = Instant::now();
+        self.http_server.tx_db.write().await.process_block(height, &block, &previous_utxos);
+        let tx_elapsed = begin_tx.elapsed();
         // Process for address index.
         let begin_addr_index = Instant::now();
         self.http_server.addr_index_db.write().await.process_block(&block, &previous_utxos);
@@ -83,11 +87,11 @@ impl Syncer {
         self.http_server.block_db.write().await.put(height, &block);
         self.put_synced_height(height);
         println!(
-            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:4}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms){}",
+            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:2}ms, tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms){}",
             height, block.txdata.len(), vins, vouts,
-            rest_elapsed.as_millis(), utxo_elapsed.as_millis(),
+            rest_elapsed.as_millis(), tx_elapsed.as_millis(), utxo_elapsed.as_millis(),
             addr_index_elapsed.as_millis(), begin.elapsed().as_millis(),
-            match block_fetcher { Some(bf) => format!(" (blocks:{:3})", bf.len().await), None => "".to_string(), });
+            match block_fetcher { Some(bf) => format!(" [b:{:3}]", bf.len().await), None => "".to_string(), });
     }
     async fn process_reorgs(&mut self) {
         let mut height = match self.synced_height() {

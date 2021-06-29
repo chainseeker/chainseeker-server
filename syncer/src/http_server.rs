@@ -246,6 +246,7 @@ pub struct HttpServer {
     // (height, RestBlockSummary)
     block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
     pub block_db: Arc<RwLock<BlockDB>>,
+    pub tx_db: Arc<RwLock<TxDB>>,
     pub addr_index_db: Arc<RwLock<AddressIndexDB>>,
     pub utxo_server: Arc<RwLock<UtxoServer>>,
     pub rich_list: Arc<RwLock<RichList>>,
@@ -258,6 +259,7 @@ impl HttpServer {
             rest,
             block_summary_cache: Arc::new(RwLock::new(HashMap::new())),
             block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
+            tx_db: Arc::new(RwLock::new(TxDB::new(coin, false))),
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin, false))),
             utxo_server: Arc::new(RwLock::new(UtxoServer::new(coin))),
             rich_list: Arc::new(RwLock::new(RichList::new())),
