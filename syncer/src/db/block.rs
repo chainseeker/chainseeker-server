@@ -109,14 +109,13 @@ impl serde::ser::Serialize for BlockContentDBValue {
     }
 }
 
+const BLOCK_HEADER_LEN: usize = 80;
+
 impl Serialize for BlockContentDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut ret = Vec::new();
         ret.push(self.height.to_le_bytes().to_vec());
-        let block_header = consensus_encode(&self.block_header);
-        let block_header_len: u16 = block_header.len() as u16;
-        ret.push(block_header_len.to_le_bytes().to_vec());
-        ret.push(block_header);
+        ret.push(consensus_encode(&self.block_header));
         ret.push(self.size.to_le_bytes().to_vec());
         ret.push(self.strippedsize.to_le_bytes().to_vec());
         ret.push(self.weight.to_le_bytes().to_vec());
@@ -130,10 +129,9 @@ impl Serialize for BlockContentDBValue {
 impl Deserialize for BlockContentDBValue {
     fn deserialize(buf: &[u8]) -> Self {
         let height = bytes_to_u32(&buf[0..4]);
-        let block_header_len = bytes_to_u16(&buf[4..6]) as usize;
-        let mut offset = 6usize;
-        let block_header = consensus_decode(&buf[offset..block_header_len+offset]);
-        offset += block_header_len as usize;
+        let mut offset = 4usize;
+        let block_header = consensus_decode(&buf[offset..BLOCK_HEADER_LEN+offset]);
+        offset += BLOCK_HEADER_LEN;
         let size = bytes_to_u32(&buf[offset..offset+4]);
         offset += 4;
         let strippedsize = bytes_to_u32(&buf[offset..offset+4]);
