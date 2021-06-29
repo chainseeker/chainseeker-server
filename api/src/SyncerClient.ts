@@ -39,11 +39,8 @@ export class SyncerClient {
 	async getBlockSummary(offset: number, limit: number): Promise<SyncerBlockSummary> {
 		return await this.call<SyncerBlockSummary>('block_summary', offset.toString(), limit.toString());
 	}
-	async getBlock(blockid: string): Promise<cs.Block> {
-		return await this.call<cs.Block>('block', blockid);
-	}
-	async getBlockByHeight(height: number): Promise<cs.Block> {
-		return await this.call<cs.Block>('block', height.toString());
+	async getBlock(param: string | number): Promise<cs.Block> {
+		return await this.call<cs.Block>('block', typeof param == 'number' ? param.toString() : param);
 	}
 	async getTx(txhash: string): Promise<cs.Transaction> {
 		return await this.call<cs.Transaction>('tx', txhash);

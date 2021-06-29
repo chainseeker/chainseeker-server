@@ -13,9 +13,16 @@ import coininfo from 'coininfo';
 import * as cs from 'chainseeker/dist/types';
 
 import { SyncerClient } from './SyncerClient';
-import { fetchBlockByHeight, fetchBlockByHash, fetchTransaction, resolveAddress } from './lib';
 import WebSocketRelay from './WebSocketRelay';
 import GQL_SCHEMA from './gql-schema';
+
+const resolveAddress = (script: Buffer, network: bitcoin.Network): string|null => {
+	try {
+		return bitcoin.address.fromOutputScript(script, network);
+	} catch(e) {
+		return null;
+	}
+};
 
 const main = async () => {
 	
@@ -80,11 +87,7 @@ const main = async () => {
 			}),
 			block: async (args: {id: string}): Promise<cs.Block|null> => {
 				try {
-					if(args.id.match(/[0-9]+/)) {
-						return await fetchBlockByHeight(syncer, Number.parseInt(args.id));
-					} else {
-						return await fetchBlockByHash(syncer, args.id);
-					}
+					return await syncer.getBlock(args.id);
 				} catch(e) {
 					if(config.debug) console.log(e);
 					return null;
@@ -92,7 +95,7 @@ const main = async () => {
 			},
 			tx: async (args: {id: string}): Promise<cs.Transaction|null> => {
 				try {
-					return await fetchTransaction(syncer, args.id);
+					return await syncer.getTx(args.id);
 				} catch(e) {
 					if(config.debug) console.log(e);
 					return null;
@@ -156,7 +159,7 @@ const main = async () => {
 	// /block/[blockid]
 	app.get(`${config.server.api.prefix}/${API_VERSION}/block/:blockid([0-9a-fA-F]{64})`, async (req, res, next) => {
 		try {
-			res.json(await fetchBlockByHash(syncer, req.params.blockid));
+			res.json(await syncer.getBlock(req.params.blockid));
 		} catch(e) {
 			if(config.debug) console.log(e);
 			res.status(404).json({ error: 'Block not found.' });
@@ -166,7 +169,7 @@ const main = async () => {
 	// /block/[height]
 	app.get(`${config.server.api.prefix}/${API_VERSION}/block/:height([0-9]+)`, async (req, res, next) => {
 		try {
-			res.json(await fetchBlockByHeight(syncer, Number.parseInt(req.params.height)));
+			res.json(await syncer.getBlock(req.params.height));
 		} catch(e) {
 			if(config.debug) console.log(e);
 			res.status(404).json({ error: 'Block not found.' })
@@ -176,7 +179,7 @@ const main = async () => {
 	// /tx/[txid]
 	app.get(`${config.server.api.prefix}/${API_VERSION}/tx/:txid([0-9a-fA-F]{64})`, async (req, res, next) => {
 		try {
-			res.json(await fetchTransaction(syncer, req.params.txid));
+			res.json(await syncer.getTx(req.params.txid));
 		} catch(e) {
 			if(config.debug) console.log(e);
 			res.status(404).json({ error: 'Transaction not found.' })
@@ -210,7 +213,7 @@ const main = async () => {
 				res.status(400).json({ error: 'Failed to broadcast transaction.', message: err.toString() });
 				return;
 			}
-			res.json(await fetchTransaction(syncer, result));
+			res.json(await syncer.getTx(result));
 		});
 	});
 	
