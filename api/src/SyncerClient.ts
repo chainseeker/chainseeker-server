@@ -33,6 +33,9 @@ export class SyncerClient {
 		const json = await response.json() as T;
 		return json;
 	}
+	async getStatus(): Promise<cs.Status> {
+		return await this.call<cs.Status>('status');
+	}
 	async getBlockSummary(offset: number, limit: number): Promise<SyncerBlockSummary> {
 		return await this.call<SyncerBlockSummary>('block_summary', offset.toString(), limit.toString());
 	}
@@ -41,6 +44,9 @@ export class SyncerClient {
 	}
 	async getBlockByHeight(height: number): Promise<cs.Block> {
 		return await this.call<cs.Block>('block', height.toString());
+	}
+	async getTx(txhash: string): Promise<cs.Transaction> {
+		return await this.call<cs.Transaction>('tx', txhash);
 	}
 	async getAddressIndex(script: Buffer): Promise<SyncerAddressIndex> {
 		return await this.call<SyncerAddressIndex>('addr_index', script.toString('hex'));

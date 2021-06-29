@@ -12,7 +12,6 @@ import coininfo from 'coininfo';
 
 import * as cs from 'chainseeker/dist/types';
 
-import { RestClient } from './RestClient';
 import { SyncerClient } from './SyncerClient';
 import { fetchBlockByHeight, fetchBlockByHash, fetchTransaction, resolveAddress } from './lib';
 import WebSocketRelay from './WebSocketRelay';
@@ -34,7 +33,6 @@ const main = async () => {
 	
 	process.on('unhandledRejection', console.dir);
 	
-	const rest = new RestClient(config.rest.endpoint);
 	const syncer = new SyncerClient(config.syncer.endpoint);
 	const rpcClient = rpc.Client.$create(config.coind.port, config.coind.host, config.coind.user, config.coind.pass);
 	
@@ -65,8 +63,8 @@ const main = async () => {
 	
 	// Get current block number (height).
 	const getBlocks = async (): Promise<number> => {
-		const chainInfo = await rest.getChainInfo();
-		return chainInfo.blocks;
+		const status = await syncer.getStatus();
+		return status.blocks;
 	};
 	
 	// GraphQL.
@@ -94,7 +92,7 @@ const main = async () => {
 			},
 			tx: async (args: {id: string}): Promise<cs.Transaction|null> => {
 				try {
-					return await fetchTransaction(syncer, rest, args.id, NETWORK);
+					return await fetchTransaction(syncer, args.id);
 				} catch(e) {
 					if(config.debug) console.log(e);
 					return null;
@@ -178,7 +176,7 @@ const main = async () => {
 	// /tx/[txid]
 	app.get(`${config.server.api.prefix}/${API_VERSION}/tx/:txid([0-9a-fA-F]{64})`, async (req, res, next) => {
 		try {
-			res.json(await fetchTransaction(syncer, rest, req.params.txid, NETWORK));
+			res.json(await fetchTransaction(syncer, req.params.txid));
 		} catch(e) {
 			if(config.debug) console.log(e);
 			res.status(404).json({ error: 'Transaction not found.' })
@@ -212,7 +210,7 @@ const main = async () => {
 				res.status(400).json({ error: 'Failed to broadcast transaction.', message: err.toString() });
 				return;
 			}
-			res.json(await fetchTransaction(syncer, rest, result, NETWORK));
+			res.json(await fetchTransaction(syncer, result));
 		});
 	});
 	
