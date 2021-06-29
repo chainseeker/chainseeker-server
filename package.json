@@ -7,7 +7,8 @@
     "syncer": "cargo run --release",
     "api": "ts-node ./api/src/index.ts",
     "web": "ts-node ./web/src/index.ts",
-    "test": "jest"
+    "test": "jest",
+    "bench:status": "autocannon http://localhost:7001/api/v1/status"
   },
   "author": "Vis Virial <visvirial@gmail.com>",
   "license": "MIT",

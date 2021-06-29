@@ -3,16 +3,12 @@ use std::time::Instant;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
-
 use tokio::sync::RwLock;
-
-use bitcoin_hashes::hex::FromHex;
-use bitcoin::Script;
-
 use hyper::{Body, Request, Response, Server, StatusCode};
-
 use routerify::prelude::*;
 use routerify::{Middleware, Router, RouterService};
+use bitcoin_hashes::hex::{FromHex, ToHex};
+use bitcoin::Script;
 
 use super::*;
 
@@ -57,6 +53,15 @@ impl HttpServer {
     fn ok(json: String) -> Response<Body> {
         Self::response(&StatusCode::OK, json)
     }
+    fn json<S>(object: S) -> Response<Body>
+        where S: serde::ser::Serialize,
+    {
+        let json = serde_json::to_string(&object);
+        match json {
+            Ok(json) => Self::ok(json),
+            Err(_) => Self::internal_error("Failed to encode to JSON."),
+        }
+    }
     /// `/block/:block_hash` endpoint.
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
@@ -74,11 +79,7 @@ impl HttpServer {
         if block_content.is_none() {
             return Ok(Self::not_found("Block not found."));
         }
-        let json = serde_json::to_string(&block_content);
-        match json {
-            Ok(json) => return Ok(Self::ok(json)),
-            Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
-        };
+        Ok(Self::json(&block_content))
     }
     /// `/blockbyheight/:height` endpoint.
     async fn blockbyheight_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -91,59 +92,37 @@ impl HttpServer {
         if block_content.is_none() {
             return Ok(Self::not_found("Block not found."));
         }
-        let json = serde_json::to_string(&block_content);
-        match json {
-            Ok(json) => return Ok(Self::ok(json)),
-            Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
-        };
+        Ok(Self::json(&block_content))
     }
     /// `/addr_index/:script` endpoint.
     async fn addr_index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        let addr_index_db = &server.addr_index_db;
         let script_hex = req.param("script").unwrap();
         let script = Script::from_hex(script_hex);
-        match script {
-            Ok(script) => {
-                let txids = addr_index_db.read().await.get(&script);
-                let txids: Vec<String> = txids.iter().map(|txid| {
-                    let mut txid = consensus_encode(&txid);
-                    txid.reverse();
-                    hex::encode(txid)
-                }).collect();
-                let json = serde_json::to_string(&txids);
-                match json {
-                    Ok(json) => return Ok(Self::ok(json)),
-                    Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
-                };
-            },
-            Err(_) => return Ok(Self::not_found("Failed to decode input script.")),
+        if script.is_err() {
+            return Ok(Self::not_found("Failed to decode input script."));
         }
+        let script = script.unwrap();
+        let txids = server.addr_index_db.read().await.get(&script);
+        let txids = txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>();
+        Ok(Self::json(&txids))
     }
     /// `/utxo/:script` endpoint.
     async fn utxo_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        let utxo_server = &server.utxo_server;
         let script_hex = req.param("script").unwrap();
         let script = Script::from_hex(script_hex);
-        match script {
-            Ok(script) => {
-                let utxo_server = utxo_server.read().await;
-                let values = utxo_server.get(&script).await;
-                let json = serde_json::to_string(&values);
-                match json {
-                    Ok(json) => return Ok(Self::ok(json)),
-                    Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
-                };
-            },
-            Err(_) => return Ok(Self::not_found("Failed to decode input script.")),
+        if script.is_err() {
+            return Ok(Self::not_found("Failed to decode input script."));
         }
+        let script = script.unwrap();
+        let values = server.utxo_server.read().await.get(&script).await;
+        Ok(Self::json(&values))
     }
     /// `/rich_list/count` endpoint.
     async fn rich_list_count_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        let rich_list = server.rich_list.read().await;
-        let json = format!("{{\"count\":{}}}", rich_list.len());
+        let json = format!("{{\"count\":{}}}", server.rich_list.read().await.len());
         Ok(Self::ok(json))
     }
     /// `/rich_list/:offset/:limit` endpoint.
@@ -161,11 +140,7 @@ impl HttpServer {
         let begin = min(offset, rich_list.len() - 1usize);
         let end = min(offset + limit, rich_list.len() - 1usize);
         let addresses = rich_list.get_in_range(begin..end);
-        let json = serde_json::to_string(&addresses);
-        match json {
-            Ok(json) => return Ok(Self::ok(json)),
-            Err(_) => return Ok(Self::internal_error("Failed to encode to JSON.")),
-        };
+        Ok(Self::json(&addresses))
     }
     pub async fn run(&self, ip: &str, port: u16) {
         let addr = SocketAddr::from((

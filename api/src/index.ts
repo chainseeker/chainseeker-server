@@ -21,7 +21,7 @@ import GQL_SCHEMA from './gql-schema';
 const main = async () => {
 	
 	const COIN_NAME = process.argv[2];
-	const configs = (await import(`${process.env['HOME']}/.chainseeker/config.ts`)).configs;
+	const configs = (await import(`${process.env['HOME']}/.chainseeker/config`)).configs;
 	const config = configs[COIN_NAME];
 	
 	const API_VERSION = 'v1';
