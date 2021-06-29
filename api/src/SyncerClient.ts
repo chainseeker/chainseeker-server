@@ -28,7 +28,7 @@ export class SyncerClient {
 	constructor(private endpoint: string) {
 	}
 	private async call<T>(...path: string[]): Promise<T> {
-		const url = `${this.endpoint}/${path.join('/')}`;
+		const url = `${this.endpoint}/api/v1/${path.join('/')}`;
 		const response = await fetch(url);
 		const json = await response.json() as T;
 		return json;
