@@ -41,28 +41,24 @@ impl Syncer {
     fn coin_config(&self) -> &CoinConfig {
         &self.config.coins[&self.coin]
     }
-    async fn process_block(&mut self, initial: bool, height: u32) {
+    async fn process_block(&mut self, initial: bool, height: u32, block: &Block) {
         let begin = Instant::now();
-        // Fetch block from REST.
-        let begin_rest = Instant::now();
-        let (_block_hash, block) = fetch_block(&self.rest, height).await;
-        let rest_elapsed = begin_rest.elapsed();
         // Process for UTXOs.
         let begin_utxo = Instant::now();
-        let previous_utxos = self.utxo_db.process_block(&block, false);
+        let previous_utxos = self.utxo_db.process_block(block, false);
         let utxo_elapsed = begin_utxo.elapsed();
         // Process for TxDB.
         let begin_tx = Instant::now();
-        self.http_server.tx_db.write().await.process_block(height, &block, &previous_utxos);
+        self.http_server.tx_db.write().await.process_block(height, block, &previous_utxos);
         let tx_elapsed = begin_tx.elapsed();
         // Process for address index.
         let begin_addr_index = Instant::now();
-        self.http_server.addr_index_db.write().await.process_block(&block, &previous_utxos);
+        self.http_server.addr_index_db.write().await.process_block(block, &previous_utxos);
         let addr_index_elapsed = begin_addr_index.elapsed();
         // Process if non initial-sync.
         if !initial {
-            self.http_server.utxo_server.write().await.process_block(&block, &previous_utxos).await;
-            self.rich_list_builder.process_block(&block, &previous_utxos);
+            self.http_server.utxo_server.write().await.process_block(block, &previous_utxos).await;
+            self.rich_list_builder.process_block(block, &previous_utxos);
             *self.http_server.rich_list.write().await = self.rich_list_builder.finalize();
         }
         // Count vins/vouts.
@@ -76,9 +72,9 @@ impl Syncer {
         self.http_server.block_db.write().await.put(height, &block);
         put_synced_height(&self.coin, height);
         println!(
-            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (rest:{:2}ms, tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
+            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
             height, block.txdata.len(), vins, vouts,
-            rest_elapsed.as_millis(), tx_elapsed.as_millis(), utxo_elapsed.as_millis(),
+            tx_elapsed.as_millis(), utxo_elapsed.as_millis(),
             addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
     }
     async fn process_reorgs(&mut self) {
@@ -123,12 +119,53 @@ impl Syncer {
         let chaininfo = self.rest.chaininfo().await.expect("Failed to fetch chaininfo.");
         let target_height = chaininfo.blocks;
         let mut synced_blocks = 0;
+        const BLOCK_QUEUE_SIZE: usize = 1000;
+        let block_queue = Arc::new(RwLock::new(std::collections::VecDeque::with_capacity(BLOCK_QUEUE_SIZE)));
+        {
+            let block_queue = block_queue.clone();
+            let stop = self.stop.clone();
+            let rest = self.rest.clone();
+            tokio::spawn(async move {
+                let mut height = start_height;
+                loop {
+                    //let begin = Instant::now();
+                    if *stop.read().await || height > target_height {
+                        break;
+                    }
+                    let block_queue_len = block_queue.read().await.len();
+                    if block_queue_len >= BLOCK_QUEUE_SIZE {
+                        //println!("Block queue is full. Waiting for 100ms...");
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        continue;
+                    }
+                    for _ in block_queue_len..BLOCK_QUEUE_SIZE {
+                        let (_block_hash, block) = fetch_block(&rest, height).await;
+                        block_queue.write().await.push_back(block);
+                        height += 1;
+                    }
+                    //println!("Block fetched in {}ms.", begin.elapsed().as_millis());
+                }
+            });
+        }
         for height in start_height..(target_height + 1) {
             if self.is_stopped().await {
                 break;
             }
-            self.process_block(initial, height).await;
-            synced_blocks += 1;
+            // Fetch block from REST.
+            loop {
+                let block = block_queue.write().await.pop_front();
+                match block {
+                    Some(block) => {
+                        self.process_block(initial, height, &block).await;
+                        synced_blocks += 1;
+                        break;
+                    },
+                    None => {
+                        println!("Block queue is empty. Waiting for blocks...");
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                }
+            }
         }
         synced_blocks
     }
