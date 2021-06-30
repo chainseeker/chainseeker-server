@@ -7,6 +7,7 @@ rpc_pass = "bitcoinrpc"
 rest_endpoint = "http://localhost:8332/rest/"
 zmq_endpoint = "tcp://localhost:28332"
 http_port = 6000
+ws_endpoint = "127.0.0.1:7000"
 
 [coins.tbtc]
 rpc_endpoint = "http://localhost:18332"
@@ -15,6 +16,7 @@ rpc_pass = "bitcoinrpc"
 rest_endpoint = "http://localhost:18332/rest/"
 zmq_endpoint = "tcp://localhost:28333"
 http_port = 6001
+ws_endpoint = "127.0.0.1:7001"
 
 [coins.rbtc]
 rpc_endpoint = "http://localhost:18443"
@@ -23,6 +25,7 @@ rpc_pass = "bitcoinrpc"
 rest_endpoint = "http://localhost:18443/rest/"
 zmq_endpoint = "tcp://localhost:28334"
 http_port = 6002
+ws_endpoint = "127.0.0.1:7002"
 
 [coins.sbtc]
 rpc_endpoint = "http://localhost:38332"
@@ -31,3 +34,4 @@ rpc_pass = "bitcoinrpc"
 rest_endpoint = "http://localhost:38332/rest/"
 zmq_endpoint = "tcp://localhost:28335"
 http_port = 6003
+ws_endpoint = "127.0.0.1:7003"
