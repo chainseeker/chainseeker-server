@@ -23,29 +23,18 @@ const useStyles = makeStyles({
 });
 
 const fetcher = async () => {
-	//const status = await cs.getStatus();
-	const status = await (await fetch(`${config.apiEndpoint}/v1/status`)).json();
+	const status = await cs.getStatus();
+	const recentBlocks = [];
+	for(let height=status.blocks; height>status.blocks-MAX_LATEST_BLOCKS; height--) {
+		recentBlocks.push(await cs.getBlock(height));
+	}
 	return {
 		status,
+		recentBlocks,
 	};
 };
 
 class Home extends React.Component {
-	static async getInitialProps() {
-		const status = await cs.getStatus();
-		console.log(status);
-		/*
-		const recentBlocks = [];
-		for(let height=status.blocks; height>status.blocks-MAX_LATEST_BLOCKS; height--) {
-			recentBlocks.push(await cs.getBlock(height));
-		}
-		console.log(recentBlocks);
-		*/
-		return {
-			status,
-			//recentBlocks,
-		};
-	}
 	render() {
 		const router = this.props.router;
 		const classes = this.props.classes;
@@ -61,23 +50,35 @@ class Home extends React.Component {
 						<TableHead>
 							<TableRow>
 								<TableCell>Height</TableCell>
+								<TableCell>Time</TableCell>
+								<TableCell># of txs</TableCell>
+								<TableCell>Size</TableCell>
+								<TableCell>ID</TableCell>
 							</TableRow>
 						</TableHead>
 						<TableBody>
-							{/*
-							{this.props.recentBlocks.map((block) => (
-								<TableRow key={row.name}>
+							{data.recentBlocks.map((block) => (
+								<TableRow key={block.height}>
 									<TableCell component="th" scope="row">
 										{block.height}
 									</TableCell>
+									<TableCell scope="row">
+										{new Date(1000 * block.time).toLocaleString()}
+									</TableCell>
+									<TableCell scope="row">
+										{block.txids.length}
+									</TableCell>
+									<TableCell scope="row">
+										{block.size.toLocaleString()} bytes
+									</TableCell>
+									<TableCell scope="row">
+										{block.hash}
+									</TableCell>
 								</TableRow>
 							))}
-							*/}
 						</TableBody>
 					</Table>
 				</TableContainer>
-				Hello, world!
-				{data.status.blocks}
 			</div>
 		</Layout>;
 	}
@@ -87,10 +88,8 @@ export default function home(props) {
 	const router = useRouter();
 	const classes = useStyles();
 	const { data, error } = useSWR(config.apiEndpoint, fetcher);
-	console.log(error);
 	if(error) return <div>failed to load.</div>;
 	if(!data) return <div>loading...</div>;
-	console.log(data);
 	return <Home {...props} router={router} classes={classes} data={data} />;
 };
 
