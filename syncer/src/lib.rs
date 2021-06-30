@@ -15,6 +15,8 @@ pub mod syncer;
 pub use syncer::*;
 pub mod http_server;
 pub use http_server::*;
+pub mod web_socket_relay;
+pub use web_socket_relay::*;
 #[cfg(test)]
 pub mod test_fixtures;
 
@@ -65,6 +67,7 @@ pub struct CoinConfig {
     pub rest_endpoint: String,
     pub zmq_endpoint: String,
     pub http_port: u16,
+    pub ws_endpoint: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

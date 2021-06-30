@@ -13,12 +13,25 @@ async fn main() {
     let config = load_config();
     // Create Syncer instance.
     let mut syncer = Syncer::new(&coin, &config).await;
-    // Run HTTP server.
     let mut handles = Vec::new();
-    let server = syncer.http_server.clone();
-    handles.push(tokio::spawn(async move {
-        server.run(&config.http_ip, config.coins[&coin].http_port).await;
-    }));
+    // Run HTTP server.
+    {
+        let server = syncer.http_server.clone();
+        let http_ip = config.http_ip.clone();
+        let http_port = config.coins[&coin].http_port;
+        handles.push(tokio::spawn(async move {
+            server.run(&http_ip, http_port).await;
+        }));
+    }
+    // Run WebSocketRelay.
+    {
+        let ws = WebSocketRelay::new();
+        let zmq_endpoint = config.coins[&coin].zmq_endpoint.clone();
+        let ws_endpoint = config.coins[&coin].ws_endpoint.clone();
+        handles.push(tokio::spawn(async move {
+            ws.run(&zmq_endpoint, &ws_endpoint).await;
+        }));
+    }
     // Do initial sync.
     syncer.initial_sync().await;
     if syncer.is_stopped().await {

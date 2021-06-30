@@ -141,7 +141,7 @@ $(function() {
 	setInterval(updateLatestTxs, 500);
 	setInterval(updateLatestBlocks, 500);
 	// Initialize WebSocket connection.
-	ws = new WebSocket(websocket_endpoint, 'chainseeker');
+	ws = new WebSocket(websocket_endpoint);
 	ws.onmessage = function(msg) {
 		const data = JSON.parse(msg.data);
 		switch(data[0]) {

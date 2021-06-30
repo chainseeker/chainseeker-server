@@ -121,7 +121,7 @@ impl Syncer {
         let mut synced_blocks = 0;
         const BLOCK_QUEUE_SIZE: usize = 1000;
         let block_queue = Arc::new(RwLock::new(std::collections::VecDeque::with_capacity(BLOCK_QUEUE_SIZE)));
-        {
+        if initial {
             let block_queue = block_queue.clone();
             let stop = self.stop.clone();
             let rest = self.rest.clone();
@@ -151,20 +151,25 @@ impl Syncer {
             if self.is_stopped().await {
                 break;
             }
-            // Fetch block from REST.
-            loop {
-                let block = block_queue.write().await.pop_front();
-                match block {
-                    Some(block) => {
-                        self.process_block(initial, height, &block).await;
-                        synced_blocks += 1;
-                        break;
-                    },
-                    None => {
-                        println!("Block queue is empty. Waiting for blocks...");
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+            if initial {
+                // Fetch block from REST.
+                loop {
+                    let block = block_queue.write().await.pop_front();
+                    match block {
+                        Some(block) => {
+                            self.process_block(initial, height, &block).await;
+                            synced_blocks += 1;
+                            break;
+                        },
+                        None => {
+                            println!("Block queue is empty. Waiting for blocks...");
+                            std::thread::sleep(std::time::Duration::from_millis(100));
+                        }
                     }
                 }
+            } else {
+                let (_block_hash, block) = fetch_block(&self.rest, height).await;
+                self.process_block(initial, height, &block).await;
             }
         }
         synced_blocks
