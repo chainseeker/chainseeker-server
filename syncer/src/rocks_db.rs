@@ -1,7 +1,7 @@
 /// An abstraction struct for key-value store.
 use std::fs::remove_dir_all;
 use std::marker::PhantomData;
-use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode};
+use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode, BoundColumnFamily};
 
 use crate::*;
 
@@ -69,6 +69,24 @@ impl<D> Deserialize for Vec<D>
     }
 }
 
+pub struct Empty {}
+
+impl ConstantSize for Empty {
+    const LEN: usize = 0;
+}
+
+impl Serialize for Empty {
+    fn serialize(&self) -> Vec<u8> {
+        Vec::new()
+    }
+}
+
+impl Deserialize for Empty {
+    fn deserialize(_buf: &[u8]) -> Self {
+        Empty {}
+    }
+}
+
 type Rocks = DBWithThreadMode<MultiThreaded>;
 
 pub struct RocksDBIterator<'a, K, V>
@@ -82,9 +100,9 @@ pub struct RocksDBIterator<'a, K, V>
 impl<'a, K, V> RocksDBIterator<'a, K, V>
     where K: Serialize + Deserialize, V: Serialize + Deserialize,
 {
-    pub fn new(rocks_db: &'a RocksDB<K, V>) -> Self {
+    pub fn new(base: DBIteratorWithThreadMode<'a, Rocks>) -> Self {
         Self {
-            base: rocks_db.db.iterator(rocksdb::IteratorMode::Start),
+            base,
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -119,10 +137,10 @@ impl<'a, K, V> RocksDBPrefixIterator<'a, K, V>
     where K: Serialize + Deserialize,
           V: Serialize + Deserialize,
 {
-    pub fn new(rocks_db: &'a RocksDB<K, V>, prefix: Vec<u8>) -> Self
+    pub fn new(base: DBIteratorWithThreadMode<'a, Rocks>, prefix: Vec<u8>) -> Self
     {
         Self {
-            base: rocks_db.db.prefix_iterator(prefix.clone()),
+            base,
             prefix: prefix,
             _k: PhantomData,
             _v: PhantomData,
@@ -146,6 +164,63 @@ impl<'a, K, V> Iterator for RocksDBPrefixIterator<'a, K, V>
             },
             None => None,
         }
+    }
+}
+
+pub struct RocksDBColumnFamily<'a, K, V>
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
+{
+    base: &'a RocksDB<Empty, Empty>,
+    name: String,
+    cf: BoundColumnFamily<'a>,
+    _k: PhantomData<fn() -> K>,
+    _v: PhantomData<fn() -> V>,
+}
+
+impl<'a, K, V> RocksDBColumnFamily<'a, K, V>
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
+{
+    pub fn new(base: &'a RocksDB<Empty, Empty>, name: &str) -> Self {
+        let cf = match base.db.cf_handle(name) {
+            Some(cf) => cf,
+            None => {
+                let mut opts = Options::default();
+                opts.set_max_open_files(100);
+                opts.create_if_missing(true);
+                base.db.create_cf(name, &opts).unwrap();
+                base.db.cf_handle(name).unwrap()
+            },
+        };
+        Self {
+            base,
+            name: name.to_string(),
+            cf,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+    pub fn get(&self, key: &K) -> Option<V> {
+        match self.base.db.get_cf(self.cf, key.serialize()).unwrap() {
+            Some(value) => Some(V::deserialize(&value)),
+            None => None,
+        }
+    }
+    pub fn put(&self, key: &K, value: &V) {
+        self.base.db.put_cf(self.cf, key.serialize(), value.serialize()).unwrap();
+    }
+    pub fn delete(&self, key: &K) {
+        self.base.db.delete_cf(self.cf, key.serialize()).unwrap();
+    }
+    pub fn iter(&self) -> RocksDBIterator<'_, K, V> {
+        RocksDBIterator::new(self.base.db.iterator_cf(self.cf, rocksdb::IteratorMode::Start))
+    }
+    pub fn prefix_iter(&self, prefix: Vec<u8>) -> RocksDBPrefixIterator<'_, K, V> {
+        RocksDBPrefixIterator::new(self.base.db.prefix_iterator_cf(self.cf, prefix.clone()), prefix)
     }
 }
 
@@ -196,10 +271,10 @@ impl<K, V> RocksDB<K, V>
         self.db.delete(key.serialize()).unwrap();
     }
     pub fn iter(&self) -> RocksDBIterator<'_, K, V> {
-        RocksDBIterator::new(&self)
+        RocksDBIterator::new(self.db.iterator(rocksdb::IteratorMode::Start))
     }
-    pub fn prefix_iter(&self, prefix: Vec<u8>) -> Box<dyn Iterator<Item = (K, V)> + '_> {
-        Box::new(RocksDBPrefixIterator::new(&self, prefix))
+    pub fn prefix_iter(&self, prefix: Vec<u8>) -> RocksDBPrefixIterator<'_, K, V> {
+        RocksDBPrefixIterator::new(self.db.prefix_iterator(prefix.clone()), prefix)
     }
     pub fn purge(&self) {
         remove_dir_all(&self.path).unwrap();
@@ -239,5 +314,15 @@ mod test {
             vec![(key1.clone(), value1.clone())]);
         db.delete(&key1);
         assert_eq!(db.get(&key1), None);
+    }
+    #[test]
+    fn rocks_db_cf() {
+        let db = RocksDB::<Empty, Empty>::new("/tmp/chainseeker/test_rocks_db_cf", true);
+        let db_cf1 = RocksDBColumnFamily::<u32, u32>::new(&db, "cf1");
+        let db_cf2 = RocksDBColumnFamily::<u32, u32>::new(&db, "cf2");
+        db_cf1.put(&114514, &12345);
+        db_cf2.put(&114514, &67890);
+        assert_eq!(db_cf1.get(&114514), Some(12345));
+        assert_eq!(db_cf2.get(&114514), Some(67890));
     }
 }
