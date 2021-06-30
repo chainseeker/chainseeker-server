@@ -28,7 +28,7 @@ impl WebSocketRelay {
         socket.connect(zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         socket.set_subscribe(b"hashtx").expect("Failed to subscribe to a ZeroMQ topic.");
-        println!("WebSocketRelay: waiting for a ZeroMQ message...");
+        //println!("WebSocketRelay: waiting for a ZeroMQ message...");
         // Create a WebSocket server.
         let ws_endpoint = ws_endpoint.to_string();
         let (tx, rx) = tokio::sync::watch::channel("".to_string());
@@ -63,7 +63,7 @@ impl WebSocketRelay {
                     assert_eq!(multipart.len(), 3);
                     let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.").to_string();
                     let hash = &multipart[1];
-                    println!("WebSocketRelay: {} {}", topic, hex::encode(hash));
+                    //println!("WebSocketRelay: {} {}", topic, hex::encode(hash));
                     let json = serde_json::to_string(&vec![topic, hex::encode(hash)]).unwrap();
                     tx.send(json).unwrap();
                 },
