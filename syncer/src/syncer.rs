@@ -250,24 +250,38 @@ impl Syncer {
         let coin_config = self.coin_config();
         socket.connect(&coin_config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
+        socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
         println!("Waiting for a ZeroMQ message...");
         loop {
             if *self.stop.read().await {
                 break;
             }
-            match socket.recv_multipart(1) {
-                Ok(multipart) => {
-                    assert_eq!(multipart.len(), 3);
-                    //let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.");
-                    let blockhash = &multipart[1];
-                    println!("Received a new block from ZeroMQ: {}", hex::encode(blockhash));
+            let multipart = socket.recv_multipart(1);
+            if multipart.is_err() {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                continue;
+            }
+            let multipart = multipart.unwrap();
+            assert_eq!(multipart.len(), 3);
+            let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.");
+            let bin = &multipart[1];
+            match topic {
+                "hashblock" => {
+                    println!("Syncer: received a new block: {}.", hex::encode(bin));
+                    self.sync(false).await;
                 },
-                Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    continue;
+                "rawtx" => {
+                    let tx: bitcoin::Transaction = consensus_decode(bin);
+                    let txid = tx.txid();
+                    println!("Syncer: received a new tx: {}.", txid);
+                    if let Err(previous_txid) = self.http_server.tx_db.write().await.put_tx(&tx, None) {
+                        println!("Syncer: failed to put transaction: {} (reason: tx {} not found).", txid, previous_txid);
+                    }
+                },
+                _ => {
+                    println!("Syncer: invalid topic received.");
                 },
             }
-            self.sync(false).await;
         }
         println!("Syncer stopped.");
     }

@@ -95,6 +95,28 @@ impl TxDB {
     pub fn put(&self, txid: &Txid, value: &TxDBValue) {
         self.db.put(&TxDBKey { txid: (*txid).clone() }, value);
     }
+    pub fn put_tx(&self, tx: &Transaction, confirmed_height: Option<u32>) -> Result<TxDBValue, Txid> {
+        let mut previous_txouts = Vec::new();
+        for vin in tx.input.iter() {
+            if vin.previous_output.is_null() {
+                continue;
+            }
+            let previous_txid = &vin.previous_output.txid;
+            let previous_tx = self.get(previous_txid);
+            if previous_tx.is_none() {
+                return Err((*previous_txid).clone());
+            }
+            let previous_tx = previous_tx.unwrap();
+            previous_txouts.push(previous_tx.tx.output[vin.previous_output.vout as usize].clone());
+        }
+        let value = TxDBValue {
+            confirmed_height,
+            tx: (*tx).clone(),
+            previous_txouts,
+        };
+        self.put(&tx.txid(), &value);
+        Ok(value)
+    }
     pub fn get(&self, txid: &Txid) -> Option<TxDBValue> {
         self.db.get(&TxDBKey { txid: (*txid).clone() })
     }
