@@ -226,6 +226,7 @@ impl HttpServer {
     fn response(status: &StatusCode, body: String) -> Response<Body> {
         Response::builder()
             .header("Content-Type", "application/json")
+            .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
             .status(status)
             .body(body.into())
             .unwrap()
