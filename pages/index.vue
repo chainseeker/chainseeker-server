@@ -54,108 +54,6 @@ import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
 
-/****************************************************************************************************
- * Latest Transactions.
- ****************************************************************************************************/
-
-const MAX_LATEST_TXS = 10;
-let txs = [];
-let lastTxCount = 0;
-
-function updateLatestTxTime() {
-	if(txs.length == 0) return;
-	for(let i=txs.length-1; i>=Math.max(0, txs.length-MAX_LATEST_TXS); i--) {
-		const idx = txs.length - i;
-		const html = formatElapsedTime(new Date().getTime() - (txs[i].time)) + ' ago';
-		$('#latest-txs tbody tr:nth-child('+idx+') td:nth-child(2)').html(html);
-	}
-}
-
-function updateLatestTxs() {
-	if(txs.length == 0) return;
-	if(txs.length == lastTxCount) {
-		updateLatestTxTime();
-		return;
-	}
-	lastTxCount = txs.length;
-	let html = '';
-	for(let i=txs.length-1; i>=Math.max(0, txs.length-MAX_LATEST_TXS); i--) {
-		const tx = txs[i].tx;
-		html += [
-			'<tr>',
-				'<td><a href="' + server_prefix + '/tx/' + tx.txid + '">' + tx.txid + '</a></td>',
-				'<td>' + formatElapsedTime(new Date().getTime() - txs[i].time) + ' sec ago</td>',
-				'<td>' + tx.size.toLocaleString() + ' bytes</td>',
-				'<td>' + formatAmount(tx.vout.reduce((a, b) => (a + b.value), 0)) + '</td>',
-			'</tr>',
-		].join('');
-	}
-	$('#latest-txs tbody').html(html);
-}
-
-function insertTx(txid) {
-	return chainseeker.getTransaction(txid).then((tx) => {
-		if(!tx) return;
-		txs.push({
-			tx: tx,
-			time: new Date().getTime(),
-		});
-	});
-}
-
-/****************************************************************************************************
- * Latest Blocks.
- ****************************************************************************************************/
-
-const MAX_LATEST_BLOCKS = 5;
-let blocks = [];
-let lastBlockCount = 0;
-
-function updateLatestBlockTime() {
-	if(blocks.length == 0) return;
-	for(let i=blocks.length-1; i>=Math.max(0, blocks.length-MAX_LATEST_BLOCKS); i--) {
-		const idx = blocks.length - i;
-		const html = formatElapsedTime(new Date().getTime() - 1000 * (blocks[i].time)) + ' ago';
-		$('#latest-blocks tbody tr:nth-child('+idx+') td:nth-child(2)').html(html);
-	}
-}
-
-function updateLatestBlocks() {
-	if(blocks.length == 0) return;
-	if(blocks.length == lastBlockCount) {
-		updateLatestBlockTime();
-		return;
-	}
-	lastBlockCount = blocks.length;
-	let html = '';
-	for(let i=blocks.length-1; i>=Math.max(0, blocks.length-MAX_LATEST_BLOCKS); i--) {
-		const block = blocks[i];
-		html += [
-			'<tr>',
-				'<td><a href="' + server_prefix + '/block/' + block.height + '">',
-					block.height.toLocaleString(),
-				'</a></td>',
-				'<td>' + formatElapsedTime(new Date().getTime() - 1000 * (block.time)) + ' ago</td>',
-				'<td>' + block.txids.length.toLocaleString() + '</td>',
-				'<td>' + block.size.toLocaleString() + ' bytes</td>',
-				'<td style="font-family:monospace;">' + block.hash + '</td>',
-			'</tr>',
-		].join('');
-	}
-	$('#latest-blocks tbody').html(html);
-}
-
-function insertBlock(blockid) {
-	return chainseeker.getBlock(blockid).then((block) => {
-		if(!block) return;
-		blocks.push(block);
-	});
-}
-
-/****************************************************************************************************
- * Initialize.
- ****************************************************************************************************/
-
 @Component
 export default class Home extends Vue {
 	const MAX_LATEST_BLOCKS = 5;
@@ -190,7 +88,7 @@ export default class Home extends Vue {
 		// Fetch status.
 		const status = await this.cs.getStatus();
 		// Fetch recent blocks.
-		for(let height=status.blocks; height>=status.blocks-MAX_LATEST_BLOCKS; height--) {
+		for(let height=status.blocks; height>=status.blocks-this.MAX_LATEST_BLOCKS; height--) {
 			this.recentBlocks.push(await this.cs.getBlock(height));
 		}
 		// Initialize WebSocket connection.
