@@ -21,6 +21,7 @@
     "coininfo": "^5.1.0",
     "compression": "^1.7.4",
     "counterjs": "0.0.3",
+    "d3": "^7.0.0",
     "ejs": "^3.1.6",
     "express": "^4.17.1",
     "express-graphql": "^0.8.0",
