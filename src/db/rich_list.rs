@@ -1,3 +1,4 @@
+use std::cmp::min;
 use core::ops::Range;
 use std::collections::HashMap;
 use rayon::prelude::*;
@@ -39,7 +40,12 @@ impl RichList {
         self.entries.len()
     }
     pub fn get_in_range(&self, range: Range<usize>) -> Vec<RichListEntry> {
-        self.entries[range].to_vec()
+        if self.entries.len() < 1 {
+            return Vec::new();
+        }
+        let start = min(range.start, self.entries.len() - 1);
+        let end = min(range.end, self.entries.len());
+        self.entries[start..end].to_vec()
     }
 }
 

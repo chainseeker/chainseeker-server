@@ -1,4 +1,3 @@
-use std::cmp::min;
 use std::str::FromStr;
 use std::time::Instant;
 use std::convert::Infallible;
@@ -610,9 +609,7 @@ impl HttpServer {
         };
         let server = req.data::<HttpServer>().unwrap();
         let rich_list = server.rich_list.read().await;
-        let begin = min(offset, rich_list.len() - 1usize);
-        let end = min(offset + limit, rich_list.len() - 1usize);
-        let addresses = rich_list.get_in_range(begin..end).iter()
+        let addresses = rich_list.get_in_range(offset..offset+limit).iter()
             .map(|entry| RestRichListEntry::from_rich_list_entry(entry, Self::network(&server.coin)))
             .collect::<Vec<RestRichListEntry>>();
         Ok(Self::json(&addresses))
