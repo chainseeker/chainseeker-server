@@ -119,7 +119,7 @@ impl RestVout {
 }
 
 #[derive(Debug, Clone, Serialize)]
-//#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct RestTx {
     confirmed_height: Option<u32>,
     hex: String,
