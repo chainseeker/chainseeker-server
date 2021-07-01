@@ -139,6 +139,9 @@ impl Syncer {
                         continue;
                     }
                     for _ in block_queue_len..BLOCK_QUEUE_SIZE {
+                        if height > target_height {
+                            break;
+                        }
                         let (_block_hash, block) = fetch_block(&rest, height).await;
                         block_queue.write().await.push_back(block);
                         height += 1;
