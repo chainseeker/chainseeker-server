@@ -39,9 +39,27 @@ export default {
 	
 	publicRuntimeConfig: {
 		coins: {
+			btc: {
+				coin: {
+					name: "Bitcoin (Mainnet)",
+					symbol: "BTC",
+					satoshi: "satoshi",
+				},
+				apiEndpoint: 'https://btc.chainseeker.info/api',
+				wsEndpoint: 'wss://btc.chainseeker.info/ws',
+			},
+			tbtc: {
+				coin: {
+					name: "Bitcoin (Testnet)",
+					symbol: "tBTC",
+					satoshi: "satoshi",
+				},
+				apiEndpoint: 'https://tbtc.chainseeker.info/api',
+				wsEndpoint: 'wss://tbtc.chainseeker.info/ws',
+			},
 			local: {
 				coin: {
-					name: "Bitcoin Local",
+					name: "Bitcoin (Local)",
 					symbol: "lBTC",
 					satoshi: "satoshi",
 				},

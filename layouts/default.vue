@@ -22,16 +22,7 @@
 						</v-form>
 					</v-toolbar>
 				</nav>
-				<v-container>
-					<Nuxt />
-					<hr style="margin-top:5ex;" />
-					<footer>
-						<v-container>
-							<p style="margin: 0px;">Copyright &copy; chainseeker 2017-{{ new Date().getFullYear() }}. All rights reserved.</p>
-							<p>Created &amp; mainted by <NuxtLink to="https://twitter.com/visvirial" target="_blank">@visvirial</NuxtLink></p>
-						</v-container>
-					</footer>
-				</v-container>
+				<Nuxt />
 			</v-container>
 		</v-main>
 	</v-app>
@@ -40,10 +31,8 @@
 <script lang="ts">
 import { Vue, Component } from 'nuxt-property-decorator';
 
-const a: string = 'false';
-
 @Component({
-	layout: 'default',
+	layout: 'base',
 	middleware: ['coin'],
 })
 export default class Layout extends Vue {
