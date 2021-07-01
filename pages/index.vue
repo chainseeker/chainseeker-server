@@ -28,6 +28,7 @@
 			<template v-slot:default>
 				<thead>
 					<tr>
+						<th>Received at</th>
 						<th>Transaction ID</th>
 						<th># of vins</th>
 						<th># of vouts</th>
@@ -36,7 +37,8 @@
 					</tr>
 				</thead>
 				<tbody>
-					<tr v-for="tx in recentTxs">
+					<tr v-for="{ received, tx } in recentTxs">
+						<td><ElapsedTime :time="received" /> ago</td>
 						<td><NuxtLink :to="`/tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></td>
 						<td>{{ tx.vin.length.toLocaleString() }}</td>
 						<td>{{ tx.vout.length.toLocaleString() }}</td>
@@ -60,7 +62,10 @@ export default class Home extends Vue {
 	const MAX_LATEST_TXS = 5;
 	cs: Chainseeker;
 	recentBlocks: cs.BlockHeader[] = [];
-	recentTxs: cs.Transaction[] = [];
+	recentTxs: {
+		received: number,
+		tx: cs.Transaction,
+	}[] = [];
 	constructor() {
 		super();
 		this.cs = new Chainseeker(this.$config.apiEndpoint);
@@ -71,7 +76,7 @@ export default class Home extends Vue {
 			const data = JSON.parse(msg.data);
 			switch(data[0]) {
 				case 'hashtx':
-					this.recentTxs.unshift(await this.cs.getTransaction(data[1]));
+					this.recentTxs.unshift({ received: Date.now(), tx: await this.cs.getTransaction(data[1]) });
 					if(this.recentTxs.length > this.MAX_LATEST_TXS) {
 						this.recentTxs.splice(0, this.recentTxs.length - this.MAX_LATEST_TXS);
 					}
