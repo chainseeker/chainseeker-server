@@ -107,7 +107,6 @@ export default class Home extends Vue {
 				confirmations,
 			};
 		} catch(e) {
-			console.log(e);
 			error({ statusCode: 404, message: 'Transaction Not Found.' });
 		}
 	}

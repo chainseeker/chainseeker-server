@@ -8,14 +8,14 @@
 						<div class="ml-4"><NuxtLink to="/rich_list">Rich List</NuxtLink></div>
 						<div class="ml-2"><a href="https://chainseeker.docs.apiary.io/" target="_blank">REST API</a></div>
 						<v-spacer />
-						<v-form>
+						<v-form v-on:submit="search">
 							<v-container style="margin-top:2ex">
 								<v-row>
 									<v-col>
 										<v-text-field v-model="query" label="blockid, height, txid, address" style="width: 40em" />
 									</v-col>
 									<v-col>
-										<v-btn>Search</v-btn>
+										<v-btn type="submit">Search</v-btn>
 									</v-col>
 								</v-row>
 							</v-container>
@@ -47,6 +47,11 @@ const a: string = 'false';
 })
 export default class Layout extends Vue {
 	query: string = '';
+	search(e) {
+		e.preventDefault();
+		this.$router.push(`/search/${this.query}`);
+		return false;
+	}
 }
 </script>
 
