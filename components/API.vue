@@ -19,7 +19,7 @@
 import { Vue, Component, Prop } from 'nuxt-property-decorator';
 
 @Component
-export default class ElapsedTime extends Vue {
+export default class API extends Vue {
 	@Prop({ type: String, required: true, })
 	path: string;
 	active?: number = 0;

@@ -68,7 +68,7 @@
 					</tr>
 					<tr>
 						<th>#transactions</th>
-						<td colspan="3">{{ block.txids.length.toLocaleString() }}</td>
+						<td colspan="3">{{ block.txs.length.toLocaleString() }}</td>
 					</tr>
 					<tr>
 						<th>Block Reward</th>
@@ -80,28 +80,19 @@
 			</template>
 		</v-simple-table>
 		<API :path="`block/${block.hash}`" />
-		<!--
 		<h2>Transactions in the Block</h2>
-		<% for(let i in block.txs) { %>
-		<% const tx = block.txs[i] %>
-		<table class="table">
-			<thead>
-				<tr>
-					<th colspan="3">
-						<a href="<%= config.server.web.prefix %>/tx/<%= tx.txid %>"><%= tx.txid %></a>
-						<% if(tx.vin[0].address != 'coinbase') { %>
-						<div class="pull-right"><small>(fee: <%- formatAmount(tx.fee) %>)</small></div>
-						<% } else { %>
-						<div class="pull-right"><small>(fee reward: <%- formatAmount(-(block.reward + tx.fee)) %>)</small></div>
-						<% } %>
-					</th>
-				</tr>
-			</thead>
-			<tbody>
-				<%- include('transaction_movements.ejs', { tx: tx, colorize: [] }) %>
-			</tbody>
-		</table>
-		-->
+		<div v-for="tx in block.txs" class="my-4">
+			<v-container>
+				<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
+					<v-col><strong><NuxtLink to="/tx/${tx.txid}">{{ tx.txid }}</NuxtLink></strong></v-col>
+					<v-col v-if="tx.address !== 'coinbase'" class="text-right">(fee: <Amount :value="tx.fee" />)</v-col>
+					<v-col v-else                           class="text-right">(reward: <Amount :value="tx.fee" />)</v-col>
+				</v-row>
+				<v-row>
+					<TxMovement :tx="tx" />
+				</v-row>
+			</v-container>
+		</div>
 	</div>
 </template>
 
@@ -113,7 +104,7 @@ import * as cs from 'chainseeker/dist/types';
 @Component
 export default class Home extends Vue {
 	status: cs.Status;
-	block?: cs.Block | null = null;
+	block?: cs.BlockWithTxs | null = null;
 	constructor() {
 		super();
 	}
@@ -121,7 +112,7 @@ export default class Home extends Vue {
 		const cs = new Chainseeker(this.$config.apiEndpoint);
 		this.status = await cs.getStatus();
 		// Fetch block.
-		const block = await cs.getBlock(this.$route.params.id);
+		const block = await cs.getBlockWithTxs(this.$route.params.id);
 		this.block = block;
 	}
 }

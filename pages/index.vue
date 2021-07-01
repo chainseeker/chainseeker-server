@@ -16,7 +16,7 @@
 					<tr v-for="block in recentBlocks">
 						<td><NuxtLink :to="`/block/${block.height}`">{{ block.height }}</NuxtLink></td>
 						<td><ElapsedTime :time="1000 * block.time" /> ago</td>
-						<td>{{ block.txids.length }}</td>
+						<td>{{ block.ntxs }}</td>
 						<td>{{ block.size.toLocaleString() }} bytes</td>
 						<td>{{ block.hash }} bytes</td>
 					</tr>
@@ -59,7 +59,7 @@ export default class Home extends Vue {
 	const MAX_LATEST_BLOCKS = 5;
 	const MAX_LATEST_TXS = 5;
 	cs: Chainseeker;
-	recentBlocks: cs.Blocks[] = [];
+	recentBlocks: cs.BlockHeader[] = [];
 	recentTxs: cs.Transaction[] = [];
 	constructor() {
 		super();
@@ -77,7 +77,7 @@ export default class Home extends Vue {
 					}
 					break;
 				case 'hashblock':
-					this.recentBlocks.unshift(await this.cs.getBlock(data[1]));
+					this.recentBlocks.unshift(await this.cs.getBlockHeader(data[1]));
 					this.recentBlocks.pop();
 					break;
 				default:
@@ -89,7 +89,7 @@ export default class Home extends Vue {
 		const status = await this.cs.getStatus();
 		// Fetch recent blocks.
 		for(let height=status.blocks; height>=status.blocks-this.MAX_LATEST_BLOCKS; height--) {
-			this.recentBlocks.push(await this.cs.getBlock(height));
+			this.recentBlocks.push(await this.cs.getBlockHeader(height));
 		}
 		// Initialize WebSocket connection.
 		this.initWebSocket();

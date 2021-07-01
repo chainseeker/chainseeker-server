@@ -8,7 +8,7 @@
 import { Vue, Component, Prop } from 'nuxt-property-decorator';
 
 @Component
-export default class ElapsedTime extends Vue {
+export default class Duration extends Vue {
 	@Prop({ type: Number, required: true, })
 	duration: number;
 	format(time: number) {
