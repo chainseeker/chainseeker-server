@@ -245,14 +245,10 @@ impl UtxoServerInStorageLazy {
         let server = Self {
             db,
         };
-        server.run();
         server
     }
-    pub fn run(&self) {
-        self.db.run();
-    }
-    pub async fn stop(&self) {
-        self.db.stop().await;
+    pub async fn flush(&self) {
+        self.db.flush().await;
     }
     pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         self.db.get(&script_pubkey.into()).await

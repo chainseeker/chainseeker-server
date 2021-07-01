@@ -5,16 +5,13 @@ use tokio::sync::RwLock;
 
 use crate::*;
 
-const MAX_ENTRIES: usize = 1000_000;
-
 #[derive(Debug)]
 pub struct RocksDBLazy<K, V>
     where K: Serialize + Deserialize + 'static,
           V: Serialize + Deserialize + 'static + ConstantSize,
 {
     buffer: Arc<RwLock<HashMap<K, Vec<V>>>>,
-    db: Arc<RwLock<RocksDB<K, Vec<V>>>>,
-    stop: Arc<RwLock<bool>>,
+    db: Arc<RwLock<RocksDBMulti<K, V>>>,
 }
 
 impl<K, V> RocksDBLazy<K, V>
@@ -24,33 +21,25 @@ impl<K, V> RocksDBLazy<K, V>
     pub fn new(path: &str, temporary: bool) -> Self {
         Self {
             buffer: Arc::new(RwLock::new(HashMap::new())),
-            db: Arc::new(RwLock::new(RocksDB::new(path, temporary))),
-            stop: Arc::new(RwLock::new(false)),
+            db: Arc::new(RwLock::new(RocksDBMulti::new(path, temporary))),
         }
     }
-    pub async fn get(&self, key: &K) -> Vec<V> {
+    async fn get_from_buffer(&self, key: &K) -> Vec<V> {
         match self.buffer.read().await.get(key) {
             Some(value) => (*value).clone(),
-            None => {
-                let value = self.db.read().await.get(key);
-                match value {
-                    Some(value) => value,
-                    None => Vec::new(),
-                }
-            },
+            None => Vec::new(),
         }
+    }
+    async fn get_from_db(&self, key: &K) -> Vec<V> {
+        self.db.read().await.get(key)
+    }
+    pub async fn get(&self, key: &K) -> Vec<V> {
+        vec![self.get_from_buffer(key).await, self.get_from_db(key).await].concat()
     }
     pub async fn insert(&mut self, key: K, value: Vec<V>) {
         self.buffer.write().await.insert(key, value);
     }
     pub async fn push(&mut self, key: &K, value: &V) {
-        loop {
-            if self.buffer.read().await.len() > MAX_ENTRIES {
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            } else {
-                break;
-            }
-        }
         let mut buffer = self.buffer.write().await;
         match buffer.get_mut(key) {
             Some(values) => {
@@ -63,49 +52,27 @@ impl<K, V> RocksDBLazy<K, V>
             }
         }
     }
+    async fn remove_from_buffer(&self, key: &K, value: &V) {
+        match self.buffer.write().await.get_mut(&key) {
+            Some(values) => *values = values.iter().filter(|v| *v != value).cloned().collect(),
+            None => (),
+        }
+    }
+    async fn remove_from_db(&self, key: &K, value: &V) {
+        let db = self.db.write().await;
+        let values = db.get(key).iter().filter(|v| *v != value).cloned().collect();
+        db.put(key, &values);
+    }
     pub async fn remove(&mut self, key: &K, value: &V) {
-        let values_old = self.get(key).await;
-        let mut values = Vec::new();
-        for v in values_old.iter() {
-            if *v != *value {
-                values.push((*v).clone());
-            }
-        }
-        self.insert((*key).clone(), values).await;
+        self.remove_from_buffer(key, value).await;
+        self.remove_from_db(key, value).await;
     }
-    pub fn run(&self) {
-        {
-            let stop = self.stop.clone();
-            tokio::spawn(async move {
-                tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
-                println!("Ctrl-C was pressed. Exiting RocksDBLazy...");
-                *stop.write().await = true;
-            });
+    pub async fn flush(&self) {
+        for key in self.buffer.read().await.keys() {
+            let mut buffer = self.buffer.write().await;
+            let db = self.db.write().await;
+            let (key, value) = buffer.remove_entry(key).unwrap();
+            db.put(&key, &value);
         }
-        let buffer = self.buffer.clone();
-        let db = self.db.clone();
-        let stop = self.stop.clone();
-        tokio::spawn(async move {
-            loop {
-                if *stop.read().await {
-                    break;
-                }
-                if buffer.read().await.len() == 0 {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    continue;
-                }
-                let buffer: Vec<(K, Vec<V>)> = {
-                    let buf = buffer.read().await.iter().map(|(k, v)| ((*k).clone(), (*v).clone())).collect();
-                    *buffer.write().await = HashMap::new();
-                    buf
-                };
-                for (key, val) in buffer.iter() {
-                    db.write().await.put(key, val);
-                }
-            }
-        });
-    }
-    pub async fn stop(&self) {
-        *self.stop.write().await = true;
     }
 }
