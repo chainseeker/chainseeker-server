@@ -539,6 +539,32 @@ impl HttpServer {
         let txids = txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>();
         Ok(Self::json(&txids))
     }
+    /// `/txs/:script_or_address` endpoint.
+    async fn txs_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        let script = Self::decode_script_or_address(req.param("script_or_address").unwrap());
+        if script.is_err() {
+            return Ok(Self::not_found("Failed to decode input script or address."));
+        }
+        let txids = server.addr_index_db.read().await.get(&script.unwrap());
+        let tx_db = server.tx_db.read().await;
+        let mut txids_not_found = Vec::new();
+        let txs = txids.iter().map(|txid| {
+            let tx_db_value = tx_db.get(txid);
+            match tx_db_value {
+                Some(v) => Some(RestTx::from_tx_db_value(&v, Self::network(&server.coin))),
+                None => {
+                    txids_not_found.push(txid);
+                    None
+                },
+            }
+        }).collect::<Vec<Option<RestTx>>>();
+        if txids_not_found.len() > 0 {
+            return Ok(Self::internal_error(&format!("Failed to resolve transactions (one of these is {}).", txids_not_found[0])));
+        }
+        let txs: Vec<RestTx> = txs.into_iter().map(|x| x.unwrap()).collect();
+        Ok(Self::json(&txs))
+    }
     /// `/utxos/:script_or_address` endpoint.
     async fn utxos_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
@@ -590,6 +616,7 @@ impl HttpServer {
             .get("/api/v1/block_with_txs/:hash_or_height", Self::block_with_txs_handler)
             .get("/api/v1/block/:hash_or_height", Self::block_handler)
             .get("/api/v1/txids/:script_or_address", Self::txids_handler)
+            .get("/api/v1/txs/:script_or_address", Self::txs_handler)
             .get("/api/v1/utxos/:script_or_address", Self::utxos_handler)
             .get("/api/v1/rich_list_count", Self::rich_list_count_handler)
             .get("/api/v1/rich_list/:offset/:limit", Self::rich_list_handler)
