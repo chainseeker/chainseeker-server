@@ -32,7 +32,7 @@ export default class Home extends Vue {
 			return;
 		} catch(e) {
 		}
-		error({ statusCode: 404, message: 'Not Found.' });
+		this.$nuxt.error({ statusCode: 404, message: 'Not Found.' });
 	}
 }
 </script>

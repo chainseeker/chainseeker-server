@@ -25,6 +25,6 @@ import * as cs from 'chainseeker/dist/types';
 @Component
 export default class TxMovement extends Vue {
 	@Prop({ type: Object, required: true, })
-	tx: cs.Transaction;
+	tx!: cs.Transaction;
 }
 </script>

@@ -8,10 +8,10 @@ import { Vue, Component, Prop } from 'nuxt-property-decorator';
 @Component
 export default class Amount extends Vue {
 	@Prop({ type: Number, required: true, })
-	value: number;
+	value!: number;
 	@Prop({ type: String, required: false, default: '' })
-	symbol;
+	symbol!: string;
 	@Prop({ type: Boolean, required: false, default: false })
-	unitInSatoshi;
+	unitInSatoshi!: boolean;
 }
 </script>

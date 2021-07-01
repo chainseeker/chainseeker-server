@@ -76,21 +76,21 @@
 </template>
 
 <script lang="ts">
+import { Context } from '@nuxt/types';
 import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
 
 @Component
 export default class Home extends Vue {
-	status: cs.Status;
-	status?: cs.Status | null = null;
+	status: cs.Status | null = null;
 	tx?: cs.Transaction | null = null;
 	blockHeader: cs.BlockHeader | null = null;
 	confirmations: number | null = null;
 	head() {
-		return { title: `Transaction ${this.tx.txid} - chainseeker` };
+		return { title: `Transaction ${this.$route.params.id} - chainseeker` };
 	}
-	async asyncData({ params, error, $config }) {
+	async asyncData({ params, error, $config }: Context) {
 		const cs = new Chainseeker($config.apiEndpoint);
 		const status = await cs.getStatus();
 		try {

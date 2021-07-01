@@ -39,6 +39,7 @@
 </template>
 
 <script lang="ts">
+import { Context } from '@nuxt/types';
 import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
@@ -60,9 +61,9 @@ export default class Home extends Vue {
 		};
 	}
 	head() {
-		return { title: `Rich List ${this.page * PER_PAGE + 1} - ${(this.page + 1) * PER_PAGE} - chainseeker` };
+		return { title: `Rich List ${this.page! * PER_PAGE + 1} - ${(this.page! + 1) * PER_PAGE} - chainseeker` };
 	}
-	async asyncData({ params, error, $config }) {
+	async asyncData({ params, error, $config }: Context) {
 		const page = typeof params.page === 'undefined' ? 0 : Number.parseInt(params.page);
 		const cs = new Chainseeker($config.apiEndpoint);
 		const richListCount = await cs.getRichListCount();

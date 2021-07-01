@@ -47,7 +47,7 @@ const a: string = 'false';
 })
 export default class Layout extends Vue {
 	query: string = '';
-	search(e) {
+	search(e: Event) {
 		e.preventDefault();
 		this.$router.push(`/search/${this.query}`);
 		return false;

@@ -95,19 +95,20 @@
 </template>
 
 <script lang="ts">
+import { Context } from '@nuxt/types';
 import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
 
 @Component
 export default class Home extends Vue {
-	status: cs.Status;
+	status: cs.Status | null = null;
 	block?: cs.BlockWithTxs | null = null;
 	fee: number = 0;
 	head() {
-		return { title: `Block ${this.block.hash} - chainseeker` };
+		return { title: `Block ${this.block!.hash!} - chainseeker` };
 	}
-	async asyncData({ params, error, $config }) {
+	async asyncData({ params, error, $config }: Context) {
 		const cs = new Chainseeker($config.apiEndpoint);
 		const status = await cs.getStatus();
 		// Fetch block.

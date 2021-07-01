@@ -21,13 +21,13 @@ import { Vue, Component, Prop } from 'nuxt-property-decorator';
 @Component
 export default class API extends Vue {
 	@Prop({ type: String, required: true, })
-	path: string;
+	path!: string;
 	active?: number = 0;
 	output: string = "(Please press the \"Call\" button...)";
 	created() {
 		this.active = undefined;
 	}
-	async call(e) {
+	async call(e: Event) {
 		e.preventDefault();
 		const url = `${this.$config.apiEndpoint}/v1/${this.path}`;
 		const json = await (await fetch(url)).json();

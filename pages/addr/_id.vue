@@ -67,6 +67,7 @@
 </template>
 
 <script lang="ts">
+import { Context } from '@nuxt/types';
 import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
@@ -74,7 +75,7 @@ import * as cs from 'chainseeker/dist/types';
 @Component
 export default class Home extends Vue {
 	address: string | null = null;
-	status: cs.Status;
+	status: cs.Status | null = null;
 	txids: { txid: string }[] | null = null;
 	txs: cs.Transaction[] = [];
 	utxos: cs.Utxo[]  = [];
@@ -94,7 +95,7 @@ export default class Home extends Vue {
 	head() {
 		return { title: `Address ${this.address} - chainseeker` };
 	}
-	async asyncData({ params, error, $config }) {
+	async asyncData({ params, error, $config }: Context) {
 		const address = params.id;
 		const cs = new Chainseeker($config.apiEndpoint);
 		const status = await cs.getStatus();
@@ -113,7 +114,7 @@ export default class Home extends Vue {
 	}
 	async fetchTxs() {
 		const cs = new Chainseeker(this.$config.apiEndpoint);
-		this.txs = await cs.getTxs(this.address);
+		this.txs = await cs.getTxs(this.address!);
 	}
 }
 </script>

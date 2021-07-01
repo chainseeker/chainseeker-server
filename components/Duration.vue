@@ -10,7 +10,7 @@ import { Vue, Component, Prop } from 'nuxt-property-decorator';
 @Component
 export default class Duration extends Vue {
 	@Prop({ type: Number, required: true, })
-	duration: number;
+	duration!: number;
 	format(time: number) {
 		const appendS = (n: number, text: string) => {
 			return n > 1 ? `${text}s` : text;

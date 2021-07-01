@@ -12,6 +12,7 @@
 </template>
 
 <script lang="ts">
+import { Context } from '@nuxt/types';
 import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
@@ -19,13 +20,13 @@ import * as d3 from 'd3';
 
 @Component
 export default class Home extends Vue {
-	blockSummary: cs.BlockSummaryEntry[];
+	blockSummary: cs.BlockSummaryEntry[] = [];
 	head() {
 		return { title: 'Block Size Stat - chainseeker' };
 	}
 	drawGraph() {
 		// Fetch statistical data and compute averages and standard deviations.
-		const computeStat = (arr) => {
+		const computeStat = (arr: number[]): { avg: number, stddev: number } => {
 			const avg = arr.reduce((i, a) => i+a, 0) / arr.length;
 			const variance = arr.reduce((i, a) => i+(a-avg)*(a-avg), 0) / arr.length;
 			return {
@@ -43,8 +44,8 @@ export default class Home extends Vue {
 			const s2 = computeStat(points.map((p) => p.weight));
 			data.push([INTERVAL*i, 0.001*s0.avg, 0.001*s0.stddev, 0.001*s1.avg, 0.001*s1.stddev, 0.001*s2.avg, 0.001*s2.stddev]);
 		}
-		const WIDTH = document.getElementById('plot').clientWidth;
-		const HEIGHT = document.getElementById('plot').clientHeight;
+		const WIDTH = document.getElementById('plot')!.clientWidth;
+		const HEIGHT = document.getElementById('plot')!.clientHeight;
 		const MARGIN = {
 			top: 10,
 			bottom: 50,
@@ -66,7 +67,7 @@ export default class Home extends Vue {
 			.call(d3.axisBottom(x));
 		// Create y-axis.
 		const y = d3.scaleLinear()
-			.domain([0, d3.max(data, function(d) { return Math.max(d[1]+0.5*d[2], d[3]+0.5*d[4], d[5]+0.5*d[6]); })])
+			.domain([0, d3.max(data, function(d) { return Math.max(d[1]+0.5*d[2], d[3]+0.5*d[4], d[5]+0.5*d[6]); }) as number])
 			.range([HEIGHT-MARGIN.top-MARGIN.bottom, MARGIN.top]);
 		svg.append('g')
 			.attr('transform', 'translate(' + MARGIN.left + ', 0)')
@@ -99,11 +100,11 @@ export default class Home extends Vue {
 				.attr('d', d3.area()
 					.x((d) => x(d[0]))
 					.y0((d) => y(d[2*i+1]-0.5*d[2*i+2]))
-					.y1((d) => y(d[2*i+1]+0.5*d[2*i+2]))
+					.y1((d) => y(d[2*i+1]+0.5*d[2*i+2])) as any
 				);
 		}
 	}
-	async asyncData({ params, error, $config }) {
+	async asyncData({ params, error, $config }: Context) {
 		const cs = new Chainseeker($config.apiEndpoint);
 		const status = await cs.getStatus();
 		const blockSummary = await cs.getBlockSummary(0, status.blocks);

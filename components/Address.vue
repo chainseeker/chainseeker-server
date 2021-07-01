@@ -18,10 +18,10 @@ import { toSvg } from 'jdenticon';
 
 @Component
 export default class Address extends Vue {
-	@Prop({ type: String | null, required: true, })
-	value: string;
+	@Prop({ type: String, required: true, })
+	value!: string;
 	@Prop({ type: String, required: false, })
-	display: string;
+	display!: string;
 	toSvg(value: string): string {
 		return toSvg(value, 20);
 	}

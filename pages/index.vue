@@ -52,6 +52,7 @@
 </template>
 
 <script lang="ts">
+import { Context } from '@nuxt/types';
 import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
@@ -86,7 +87,7 @@ export default class Home extends Vue {
 			}
 		};
 	}
-	async asyncData({ params, error, $config }) {
+	async asyncData({ params, error, $config }: Context) {
 		const cs = new Chainseeker($config.apiEndpoint);
 		// Fetch status.
 		const status = await cs.getStatus();
