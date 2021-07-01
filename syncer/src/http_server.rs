@@ -173,6 +173,134 @@ impl RestTx {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct RestBlockHeader {
+    pub height: u32,
+    pub header: String,
+    pub hash: String,
+    pub version: i32,
+    pub previousblockhash: String,
+    pub merkleroot: String,
+    pub time: u32,
+    pub bits: String,
+    pub difficulty: u64,
+    pub nonce: u32,
+    pub size: u32,
+    pub strippedsize: u32,
+    pub weight: u32,
+}
+
+impl RestBlockHeader {
+    pub fn from_block_content(block_content: &BlockContentDBValue, network: Network) -> Self {
+        let block_header = &block_content.block_header;
+        let mut hash = consensus_encode(&block_header.block_hash());
+        hash.reverse();
+        let mut prev_blockhash = consensus_encode(&block_header.prev_blockhash);
+        prev_blockhash.reverse();
+        let mut merkle_root = consensus_encode(&block_header.merkle_root);
+        merkle_root.reverse();
+        Self {
+            height           : block_content.height,
+            header           : hex::encode(consensus_encode(&block_header)),
+            hash             : hex::encode(&hash),
+            version          : block_header.version,
+            previousblockhash: hex::encode(&prev_blockhash),
+            merkleroot       : hex::encode(&merkle_root),
+            time             : block_header.time,
+            bits             : format!("{:x}", block_header.bits),
+            difficulty       : block_header.difficulty(network),
+            nonce            : block_header.nonce,
+            size             : block_content.size,
+            strippedsize     : block_content.strippedsize,
+            weight           : block_content.weight,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RestBlockWithTxids {
+    pub height: u32,
+    pub header: String,
+    pub hash: String,
+    pub version: i32,
+    pub previousblockhash: String,
+    pub merkleroot: String,
+    pub time: u32,
+    pub bits: String,
+    pub difficulty: u64,
+    pub nonce: u32,
+    pub size: u32,
+    pub strippedsize: u32,
+    pub weight: u32,
+    pub txids: Vec<String>,
+}
+
+impl RestBlockWithTxids {
+    pub fn from_block_content(block_content: &BlockContentDBValue, network: Network) -> Self {
+        let rest_block_header = RestBlockHeader::from_block_content(block_content, network);
+        Self {
+            height           : rest_block_header.height,
+            header           : rest_block_header.header,
+            hash             : rest_block_header.hash,
+            version          : rest_block_header.version,
+            previousblockhash: rest_block_header.previousblockhash,
+            merkleroot       : rest_block_header.merkleroot,
+            time             : rest_block_header.time,
+            bits             : rest_block_header.bits,
+            difficulty       : rest_block_header.difficulty,
+            nonce            : rest_block_header.nonce,
+            size             : rest_block_header.size,
+            strippedsize     : rest_block_header.strippedsize,
+            weight           : rest_block_header.weight,
+            txids            : block_content.txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RestBlockWithTxs {
+    pub height: u32,
+    pub header: String,
+    pub hash: String,
+    pub version: i32,
+    pub previousblockhash: String,
+    pub merkleroot: String,
+    pub time: u32,
+    pub bits: String,
+    pub difficulty: u64,
+    pub nonce: u32,
+    pub size: u32,
+    pub strippedsize: u32,
+    pub weight: u32,
+    pub txs: Vec<RestTx>,
+}
+
+impl RestBlockWithTxs {
+    pub fn from_block_content(tx_db: &TxDB, block_content: &BlockContentDBValue, network: Network) -> Self {
+        let rest_block_header = RestBlockHeader::from_block_content(block_content, network);
+        let txs = block_content.txids.iter().map(|txid| {
+            let tx = tx_db.get(txid).unwrap();
+            RestTx::from_tx_db_value(&tx, network)
+        }).collect::<Vec<RestTx>>();
+        Self {
+            height           : rest_block_header.height,
+            header           : rest_block_header.header,
+            hash             : rest_block_header.hash,
+            version          : rest_block_header.version,
+            previousblockhash: rest_block_header.previousblockhash,
+            merkleroot       : rest_block_header.merkleroot,
+            time             : rest_block_header.time,
+            bits             : rest_block_header.bits,
+            difficulty       : rest_block_header.difficulty,
+            nonce            : rest_block_header.nonce,
+            size             : rest_block_header.size,
+            strippedsize     : rest_block_header.strippedsize,
+            weight           : rest_block_header.weight,
+            txs,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct RestBlockSummary {
     hash        : String,
     time        : u32,
@@ -255,6 +383,15 @@ impl HttpServer {
             Err(_) => Self::internal_error("Failed to encode to JSON."),
         }
     }
+    fn network(coin: &str) -> Network {
+        match coin {
+            "btc"  => Network::Bitcoin,
+            "tbtc" => Network::Testnet,
+            "rbtc" => Network::Regtest,
+            "sbtc" => Network::Signet,
+            _ => panic!("Coin not supported."),
+        }
+    }
     /// `/status` endpoint.
     async fn status_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
@@ -270,13 +407,7 @@ impl HttpServer {
             Ok(txid) => txid,
             Err(_) => return Ok(Self::not_found("Failed to decode txid.")),
         };
-        let network = match server.coin.as_str() {
-            "btc"  => Network::Bitcoin,
-            "tbtc" => Network::Testnet,
-            "rbtc" => Network::Regtest,
-            "sbtc" => Network::Signet,
-            _ => panic!("Coin not supported."),
-        };
+        let network = Self::network(&server.coin);
         match server.tx_db.read().await.get(&txid) {
             Some(value) => Ok(Self::json(RestTx::from_tx_db_value(&value, network))),
             None => Ok(Self::not_found("Transaction not found.")),
@@ -329,18 +460,18 @@ impl HttpServer {
         }
         Ok(Self::json(&ret))
     }
-    /// `/block/:hash_or_height` endpoint.
-    async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    /// Helper function for `/block*` APIs.
+    async fn block_content(req: &Request<Body>) -> Result<BlockContentDBValue, Response<Body>> {
         let server = req.data::<HttpServer>().unwrap();
         let hash_or_height = req.param("hash_or_height").unwrap();
         let block_content = if hash_or_height.len() == 64 {
             let block_hash = Vec::from_hex(hash_or_height);
             if block_hash.is_err() {
-                return Ok(Self::not_found("Failed to decode input block hash."));
+                return Err(Self::not_found("Failed to decode input block hash."));
             }
             let mut block_hash = block_hash.unwrap();
             if block_hash.len() != 32 {
-                return Ok(Self::not_found("Block hash has an invalid length."));
+                return Err(Self::not_found("Block hash has an invalid length."));
             }
             block_hash.reverse();
             let block_hash = consensus_decode(&block_hash[..]);
@@ -348,14 +479,40 @@ impl HttpServer {
         } else {
             let height = hash_or_height.parse();
             if height.is_err() {
-                return Ok(Self::not_found("Failed to decode input block height."));
+                return Err(Self::not_found("Failed to decode input block height."));
             }
             server.block_db.read().await.get(height.unwrap())
         };
-        if block_content.is_none() {
-            return Ok(Self::not_found("Block not found."));
+        match block_content {
+            Some(block_content) => Ok(block_content),
+            None => Err(Self::not_found("Block not found.")),
         }
-        Ok(Self::json(&block_content))
+    }
+    /// `/block_with_txids/:hash_or_height` endpoint.
+    async fn block_with_txids_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let network = Self::network(&req.data::<HttpServer>().unwrap().coin);
+        match Self::block_content(&req).await {
+            Ok(block_content) => Ok(Self::json(RestBlockWithTxids::from_block_content(&block_content, network))),
+            Err(res) => Ok(res),
+        }
+    }
+    /// `/block_with_txs/:hash_or_height` endpoint.
+    async fn block_with_txs_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        let tx_db = server.tx_db.read().await;
+        let network = Self::network(&server.coin);
+        match Self::block_content(&req).await {
+            Ok(block_content) => Ok(Self::json(RestBlockWithTxs::from_block_content(&tx_db, &block_content, network))),
+            Err(res) => Ok(res),
+        }
+    }
+    /// `/block/:hash_or_height` endpoint.
+    async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let network = Self::network(&req.data::<HttpServer>().unwrap().coin);
+        match Self::block_content(&req).await {
+            Ok(block_content) => Ok(Self::json(RestBlockHeader::from_block_content(&block_content, network))),
+            Err(res) => Ok(res),
+        }
     }
     /// `/addr_index/:script` endpoint.
     async fn addr_index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -419,6 +576,8 @@ impl HttpServer {
             .get("/api/v1/tx/:txid", Self::tx_handler)
             .put("/api/v1/tx/broadcast", Self::tx_broadcast_handler)
             .get("/api/v1/block_summary/:offset/:limit", Self::block_summary_handler)
+            .get("/api/v1/block_with_txids/:hash_or_height", Self::block_with_txids_handler)
+            .get("/api/v1/block_with_txs/:hash_or_height", Self::block_with_txs_handler)
             .get("/api/v1/block/:hash_or_height", Self::block_handler)
             .get("/api/v1/addr_index/:script", Self::addr_index_handler)
             .get("/api/v1/utxo/:script", Self::utxo_handler)
