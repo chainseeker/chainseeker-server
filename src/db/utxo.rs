@@ -247,7 +247,7 @@ mod test {
     }
     #[test]
     fn utxo_db() {
-        let blocks = test_fixtures::regtest_blocks().to_vec();
+        let blocks = fixtures::regtest_blocks().to_vec();
         let mut utxo_db = UtxoDB::new("test/utxo", true);
         for h in 0..(blocks.len()-1) {
             utxo_db.process_block(&blocks[h], false);
@@ -255,7 +255,7 @@ mod test {
         // Test UTXO database BEFORE reorg.
         let mut utxos_test = utxo_db.iter().filter(|utxo| utxo.value != 0).collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
-        let mut utxos = test_fixtures::utxos_before_reorg();
+        let mut utxos = fixtures::utxos_before_reorg();
         utxos.sort();
         assert_eq!(utxos_test, utxos);
         // Test UTXO database AFTER reorg.
@@ -275,7 +275,7 @@ mod test {
         utxo_db.process_block(&blocks[blocks.len()-1], false);
         let mut utxos_test = utxo_db.iter().filter(|utxo| utxo.value != 0).collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
-        let mut utxos = test_fixtures::utxos_after_reorg();
+        let mut utxos = fixtures::utxos_after_reorg();
         utxos.sort();
         assert_eq!(utxos_test, utxos);
     }

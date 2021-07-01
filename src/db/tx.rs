@@ -151,7 +151,7 @@ mod tests {
     use super::*;
     #[test]
     fn put_and_get_transactions() {
-        let blocks = test_fixtures::regtest_blocks().to_vec();
+        let blocks = fixtures::regtest_blocks().to_vec();
         let mut utxo_db = UtxoDB::new("test/tx", true);
         let tx_db = TxDB::new("test/tx", true);
         let mut previous_utxos_vec = Vec::new();

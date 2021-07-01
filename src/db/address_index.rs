@@ -128,7 +128,7 @@ mod test {
     }
     #[test]
     fn addr_index_db() {
-        let blocks = test_fixtures::regtest_blocks().to_vec();
+        let blocks = fixtures::regtest_blocks().to_vec();
         let addr_index_db = AddressIndexDB::new("test/address_index", true);
         let mut utxo_db = UtxoDB::new("test/address_index", true);
         for h in 0..(blocks.len()-1) {
@@ -139,7 +139,7 @@ mod test {
         //print_addr_index_db(&addr_index_db);
         let mut entries_test = addr_index_db.db.iter().map(|(key, _value)| key).collect::<Vec<AddressIndexDBKey>>();
         entries_test.sort();
-        let mut entries = test_fixtures::addr_index_db();
+        let mut entries = fixtures::addr_index_db();
         entries.sort();
         assert_eq!(entries_test, entries);
     }

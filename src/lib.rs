@@ -18,7 +18,7 @@ pub use http_server::*;
 pub mod web_socket_relay;
 pub use web_socket_relay::*;
 #[cfg(test)]
-pub mod test_fixtures;
+pub mod fixtures;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 

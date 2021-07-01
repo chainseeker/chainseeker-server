@@ -178,7 +178,7 @@ impl BlockDB {
 mod tests {
     use super::*;
     const HEIGHT: u32 = 500000;
-    const BLOCK: &[u8] = include_bytes!("../../fixtures/mainnet/block_500000.bin");
+    const BLOCK: &[u8] = include_bytes!("../fixtures/mainnet/block_500000.bin");
     #[test]
     fn put_and_get_block() {
         let block = consensus_decode(BLOCK);
