@@ -39,9 +39,13 @@ impl WebSocketRelay {
                     let mut rx = rx.clone();
                     tokio::spawn(async move {
                         let addr = stream.peer_addr().unwrap();
-                        let ws_stream = tokio_tungstenite::accept_async(stream).await.unwrap();
+                        let ws_stream = tokio_tungstenite::accept_async(stream).await;
+                        if ws_stream.is_err() {
+                            // Invalid request from client.
+                            return;
+                        }
                         println!("WebSocketRelay: new connection from {}.", addr);
-                        let (mut write, _read) = ws_stream.split();
+                        let (mut write, _read) = ws_stream.unwrap().split();
                         while rx.changed().await.is_ok() {
                             let message = (*rx.borrow()).to_string();
                             match write.send(Message::Text(message)).await {
