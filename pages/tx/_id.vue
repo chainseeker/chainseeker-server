@@ -87,6 +87,9 @@ export default class Home extends Vue {
 	tx?: cs.Transaction | null = null;
 	blockHeader: cs.BlockHeader | null = null;
 	confirmations: number | null = null;
+	head() {
+		return { title: `Transaction ${this.tx.txid} - chainseeker` };
+	}
 	async asyncData({ params, error, $config }) {
 		const cs = new Chainseeker($config.apiEndpoint);
 		const status = await cs.getStatus();

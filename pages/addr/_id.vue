@@ -91,6 +91,9 @@ export default class Home extends Vue {
 			],
 		};
 	}
+	head() {
+		return { title: `Address ${this.address} - chainseeker` };
+	}
 	async asyncData({ params, error, $config }) {
 		const address = params.id;
 		const cs = new Chainseeker($config.apiEndpoint);

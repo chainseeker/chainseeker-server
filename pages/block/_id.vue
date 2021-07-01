@@ -104,6 +104,9 @@ export default class Home extends Vue {
 	status: cs.Status;
 	block?: cs.BlockWithTxs | null = null;
 	fee: number = 0;
+	head() {
+		return { title: `Block ${this.block.hash} - chainseeker` };
+	}
 	async asyncData({ params, error, $config }) {
 		const cs = new Chainseeker($config.apiEndpoint);
 		const status = await cs.getStatus();
