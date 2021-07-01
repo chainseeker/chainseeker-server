@@ -56,46 +56,51 @@ import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
 
+const MAX_LATEST_BLOCKS = 5;
+const MAX_LATEST_TXS = 5;
+
 @Component
 export default class Home extends Vue {
-	const MAX_LATEST_BLOCKS = 5;
-	const MAX_LATEST_TXS = 5;
-	cs: Chainseeker;
 	recentBlocks: cs.BlockHeader[] = [];
 	recentTxs: {
 		received: number,
 		tx: cs.Transaction,
 	}[] = [];
-	constructor() {
-		super();
-		this.cs = new Chainseeker(this.$config.apiEndpoint);
-	}
 	initWebSocket() {
+		const cs = new Chainseeker(this.$config.apiEndpoint);
 		const ws = new WebSocket(this.$config.wsEndpoint);
 		ws.onmessage = async (msg) => {
 			const data = JSON.parse(msg.data);
 			switch(data[0]) {
 				case 'hashtx':
-					this.recentTxs.unshift({ received: Date.now(), tx: await this.cs.getTransaction(data[1]) });
-					if(this.recentTxs.length > this.MAX_LATEST_TXS) {
-						this.recentTxs.splice(0, this.recentTxs.length - this.MAX_LATEST_TXS);
+					this.recentTxs.unshift({ received: Date.now(), tx: await cs.getTransaction(data[1]) });
+					if(this.recentTxs.length > MAX_LATEST_TXS) {
+						this.recentTxs.splice(0, this.recentTxs.length - MAX_LATEST_TXS);
 					}
 					break;
 				case 'hashblock':
-					this.recentBlocks.unshift(await this.cs.getBlockHeader(data[1]));
+					this.recentBlocks.unshift(await cs.getBlockHeader(data[1]));
 					this.recentBlocks.pop();
 					break;
 				default:
 			}
 		};
 	}
-	async mounted() {
+	async asyncData({ params, error, $config }) {
+		const cs = new Chainseeker($config.apiEndpoint);
 		// Fetch status.
-		const status = await this.cs.getStatus();
+		const status = await cs.getStatus();
 		// Fetch recent blocks.
-		for(let height=status.blocks; height>=status.blocks-this.MAX_LATEST_BLOCKS; height--) {
-			this.recentBlocks.push(await this.cs.getBlockHeader(height));
+		const recentBlocks = [];
+		for(let height=status.blocks; height>=status.blocks-MAX_LATEST_BLOCKS; height--) {
+			recentBlocks.push(await cs.getBlockHeader(height));
 		}
+		return {
+			status,
+			recentBlocks,
+		};
+	}
+	mounted() {
 		// Initialize WebSocket connection.
 		this.initWebSocket();
 	}
