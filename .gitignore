@@ -1,5 +1,6 @@
 
 /.nuxt
+/dist
 /target
 Cargo.lock
 

@@ -4,11 +4,10 @@
   "version": "0.0.1",
   "description": "chainseeker: A fast, reliable and open-source cryptocurrency blockexplorer.",
   "scripts": {
-    "syncer": "cargo run --release",
-    "api": "ts-node ./api/src/index.ts",
-    "web": "ts-node ./web/src/index.ts",
-    "test": "jest",
-    "bench:status": "autocannon http://localhost:7001/api/v1/status"
+    "start": "cargo run --release",
+    "nuxt:dev": "nuxt dev",
+    "nuxt:generate": "nuxt generate",
+    "bench:status": "autocannon http://localhost:6001/api/v1/status"
   },
   "author": "Vis Virial <visvirial@gmail.com>",
   "license": "MIT",
