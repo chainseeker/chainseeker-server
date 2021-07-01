@@ -11,7 +11,7 @@ import * as cs from 'chainseeker/dist/types';
 
 @Component
 export default class TxMovement extends Vue {
-	@Prop({ type: String, required: true, })
+	@Prop({ type: String | null, required: true, })
 	address: string;
 	@Prop({ type: Number, required: true, })
 	amount: number;

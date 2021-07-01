@@ -72,21 +72,21 @@
 					</tr>
 					<tr>
 						<th>Block Reward</th>
-						<td><Amount :value="block.reward" /></td>
+						<td><Amount :value="block.txs[0].vout[0].value" /></td>
 						<th>Transaction Fee in Total</th>
-						<td><Amount :value="block.fee" /></td>
+						<td><Amount :value="fee" /></td>
 					</tr>
 				</tbody>
 			</template>
 		</v-simple-table>
 		<API :path="`block/${block.hash}`" />
 		<h2>Transactions in the Block</h2>
-		<div v-for="tx in block.txs" class="my-4">
+		<div v-for="(tx, n) in block.txs" class="my-4">
 			<v-container>
 				<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
 					<v-col><strong><NuxtLink :to="`/tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
-					<v-col v-if="tx.address !== 'coinbase'" class="text-right">(fee: <Amount :value="tx.fee" />)</v-col>
-					<v-col v-else                           class="text-right">(reward: <Amount :value="tx.fee" />)</v-col>
+					<v-col v-if="n !== 0" class="text-right">(fee: <Amount :value="tx.fee" />)</v-col>
+					<v-col v-else         class="text-right">(reward: <Amount :value="-tx.fee" />)</v-col>
 				</v-row>
 				<v-row>
 					<TxMovement :tx="tx" />
@@ -105,11 +105,19 @@ import * as cs from 'chainseeker/dist/types';
 export default class Home extends Vue {
 	status: cs.Status;
 	block?: cs.BlockWithTxs | null = null;
+	fee: number = 0;
 	async mounted() {
 		const cs = new Chainseeker(this.$config.apiEndpoint);
 		this.status = await cs.getStatus();
 		// Fetch block.
 		const block = await cs.getBlockWithTxs(this.$route.params.id);
+		// Compute fee.
+		this.fee = 0;
+		for(let n=1; n<block.txs.length; n++) {
+			let tx = block.txs[n];
+			this.fee += tx.vin.reduce((acc, vin) => acc + vin.value, 0);
+			this.fee -= tx.vout.reduce((acc, vout) => acc + vout.value, 0);
+		}
 		this.block = block;
 	}
 }
