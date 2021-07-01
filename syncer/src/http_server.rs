@@ -304,6 +304,23 @@ impl RestBlockWithTxs {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestRichListEntry {
+    pub script_pub_key: RestScriptPubKey,
+    pub value: u64,
+}
+
+impl RestRichListEntry {
+    pub fn from_rich_list_entry(entry: &RichListEntry, network: Network) -> Self {
+        let script_pub_key = RestScriptPubKey::new(&entry.script_pubkey, network);
+        Self {
+            script_pub_key,
+            value: entry.value,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct RestBlockSummary {
     hash        : String,
     time        : u32,
@@ -595,7 +612,9 @@ impl HttpServer {
         let rich_list = server.rich_list.read().await;
         let begin = min(offset, rich_list.len() - 1usize);
         let end = min(offset + limit, rich_list.len() - 1usize);
-        let addresses = rich_list.get_in_range(begin..end);
+        let addresses = rich_list.get_in_range(begin..end).iter()
+            .map(|entry| RestRichListEntry::from_rich_list_entry(entry, Self::network(&server.coin)))
+            .collect::<Vec<RestRichListEntry>>();
         Ok(Self::json(&addresses))
     }
     pub async fn run(&self, ip: &str, port: u16) {

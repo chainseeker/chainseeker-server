@@ -1,6 +1,5 @@
 use core::ops::Range;
 use std::collections::HashMap;
-use serde::ser::{Serialize, Serializer, SerializeStruct};
 use rayon::prelude::*;
 use bitcoin::{Block, Script};
 
@@ -8,19 +7,8 @@ use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RichListEntry {
-    script_pubkey: Script,
-    value: u64,
-}
-
-impl Serialize for RichListEntry {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        let mut state = serializer.serialize_struct("RichListEntry", 2)?;
-        state.serialize_field("scriptPubKey", &hex::encode(self.script_pubkey.as_bytes()))?;
-        state.serialize_field("value", &self.value)?;
-        state.end()
-    }
+    pub script_pubkey: Script,
+    pub value: u64,
 }
 
 impl PartialOrd for RichListEntry {
