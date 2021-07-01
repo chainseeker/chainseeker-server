@@ -7,7 +7,7 @@
 			<span style="position:relative; top: 5px;">
 			<span v-html="toSvg(value)"></span>
 			</span>
-			<NuxtLink :to="`/addr/${value}`">{{ value }}</NuxtLink>
+			<NuxtLink :to="`/addr/${value}`">{{ display ? display : value }}</NuxtLink>
 		</template>
 	</span>
 </template>
@@ -20,6 +20,8 @@ import { toSvg } from 'jdenticon';
 export default class Address extends Vue {
 	@Prop({ type: String | null, required: true, })
 	value: string;
+	@Prop({ type: String, required: false, })
+	display: string;
 	toSvg(value: string): string {
 		return toSvg(value, 20);
 	}
