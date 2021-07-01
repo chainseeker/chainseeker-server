@@ -1,8 +1,5 @@
-use serde::ser::{Serializer, SerializeStruct};
-use bitcoin_hashes::hex::ToHex;
 use bitcoin::{Txid, Block, BlockHeader, BlockHash};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
-use bitcoin::network::constants::Network;
 
 use crate::*;
 
@@ -77,36 +74,6 @@ impl BlockContentDBValue {
             weight,
             txids: block.txdata.iter().map(|tx| tx.txid()).collect(),
         }
-    }
-}
-
-impl serde::ser::Serialize for BlockContentDBValue {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        let mut state = serializer.serialize_struct("BlockContentDBValue", 14)?;
-        state.serialize_field("height"           , &self.height)?;
-        let block_header = &self.block_header;
-        state.serialize_field("header"           , &hex::encode(consensus_encode(&block_header)))?;
-        let mut hash = consensus_encode(&block_header.block_hash());
-        hash.reverse();
-        state.serialize_field("hash"             , &hex::encode(&hash))?;
-        state.serialize_field("version"          , &block_header.version)?;
-        let mut prev_blockhash = consensus_encode(&block_header.prev_blockhash);
-        prev_blockhash.reverse();
-        state.serialize_field("previousblockhash", &hex::encode(&prev_blockhash))?;
-        let mut merkle_root = consensus_encode(&block_header.merkle_root);
-        merkle_root.reverse();
-        state.serialize_field("merkleroot"       , &hex::encode(&merkle_root))?;
-        state.serialize_field("time"             , &block_header.time)?;
-        state.serialize_field("bits"             , &format!("{:x}", block_header.bits))?;
-        state.serialize_field("difficulty"       , &block_header.difficulty(Network::Bitcoin))?;
-        state.serialize_field("nonce"            , &block_header.nonce)?;
-        state.serialize_field("size"             , &self.size)?;
-        state.serialize_field("strippedsize"     , &self.strippedsize)?;
-        state.serialize_field("weight"           , &self.weight)?;
-        state.serialize_field("txids"            , &self.txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>())?;
-        state.end()
     }
 }
 
