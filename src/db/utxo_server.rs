@@ -247,7 +247,7 @@ impl UtxoServerInStorageLazy {
         };
         server
     }
-    pub async fn flush(&self) {
+    pub async fn flush(&mut self) {
         self.db.flush().await;
     }
     pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
