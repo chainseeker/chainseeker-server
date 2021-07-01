@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::str::FromStr;
 use std::time::Instant;
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -516,29 +517,36 @@ impl HttpServer {
             Err(res) => Ok(res),
         }
     }
-    /// `/addr_index/:script` endpoint.
-    async fn addr_index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let server = req.data::<HttpServer>().unwrap();
-        let script_hex = req.param("script").unwrap();
-        let script = Script::from_hex(script_hex);
-        if script.is_err() {
-            return Ok(Self::not_found("Failed to decode input script."));
+    fn decode_script_or_address(script_or_address: &str) -> Result<Script, ()> {
+        let addr = Address::from_str(script_or_address);
+        if addr.is_ok() {
+            return Ok(addr.unwrap().script_pubkey());
         }
-        let script = script.unwrap();
-        let txids = server.addr_index_db.read().await.get(&script);
+        let script = Script::from_hex(script_or_address);
+        if script.is_ok() {
+            return Ok(script.unwrap());
+        }
+        Err(())
+    }
+    /// `/txids/:script_or_address` endpoint.
+    async fn txids_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        let script = Self::decode_script_or_address(req.param("script_or_address").unwrap());
+        if script.is_err() {
+            return Ok(Self::not_found("Failed to decode input script or address."));
+        }
+        let txids = server.addr_index_db.read().await.get(&script.unwrap());
         let txids = txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>();
         Ok(Self::json(&txids))
     }
-    /// `/utxo/:script` endpoint.
+    /// `/utxo/:script_or_address` endpoint.
     async fn utxo_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        let script_hex = req.param("script").unwrap();
-        let script = Script::from_hex(script_hex);
+        let script = Self::decode_script_or_address(req.param("script_or_address").unwrap());
         if script.is_err() {
-            return Ok(Self::not_found("Failed to decode input script."));
+            return Ok(Self::not_found("Failed to decode input script or address."));
         }
-        let script = script.unwrap();
-        let values = server.utxo_server.read().await.get(&script).await;
+        let values = server.utxo_server.read().await.get(&script.unwrap()).await;
         Ok(Self::json(&values))
     }
     /// `/rich_list_count` endpoint.
@@ -581,8 +589,8 @@ impl HttpServer {
             .get("/api/v1/block_with_txids/:hash_or_height", Self::block_with_txids_handler)
             .get("/api/v1/block_with_txs/:hash_or_height", Self::block_with_txs_handler)
             .get("/api/v1/block/:hash_or_height", Self::block_handler)
-            .get("/api/v1/addr_index/:script", Self::addr_index_handler)
-            .get("/api/v1/utxo/:script", Self::utxo_handler)
+            .get("/api/v1/txids/:script_or_address", Self::txids_handler)
+            .get("/api/v1/utxo/:script_or_address", Self::utxo_handler)
             .get("/api/v1/rich_list_count", Self::rich_list_count_handler)
             .get("/api/v1/rich_list/:offset/:limit", Self::rich_list_handler)
             .any(|_req| async {
