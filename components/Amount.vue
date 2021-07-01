@@ -1,5 +1,5 @@
 <template>
-	<span>{{ unitInSatoshi ? value : (value * 1e-8).toFixed(8) }} <small>{{ symbol ? symbol : $config.coin.symbol }}</small></span>
+	<span>{{ unitInSatoshi ? value : (value * 1e-8).toFixed(8) }} <small>{{ symbol ? symbol : $config.coinConfig.coin.symbol }}</small></span>
 </template>
 
 <script lang="ts">

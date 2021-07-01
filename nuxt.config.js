@@ -38,13 +38,17 @@ export default {
 	},
 	
 	publicRuntimeConfig: {
-		coin: {
-			name: "Bitcoin Testnet",
-			symbol: "tBTC",
-			satoshi: "satoshi",
-		},
-		apiEndpoint: 'http://localhost:6001/api',
-		wsEndpoint: 'ws://localhost:7001'
+		coins: {
+			local: {
+				coin: {
+					name: "Bitcoin Local",
+					symbol: "lBTC",
+					satoshi: "satoshi",
+				},
+				apiEndpoint: 'http://localhost:6001/api',
+				wsEndpoint: 'ws://localhost:7001',
+			},
+		}
 	},
 	
 };

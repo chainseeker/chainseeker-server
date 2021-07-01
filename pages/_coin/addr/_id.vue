@@ -27,17 +27,17 @@
 				<v-tab-item key="txids">
 					<v-data-table :headers="txidHeaders" :items="txids">
 						<template v-slot:item.txid="{ item }">
-							<NuxtLink :to="`/tx/${item.txid}`">{{ item.txid }}</NuxtLink>
+							<NuxtLink :to="`../tx/${item.txid}`">{{ item.txid }}</NuxtLink>
 						</template>
 					</v-data-table>
 				</v-tab-item>
 				<v-tab-item key="txs">
 					<div v-for="tx in txs" class="my-4">
 						<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
-							<v-col><strong><NuxtLink :to="`/tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
+							<v-col><strong><NuxtLink :to="`../tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
 							<v-col v-if="tx.confirmedHeight >= 0" class="text-right">
 								<small>
-									Confirmed at <NuxtLink :to="`/block/${tx.confirmedHeight}`">#{{ tx.confirmedHeight.toLocaleString() }}</NuxtLink>
+									Confirmed at <NuxtLink :to="`../block/${tx.confirmedHeight}`">#{{ tx.confirmedHeight.toLocaleString() }}</NuxtLink>
 								</small>
 							</v-col>
 							<v-col v-else class="text-right">
@@ -54,7 +54,7 @@
 				<v-tab-item key="utxos">
 					<v-data-table :headers="utxoHeaders" :items="utxos">
 						<template v-slot:item.txid="{ item }">
-							<NuxtLink :to="`/tx/${item.txid}`">{{ item.txid }}</NuxtLink>
+							<NuxtLink :to="`../tx/${item.txid}`">{{ item.txid }}</NuxtLink>
 						</template>
 						<template v-slot:item.value="{ item }">
 							<Amount :value="item.value" />
@@ -97,7 +97,7 @@ export default class Home extends Vue {
 	}
 	async asyncData({ params, error, $config }: Context) {
 		const address = params.id;
-		const cs = new Chainseeker($config.apiEndpoint);
+		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		const status = await cs.getStatus();
 		try {
 			const txids = (await cs.getTxids(address)).map(txid => ({ txid: txid }));
@@ -113,7 +113,7 @@ export default class Home extends Vue {
 		}
 	}
 	async fetchTxs() {
-		const cs = new Chainseeker(this.$config.apiEndpoint);
+		const cs = new Chainseeker(this.$config.coinConfig.apiEndpoint);
 		this.txs = await cs.getTxs(this.address!);
 	}
 }

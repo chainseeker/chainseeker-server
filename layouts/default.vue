@@ -4,8 +4,8 @@
 			<v-container>
 				<nav>
 					<v-toolbar>
-						<v-toolbar-title><NuxtLink to="/" style="color: inherit">chainseeker</NuxtLink></v-toolbar-title>
-						<div class="ml-4"><NuxtLink to="/rich_list">Rich List</NuxtLink></div>
+						<v-toolbar-title><NuxtLink :to="`/${$config.coin}`" style="color: inherit">chainseeker</NuxtLink></v-toolbar-title>
+						<div class="ml-4"><NuxtLink :to="`/${$config.coin}/rich_list`">Rich List</NuxtLink></div>
 						<div class="ml-2"><a href="https://chainseeker.docs.apiary.io/" target="_blank">REST API</a></div>
 						<v-spacer />
 						<v-form v-on:submit="search">
@@ -44,12 +44,14 @@ const a: string = 'false';
 
 @Component({
 	layout: 'default',
+	middleware: ['coin'],
 })
 export default class Layout extends Vue {
+	coin: string = '';
 	query: string = '';
 	search(e: Event) {
 		e.preventDefault();
-		this.$router.push(`/search/${this.query}`);
+		this.$router.push(`/${this.$config.coin}/search/${this.query}`);
 		return false;
 	}
 }

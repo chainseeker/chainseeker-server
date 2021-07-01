@@ -21,7 +21,7 @@
 						<template v-slot:activator="{ on, attrs }">
 							<tr v-bind="attrs" v-on="on">
 								<th>Previous Block ID</th>
-								<td colspan="3"><NuxtLink :to="`/block/${block.previousblockhash}`">{{ block.previousblockhash }}</NuxtLink></td>
+								<td colspan="3"><NuxtLink :to="`./${block.previousblockhash}`">{{ block.previousblockhash }}</NuxtLink></td>
 							</tr>
 						</template>
 						<span>The hash of the previous block mined.</span>
@@ -83,7 +83,7 @@
 		<h2>Transactions in the Block</h2>
 		<div v-for="(tx, n) in block.txs" class="my-4">
 			<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
-				<v-col><strong><NuxtLink :to="`/tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
+				<v-col><strong><NuxtLink :to="`../tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
 				<v-col v-if="n !== 0" class="text-right">(fee: <Amount :value="tx.fee" />)</v-col>
 				<v-col v-else         class="text-right">(reward: <Amount :value="-tx.fee" />)</v-col>
 			</v-row>
@@ -109,7 +109,7 @@ export default class Home extends Vue {
 		return { title: `Block ${this.block!.hash!} - chainseeker` };
 	}
 	async asyncData({ params, error, $config }: Context) {
-		const cs = new Chainseeker($config.apiEndpoint);
+		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		const status = await cs.getStatus();
 		// Fetch block.
 		try {

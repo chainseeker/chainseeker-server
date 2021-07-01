@@ -105,7 +105,7 @@ export default class Home extends Vue {
 		}
 	}
 	async asyncData({ params, error, $config }: Context) {
-		const cs = new Chainseeker($config.apiEndpoint);
+		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		const status = await cs.getStatus();
 		const blockSummary = await cs.getBlockSummary(0, status.blocks);
 		return {

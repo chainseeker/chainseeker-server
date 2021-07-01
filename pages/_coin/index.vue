@@ -14,7 +14,7 @@
 				</thead>
 				<tbody>
 					<tr v-for="block in recentBlocks">
-						<td><NuxtLink :to="`/block/${block.height}`">{{ block.height }}</NuxtLink></td>
+						<td><NuxtLink :to="`./block/${block.height}`" append>{{ block.height }}</NuxtLink></td>
 						<td><ElapsedTime :time="1000 * block.time" /> ago</td>
 						<td>{{ block.ntxs }}</td>
 						<td>{{ block.size.toLocaleString() }} bytes</td>
@@ -39,7 +39,7 @@
 				<tbody>
 					<tr v-for="{ received, tx } in recentTxs">
 						<td><ElapsedTime :time="received" /> ago</td>
-						<td><NuxtLink :to="`/tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></td>
+						<td><NuxtLink :to="`./tx/${tx.txid}`" append>{{ tx.txid }}</NuxtLink></td>
 						<td>{{ tx.vin.length.toLocaleString() }}</td>
 						<td>{{ tx.vout.length.toLocaleString() }}</td>
 						<td>{{ tx.size.toLocaleString() }} bytes</td>
@@ -68,8 +68,8 @@ export default class Home extends Vue {
 		tx: cs.Transaction,
 	}[] = [];
 	initWebSocket() {
-		const cs = new Chainseeker(this.$config.apiEndpoint);
-		const ws = new WebSocket(this.$config.wsEndpoint);
+		const cs = new Chainseeker(this.$config.coinConfig.apiEndpoint);
+		const ws = new WebSocket(this.$config.coinConfig.wsEndpoint);
 		ws.onmessage = async (msg) => {
 			const data = JSON.parse(msg.data);
 			switch(data[0]) {
@@ -88,7 +88,7 @@ export default class Home extends Vue {
 		};
 	}
 	async asyncData({ params, error, $config }: Context) {
-		const cs = new Chainseeker($config.apiEndpoint);
+		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		// Fetch status.
 		const status = await cs.getStatus();
 		// Fetch recent blocks.

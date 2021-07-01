@@ -7,7 +7,7 @@
 			<span style="position:relative; top: 5px;">
 			<span v-html="toSvg(value)"></span>
 			</span>
-			<NuxtLink :to="`/addr/${value}`">{{ display ? display : value }}</NuxtLink>
+			<NuxtLink :to="`/${$config.coin}/addr/${value}`">{{ display ? display : value }}</NuxtLink>
 		</template>
 	</span>
 </template>

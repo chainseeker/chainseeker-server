@@ -29,7 +29,7 @@
 							</div>
 						</td>
 						<td>
-							<Amount :value="item.value" /></NuxtLink>
+							<Amount :value="item.value" />
 						</td>
 					</tr>
 				</tbody>
@@ -65,7 +65,7 @@ export default class Home extends Vue {
 	}
 	async asyncData({ params, error, $config }: Context) {
 		const page = typeof params.page === 'undefined' ? 0 : Number.parseInt(params.page);
-		const cs = new Chainseeker($config.apiEndpoint);
+		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		const richListCount = await cs.getRichListCount();
 		const offset = page * PER_PAGE;
 		if(offset > richListCount) {

@@ -47,7 +47,7 @@
 				<v-col md=2><strong>Confirmed Height</strong></v-col>
 				<v-col md=4>
 					<span v-if="tx.confirmedHeight">
-						<NuxtLink :to="`/block/${tx.confirmedHeight}`">
+						<NuxtLink :to="`../block/${tx.confirmedHeight}`">
 							{{ tx.confirmedHeight.toLocaleString() }}
 						</NuxtLink>
 						<span class="ml-4">({{ new Date(1000 * blockHeader.time).toLocaleString() }})</span>
@@ -59,7 +59,7 @@
 				<v-col md=2><strong>Fee</strong></v-col>
 				<v-col md=4>
 					<Amount :value="tx.fee" />
-					(<Amount :value="Math.floor(tx.fee / tx.size)" :symbol="`${$config.coin.satoshi} / byte`" :unitInSatoshi="true" />)
+					(<Amount :value="Math.floor(tx.fee / tx.size)" :symbol="`${$config.coinConfig.coin.satoshi} / byte`" :unitInSatoshi="true" />)
 				</v-col>
 			</v-row>
 		</div>
@@ -91,7 +91,7 @@ export default class Home extends Vue {
 		return { title: `Transaction ${this.$route.params.id} - chainseeker` };
 	}
 	async asyncData({ params, error, $config }: Context) {
-		const cs = new Chainseeker($config.apiEndpoint);
+		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		const status = await cs.getStatus();
 		try {
 			const tx = await cs.getTransaction(params.id);
