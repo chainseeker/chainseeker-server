@@ -6,8 +6,8 @@
 		</h1>
 		<div class="text-center">
 			<v-badge
-				:color="confirmations ? (confirmations >= 6 ? 'green' : 'yellow darken-3') : 'red'"
-				:content="confirmations ? confirmations + ' confirmations' : 'unconfirmed'">
+				:color="confirmations === null ? 'red' : (confirmations >= 6 ? 'green' : 'yellow darken-3')"
+				:content="confirmations === null ? 'unconfirmed' : confirmations + ' confirmations'">
 			</v-badge>
 		</div>
 		<div class="my-4">
@@ -46,14 +46,14 @@
 			<v-row class="my-2">
 				<v-col md=2><strong>Confirmed Height</strong></v-col>
 				<v-col md=4>
-					<span v-if="tx.confirmed_height">
-						<NuxtLink :to="`/block/${tx.confirmed_height}`">
-							{{ tx.confirmed_height.toLocaleString() }}
+					<span v-if="tx.confirmedHeight">
+						<NuxtLink :to="`/block/${tx.confirmedHeight}`">
+							{{ tx.confirmedHeight.toLocaleString() }}
 						</NuxtLink>
 						<span class="ml-4">({{ new Date(1000 * blockHeader.time).toLocaleString() }})</span>
 					</span>
 					<span v-else>
-						{{ tx.confirmed_height ? tx.confirmed_height.toLocaleString() : 'unconfirmed' }}
+						{{ tx.confirmedHeight ? tx.confirmedHeight.toLocaleString() : 'unconfirmed' }}
 					</span>
 				</v-col>
 				<v-col md=2><strong>Fee</strong></v-col>
@@ -91,11 +91,11 @@ export default class Home extends Vue {
 		const cs = new Chainseeker(this.$config.apiEndpoint);
 		this.status = await cs.getStatus();
 		const tx = await cs.getTransaction(this.$route.params.id);
-		if(tx.confirmed_height) {
-			this.blockHeader = await cs.getBlockHeader(tx.confirmed_height);
+		if(tx.confirmedHeight) {
+			this.blockHeader = await cs.getBlockHeader(tx.confirmedHeight);
 		}
 		this.tx = tx;
-		this.confirmations = tx.confirmed_height ? this.status.blocks - tx.confirmed_height + 1 : null;
+		this.confirmations = tx.confirmedHeight ? this.status.blocks - tx.confirmedHeight + 1 : null;
 	}
 }
 </script>
