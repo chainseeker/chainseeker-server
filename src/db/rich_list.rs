@@ -1,3 +1,4 @@
+use std::mem::size_of;
 use std::cmp::min;
 use core::ops::Range;
 use std::collections::HashMap;
@@ -39,6 +40,13 @@ impl RichList {
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+    pub fn capacity(&self) -> usize {
+        self.entries.capacity()
+    }
+    /// Estimate the allocated size of this struct.
+    pub fn size(&self) -> usize {
+        self.entries.iter().map(|entry| entry.script_pubkey.len() + size_of::<u64>()).sum()
+    }
     pub fn get_in_range(&self, range: Range<usize>) -> Vec<RichListEntry> {
         if self.entries.len() < 1 {
             return Vec::new();
@@ -59,6 +67,15 @@ impl RichListBuilder {
         Self {
             map: HashMap::new(),
         }
+    }
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+    pub fn capacity(&self) -> usize {
+        self.map.capacity()
+    }
+    pub fn size(&self) -> usize {
+        self.map.iter().map(|(script, _val)| script.len() + size_of::<u64>()).sum()
     }
     pub fn push(&mut self, utxo: &UtxoEntry) {
         let value = self.map.get(&utxo.script_pubkey).unwrap_or(&0u64) + utxo.value;

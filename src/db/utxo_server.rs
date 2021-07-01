@@ -80,6 +80,15 @@ impl UtxoServerInMemory {
             db: HashMap::new(),
         }
     }
+    pub fn len(&self) -> usize {
+        self.db.len()
+    }
+    pub fn capacity(&self) -> usize {
+        self.db.capacity()
+    }
+    pub fn size(&self) -> usize {
+        self.db.iter().map(|(script, _value)| script.len() + 44).sum()
+    }
     pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         match self.db.get(script_pubkey) {
             Some(values) => (*values).clone(),

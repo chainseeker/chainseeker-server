@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+use num_format::{Locale, ToFormattedStr, ToFormattedString};
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{BlockHash, Block};
@@ -183,6 +184,12 @@ pub fn read_vec<R>(r: &mut R, len: usize) -> Vec<u8>
     vec.resize(len, 0);
     r.read_exact(&mut vec).expect("Failed to read vec.");
     vec
+}
+
+pub fn to_locale_string<T>(num: T) -> String
+    where T: ToFormattedStr,
+{
+    num.to_formatted_string(&Locale::en)
 }
 
 #[cfg(test)]

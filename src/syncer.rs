@@ -72,8 +72,8 @@ impl Syncer {
         self.http_server.block_db.write().await.put(height, &block);
         put_synced_height(&self.coin, height);
         println!(
-            "Height={:6}, #tx={:4}, #vin={:5}, #vout={:5} (tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
-            height, block.txdata.len(), vins, vouts,
+            "Height={}, #tx={:4}, #vin={:5}, #vout={:5} (tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
+            to_locale_string(height), block.txdata.len(), vins, vouts,
             tx_elapsed.as_millis(), utxo_elapsed.as_millis(),
             addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
     }
@@ -90,7 +90,7 @@ impl Syncer {
             if block_hash_rest == block_hash_me {
                 break;
             }
-            println!("Reorg detected at block height = {}.", height);
+            println!("Reorg detected at block height = {}.", to_locale_string(height));
             // Fetch the reorged block.
             let block = self.rest.block(&block_hash_me).await.expect("Failed to fetch the reorged block from REST.");
             // Fetch previous transactions.
@@ -181,7 +181,7 @@ impl Syncer {
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
             if i % 1000 == 0 || force {
-                print!("\rLoading UTXOs ({} entries processed)...", i);
+                print!("\rLoading UTXOs ({} entries processed)...", to_locale_string(i));
                 flush_stdout();
             }
         };
@@ -217,7 +217,7 @@ impl Syncer {
         }
         print_stat(i, true);
         println!("");
-        println!("Loaded all UTXOs in {}ms.", begin.elapsed().as_millis());
+        println!("Loaded all UTXOs in {}ms.", to_locale_string(begin.elapsed().as_millis()));
         // Wait async tasks to finish.
         drop(utxo_server_tx);
         drop(rich_list_tx);
@@ -226,7 +226,7 @@ impl Syncer {
         let rich_list = rich_list_builder.finalize();
         *self.http_server.rich_list.write().await = rich_list;
         self.rich_list_builder = rich_list_builder;
-        println!("Syncer.load_utxo(): executed in {}ms.", begin.elapsed().as_millis());
+        println!("Syncer.load_utxo(): executed in {}ms.", to_locale_string(begin.elapsed().as_millis()));
     }
     pub async fn initial_sync(&mut self) -> u32 {
         // Do initial sync.
@@ -240,9 +240,25 @@ impl Syncer {
             }
         }
         let begin_elapsed = begin.elapsed().as_millis();
-        println!("Initial sync: synced {} blocks in {}ms.", synced_blocks, begin_elapsed);
+        println!("Initial sync: synced {} blocks in {}ms.",
+            to_locale_string(synced_blocks), to_locale_string(begin_elapsed));
         if !self.is_stopped().await {
             self.load_utxo().await;
+            // Report the capacity / actual size.
+            println!("(len, cap) = UtxoServer: ({}, {}), RichList: ({}, {}), RichListBuilder: ({}, {})",
+                to_locale_string(self.http_server.utxo_server.read().await.len()),
+                to_locale_string(self.http_server.utxo_server.read().await.capacity()),
+                to_locale_string(self.http_server.rich_list.read().await.len()),
+                to_locale_string(self.http_server.rich_list.read().await.capacity()),
+                to_locale_string(self.rich_list_builder.len()),
+                to_locale_string(self.rich_list_builder.capacity()),
+            );
+            // Report the memory usage.
+            println!("UtxoServer: {}MiB, RichList: {}MiB, RichListBuilder: {}MiB",
+                self.http_server.utxo_server.read().await.size() / 1024 / 1024,
+                self.http_server.rich_list.read().await.size() / 1024 / 1024,
+                self.rich_list_builder.size() / 1024 / 1024,
+            );
         }
         synced_blocks
     }
