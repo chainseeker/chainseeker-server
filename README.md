@@ -2,6 +2,7 @@ chainseeker-server
 ==================
 
 [![Rust](https://github.com/chainseeker/chainseeker-server/actions/workflows/rust.yml/badge.svg)](https://github.com/chainseeker/chainseeker-server/actions/workflows/rust.yml)
+[![Node.js CI](https://github.com/chainseeker/chainseeker-server/actions/workflows/node.js.yml/badge.svg)](https://github.com/chainseeker/chainseeker-server/actions/workflows/node.js.yml)
 [![codecov](https://codecov.io/gh/chainseeker/chainseeker-server/branch/master/graph/badge.svg?token=MGtM2XKGaD)](https://codecov.io/gh/chainseeker/chainseeker-server)
 
 **chainseeker.info**: fast and reliable open-source cryptocurrency block explorer.
@@ -13,15 +14,16 @@ Cloning the repo
 ----------------
 
 ```bash
-$ git clone https://github.com/chainseeker/chainseeker-syncer.git
+$ git clone https://github.com/chainseeker/chainseeker-server.git
 ```
 
 Prerequisite
 ------------
 
-**chainseeker-server** requires a Bitcoin Core (or any compatible altcoins) running, and REST and RPC API are enabled.
+**chainseeker-server** requires a Bitcoin Core (or any compatible altcoins) running,
+and both REST (for syncing) and RPC API (for broadcasting transactions) are enabled.
 
-Configure `bitcoin.conf` as followng:
+Configure `bitcoin.conf` as below:
 ```toml:bitcoin.conf
 rpcuser = YOUR_USERNAME
 rpcpassword = VERY_LONG_PASSWORD
@@ -60,43 +62,43 @@ Then, launch `bitcoind` or `bitcoin-qt` in your machine.
 Configuration
 -------------
 
-Copy [./config.example.toml](./config.example.toml) and [./config.example.ts](./config.example.ts)
-under the `$HOME/.chainseeker/` directory and edit them.
+Copy [./config.example.toml](./config.example.toml) under the `$HOME/.chainseeker/` directory and edit them.
 ```bash
 $ mkdir $HOME/.chainseeker
 $ cp ./config.example.toml $HOME/.chainseeker/config.toml
-$ cp ./config.example.ts $HOME/.chainseeker/config.ts
+```
+
+Install
+-------
+
+If you have no Rust environment on your server, install it by running the following command.
+
+```bash
+$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 Run
 ---
 
-**chainseeker-server** is consisted of three parts: `syncer`, `api` and `web`.
-Each processes should be run in a separate terminal.
-
-### Running syncer
-
 ```bash
 $ cargo run --release COIN
 ```
 
-### Running api
+or
 
 ```bash
-$ npm run api:start
+$ npm start COIN
 ```
 
-### Running web
-
-```bash
-$ npm run web:start
-```
+The server will traverse all blocks and may take a day to finish syncing.
 
 Setup proxy
 -----------
 
 Configure your web server (such as Nginx or Apache) to proxy HTTP requests to the correct port.
 
-1. Proxy `/` to the port of `web` server listening (default port is 7001).
-1. Proxy `/api` to the port of `api` server listening (default port is 7002).
+1. Proxy `/` to the `http_port` (default port for mainnet Bitcoin is 6000).
+1. Proxy `/ws` to the port of `ws_endpoint` (default port is 7000).
+
+And then, configure SSL/TLS certificate if required or use proxy services like [CloudFlare](https://www.cloudflare.com/).
 
