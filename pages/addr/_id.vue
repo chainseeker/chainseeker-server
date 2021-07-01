@@ -33,24 +33,22 @@
 				</v-tab-item>
 				<v-tab-item key="txs">
 					<div v-for="tx in txs" class="my-4">
-						<v-container>
-							<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
-								<v-col><strong><NuxtLink :to="`/tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
-								<v-col v-if="tx.confirmedHeight >= 0" class="text-right">
-									<small>
-										Confirmed at <NuxtLink :to="`/block/${tx.confirmedHeight}`">#{{ tx.confirmedHeight.toLocaleString() }}</NuxtLink>
-									</small>
-								</v-col>
-								<v-col v-else class="text-right">
-									<small>
-										Unconfirmed
-									</small>
-								</v-col>
-							</v-row>
-							<v-row>
-								<TxMovement :tx="tx" />
-							</v-row>
-						</v-container>
+						<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
+							<v-col><strong><NuxtLink :to="`/tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
+							<v-col v-if="tx.confirmedHeight >= 0" class="text-right">
+								<small>
+									Confirmed at <NuxtLink :to="`/block/${tx.confirmedHeight}`">#{{ tx.confirmedHeight.toLocaleString() }}</NuxtLink>
+								</small>
+							</v-col>
+							<v-col v-else class="text-right">
+								<small>
+									Unconfirmed
+								</small>
+							</v-col>
+						</v-row>
+						<v-row>
+							<TxMovement :tx="tx" />
+						</v-row>
 					</div>
 				</v-tab-item>
 				<v-tab-item key="utxos">
@@ -93,12 +91,22 @@ export default class Home extends Vue {
 			],
 		};
 	}
-	async mounted() {
-		this.address = this.$route.params.id;
-		const cs = new Chainseeker(this.$config.apiEndpoint);
-		this.status = await cs.getStatus();
-		this.txids = (await cs.getTxids(this.address)).map(txid => ({ txid: txid }));
-		this.utxos = await cs.getUtxos(this.address);
+	async asyncData({ params, error, $config }) {
+		const address = params.id;
+		const cs = new Chainseeker($config.apiEndpoint);
+		const status = await cs.getStatus();
+		try {
+			const txids = (await cs.getTxids(address)).map(txid => ({ txid: txid }));
+			const utxos = await cs.getUtxos(address);
+			return {
+				address,
+				status,
+				txids,
+				utxos,
+			};
+		} catch(e) {
+			error({ statusCode: 404, message: 'Address Not Found.' });
+		}
 	}
 	async fetchTxs() {
 		const cs = new Chainseeker(this.$config.apiEndpoint);

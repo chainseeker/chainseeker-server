@@ -87,15 +87,26 @@ export default class Home extends Vue {
 	tx?: cs.Transaction | null = null;
 	blockHeader: cs.BlockHeader | null = null;
 	confirmations: number | null = null;
-	async mounted() {
-		const cs = new Chainseeker(this.$config.apiEndpoint);
-		this.status = await cs.getStatus();
-		const tx = await cs.getTransaction(this.$route.params.id);
-		if(tx.confirmedHeight) {
-			this.blockHeader = await cs.getBlockHeader(tx.confirmedHeight);
+	async asyncData({ params, error, $config }) {
+		const cs = new Chainseeker($config.apiEndpoint);
+		const status = await cs.getStatus();
+		try {
+			const tx = await cs.getTransaction(params.id);
+			let blockHeader = null;
+			if(tx.confirmedHeight) {
+				blockHeader = await cs.getBlockHeader(tx.confirmedHeight);
+			}
+			const confirmations = tx.confirmedHeight ? status.blocks - tx.confirmedHeight + 1 : null;
+			return {
+				status,
+				tx,
+				blockHeader,
+				confirmations,
+			};
+		} catch(e) {
+			console.log(e);
+			error({ statusCode: 404, message: 'Transaction Not Found.' });
 		}
-		this.tx = tx;
-		this.confirmations = tx.confirmedHeight ? this.status.blocks - tx.confirmedHeight + 1 : null;
 	}
 }
 </script>
