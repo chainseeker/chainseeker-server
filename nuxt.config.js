@@ -39,8 +39,8 @@ export default {
 	
 	publicRuntimeConfig: {
 		coin: {
-			name: "Bitcoin",
-			symbol: "BTC",
+			name: "Bitcoin Testnet",
+			symbol: "tBTC",
 			satoshi: "satoshi",
 		},
 		apiEndpoint: 'http://localhost:6001/api',

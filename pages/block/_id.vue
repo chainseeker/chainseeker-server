@@ -84,7 +84,7 @@
 		<div v-for="tx in block.txs" class="my-4">
 			<v-container>
 				<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
-					<v-col><strong><NuxtLink to="/tx/${tx.txid}">{{ tx.txid }}</NuxtLink></strong></v-col>
+					<v-col><strong><NuxtLink :to="`/tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
 					<v-col v-if="tx.address !== 'coinbase'" class="text-right">(fee: <Amount :value="tx.fee" />)</v-col>
 					<v-col v-else                           class="text-right">(reward: <Amount :value="tx.fee" />)</v-col>
 				</v-row>
@@ -105,9 +105,6 @@ import * as cs from 'chainseeker/dist/types';
 export default class Home extends Vue {
 	status: cs.Status;
 	block?: cs.BlockWithTxs | null = null;
-	constructor() {
-		super();
-	}
 	async mounted() {
 		const cs = new Chainseeker(this.$config.apiEndpoint);
 		this.status = await cs.getStatus();
