@@ -5,7 +5,8 @@
 				<nav>
 					<v-toolbar>
 						<v-toolbar-title><NuxtLink to="/" style="color: inherit">chainseeker</NuxtLink></v-toolbar-title>
-						<div class="ml-4"><a href="https://chainseeker.docs.apiary.io/" target="_blank">REST API</a></div>
+						<div class="ml-4"><NuxtLink to="/rich_list">Rich List</NuxtLink></div>
+						<div class="ml-2"><a href="https://chainseeker.docs.apiary.io/" target="_blank">REST API</a></div>
 						<v-spacer />
 						<v-form>
 							<v-container style="margin-top:2ex">
