@@ -17,7 +17,7 @@ impl Serialize for RichListEntry {
         where S: Serializer
     {
         let mut state = serializer.serialize_struct("RichListEntry", 2)?;
-        state.serialize_field("script_pubkey", &hex::encode(self.script_pubkey.as_bytes()))?;
+        state.serialize_field("scriptPubKey", &hex::encode(self.script_pubkey.as_bytes()))?;
         state.serialize_field("value", &self.value)?;
         state.end()
     }

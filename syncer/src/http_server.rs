@@ -187,6 +187,7 @@ pub struct RestBlockHeader {
     pub size: u32,
     pub strippedsize: u32,
     pub weight: u32,
+    pub ntxs: usize,
 }
 
 impl RestBlockHeader {
@@ -212,6 +213,7 @@ impl RestBlockHeader {
             size             : block_content.size,
             strippedsize     : block_content.strippedsize,
             weight           : block_content.weight,
+            ntxs             : block_content.txids.len(),
         }
     }
 }
@@ -539,7 +541,7 @@ impl HttpServer {
         let values = server.utxo_server.read().await.get(&script).await;
         Ok(Self::json(&values))
     }
-    /// `/rich_list/count` endpoint.
+    /// `/rich_list_count` endpoint.
     async fn rich_list_count_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         let json = format!("{{\"count\":{}}}", server.rich_list.read().await.len());
@@ -581,7 +583,7 @@ impl HttpServer {
             .get("/api/v1/block/:hash_or_height", Self::block_handler)
             .get("/api/v1/addr_index/:script", Self::addr_index_handler)
             .get("/api/v1/utxo/:script", Self::utxo_handler)
-            .get("/api/v1/rich_list/count", Self::rich_list_count_handler)
+            .get("/api/v1/rich_list_count", Self::rich_list_count_handler)
             .get("/api/v1/rich_list/:offset/:limit", Self::rich_list_handler)
             .any(|_req| async {
                 Ok(Self::not_found("invalid URL."))
