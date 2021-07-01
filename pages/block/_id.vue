@@ -79,6 +79,29 @@
 				</tbody>
 			</template>
 		</v-simple-table>
+		<API :path="`block/${block.hash}`" />
+		<!--
+		<h2>Transactions in the Block</h2>
+		<% for(let i in block.txs) { %>
+		<% const tx = block.txs[i] %>
+		<table class="table">
+			<thead>
+				<tr>
+					<th colspan="3">
+						<a href="<%= config.server.web.prefix %>/tx/<%= tx.txid %>"><%= tx.txid %></a>
+						<% if(tx.vin[0].address != 'coinbase') { %>
+						<div class="pull-right"><small>(fee: <%- formatAmount(tx.fee) %>)</small></div>
+						<% } else { %>
+						<div class="pull-right"><small>(fee reward: <%- formatAmount(-(block.reward + tx.fee)) %>)</small></div>
+						<% } %>
+					</th>
+				</tr>
+			</thead>
+			<tbody>
+				<%- include('transaction_movements.ejs', { tx: tx, colorize: [] }) %>
+			</tbody>
+		</table>
+		-->
 	</div>
 </template>
 
