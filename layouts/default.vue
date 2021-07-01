@@ -4,7 +4,7 @@
 			<v-container>
 				<nav>
 					<v-toolbar>
-						<v-toolbar-title>chainseeker</v-toolbar-title>
+						<v-toolbar-title><NuxtLink to="/" style="color: inherit">chainseeker</NuxtLink></v-toolbar-title>
 						<v-spacer />
 						<v-form>
 							<v-container style="margin-top:2ex">
