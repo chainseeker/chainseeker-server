@@ -255,7 +255,7 @@ export default class Home extends Vue {
 			})();
 			// Compute the amount of newly generated coins.
 			const blockReward = $config.coinConfig.coin.blockReward;
-			const generatedAmount = blockReward.initial * Math.pow(0.5, Math.floor(block.height / blockReward.halving));
+			const generatedAmount = blockReward.initial * Math.pow(0.5, Math.floor(block.height! / blockReward.halving));
 			// Compute fee.
 			const fee = coinbase.vout[0].value - generatedAmount;
 			return {
