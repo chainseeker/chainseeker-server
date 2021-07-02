@@ -9,7 +9,6 @@ pub struct Syncer {
     coin: String,
     config: Config,
     utxo_db: UtxoDB,
-    rich_list_builder: RichListBuilder,
     rest: bitcoin_rest::Context,
     stop: Arc<RwLock<bool>>,
     pub http_server: HttpServer,
@@ -22,7 +21,6 @@ impl Syncer {
             coin: coin.to_string(),
             config: (*config).clone(),
             utxo_db: UtxoDB::new(coin, false),
-            rich_list_builder: RichListBuilder::new(),
             rest: rest,
             stop: Arc::new(RwLock::new(false)),
             http_server: HttpServer::new(coin, config),
@@ -44,7 +42,6 @@ impl Syncer {
     async fn shrink_to_fit(&mut self) {
         self.http_server.utxo_server.write().await.shrink_to_fit();
         self.http_server.rich_list.write().await.shrink_to_fit();
-        self.rich_list_builder.shrink_to_fit();
     }
     async fn process_block(&mut self, initial: bool, height: u32, block: &Block) {
         let begin = Instant::now();
@@ -63,8 +60,7 @@ impl Syncer {
         // Process if non initial-sync.
         if !initial {
             self.http_server.utxo_server.write().await.process_block(block, &previous_utxos).await;
-            self.rich_list_builder.process_block(block, &previous_utxos);
-            *self.http_server.rich_list.write().await = self.rich_list_builder.finalize();
+            self.http_server.rich_list.write().await.process_block(block, &previous_utxos);
         }
         // Count vins/vouts.
         let mut vins: usize = 0;
@@ -199,12 +195,13 @@ impl Syncer {
                 utxo_server.push(&utxo).await;
             }
         });
-        let rich_list_join = tokio::task::spawn(async move {
-            let mut rich_list_builder = RichListBuilder::new();
+        let rich_list = self.http_server.rich_list.clone();
+        let rich_list_join = tokio::spawn(async move {
+            let mut rich_list = rich_list.write().await;
             while let Some(utxo) = rich_list_rx.recv().await {
-                rich_list_builder.push(&utxo);
+                rich_list.push(&utxo);
             }
-            rich_list_builder
+            rich_list.finalize();
         });
         let mut i = 0;
         for utxo in self.utxo_db.iter() {
@@ -227,10 +224,7 @@ impl Syncer {
         drop(utxo_server_tx);
         drop(rich_list_tx);
         utxo_server_join.await.unwrap();
-        let rich_list_builder = rich_list_join.await.unwrap();
-        let rich_list = rich_list_builder.finalize();
-        *self.http_server.rich_list.write().await = rich_list;
-        self.rich_list_builder = rich_list_builder;
+        rich_list_join.await.unwrap();
         self.shrink_to_fit().await;
         println!("Syncer.load_utxo(): executed in {}ms.", to_locale_string(begin.elapsed().as_millis()));
     }
@@ -251,19 +245,16 @@ impl Syncer {
         if !self.is_stopped().await {
             self.load_utxo().await;
             // Report the capacity / actual size.
-            println!("(len, cap) = UtxoServer: ({}, {}), RichList: ({}, {}), RichListBuilder: ({}, {})",
+            println!("(len, cap) = UtxoServer: ({}, {}), RichList: ({}, {})",
                 to_locale_string(self.http_server.utxo_server.read().await.len()),
                 to_locale_string(self.http_server.utxo_server.read().await.capacity()),
                 to_locale_string(self.http_server.rich_list.read().await.len()),
                 to_locale_string(self.http_server.rich_list.read().await.capacity()),
-                to_locale_string(self.rich_list_builder.len()),
-                to_locale_string(self.rich_list_builder.capacity()),
             );
             // Report the memory usage.
-            println!("UtxoServer: {}MiB, RichList: {}MiB, RichListBuilder: {}MiB",
+            println!("UtxoServer: {}MiB, RichList: {}MiB",
                 self.http_server.utxo_server.read().await.size() / 1024 / 1024,
                 self.http_server.rich_list.read().await.size() / 1024 / 1024,
-                self.rich_list_builder.size() / 1024 / 1024,
             );
         }
         synced_blocks

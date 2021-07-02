@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use serde::ser::{Serializer, SerializeStruct};
 use bitcoin::{Txid, Script, Block};
@@ -71,13 +71,13 @@ impl Deserialize for UtxoServerValue {
 
 #[derive(Debug, Clone)]
 pub struct UtxoServerInMemory {
-    db: HashMap<Script, Vec<UtxoServerValue>>,
+    db: IndexMap<Script, Vec<UtxoServerValue>>,
 }
 
 impl UtxoServerInMemory {
     pub fn new(_coin: &str) -> Self {
         Self {
-            db: HashMap::new(),
+            db: IndexMap::new(),
         }
     }
     pub fn len(&self) -> usize {

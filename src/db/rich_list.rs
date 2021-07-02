@@ -1,8 +1,7 @@
 use std::mem::size_of;
 use std::cmp::min;
 use core::ops::Range;
-use std::collections::HashMap;
-use rayon::prelude::*;
+use indexmap::IndexMap;
 use bitcoin::{Block, Script};
 
 use crate::*;
@@ -13,62 +12,15 @@ pub struct RichListEntry {
     pub value: u64,
 }
 
-impl PartialOrd for RichListEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.value.partial_cmp(&other.value)
-    }
-}
-
-impl Ord for RichListEntry {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.value.cmp(&other.value)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct RichList {
-    /// (script_pubkey, value)
-    entries: Vec<RichListEntry>,
+    map: IndexMap<Script, u64>,
 }
 
 impl RichList {
     pub fn new() -> Self {
         Self {
-            entries: Vec::new(),
-        }
-    }
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-    pub fn capacity(&self) -> usize {
-        self.entries.capacity()
-    }
-    /// Estimate the allocated size of this struct.
-    pub fn size(&self) -> usize {
-        self.entries.iter().map(|entry| entry.script_pubkey.len() + size_of::<u64>()).sum()
-    }
-    pub fn shrink_to_fit(&mut self) {
-        self.entries.shrink_to_fit();
-    }
-    pub fn get_in_range(&self, range: Range<usize>) -> Vec<RichListEntry> {
-        if self.entries.len() < 1 {
-            return Vec::new();
-        }
-        let start = min(range.start, self.entries.len() - 1);
-        let end = min(range.end, self.entries.len());
-        self.entries[start..end].to_vec()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RichListBuilder {
-    map: HashMap<Script, u64>,
-}
-
-impl RichListBuilder {
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
+            map: IndexMap::new(),
         }
     }
     pub fn len(&self) -> usize {
@@ -90,6 +42,26 @@ impl RichListBuilder {
     pub fn remove(&mut self, script_pubkey: &Script, value: u64) {
         let v = self.map.get_mut(script_pubkey).unwrap();
         *v -= value;
+    }
+    pub fn get_in_range(&self, range: Range<usize>) -> Vec<RichListEntry> {
+        if self.map.len() < 1 {
+            return Vec::new();
+        }
+        let start = min(range.start, self.map.len() - 1);
+        let end = min(range.end, self.map.len());
+        let mut ret = Vec::new();
+        for i in start..end {
+            let data = self.map.get_index(i);
+            if data.is_none() {
+                break;
+            }
+            let (script_pubkey, value) = data.unwrap();
+            ret.push(RichListEntry {
+                script_pubkey: (*script_pubkey).clone(),
+                value: *value,
+            });
+        }
+        ret
     }
     pub fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
         // Process vouts.
@@ -118,18 +90,9 @@ impl RichListBuilder {
                 previous_utxo_index += 1;
             }
         }
+        self.finalize();
     }
-    pub fn finalize(&self) -> RichList {
-        // Construct RichList instance.
-        let mut entries = self.map.par_iter().map(|(script_pubkey, value)| {
-            RichListEntry {
-                script_pubkey: (*script_pubkey).clone(),
-                value: *value,
-            }
-        }).collect::<Vec<RichListEntry>>();
-        entries.par_sort_unstable_by(|a, b| b.cmp(a));
-        RichList {
-            entries,
-        }
+    pub fn finalize(&mut self) {
+        self.map.par_sort_by(|_k1, v1, _k2, v2| v2.cmp(v1));
     }
 }
