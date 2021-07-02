@@ -34,13 +34,8 @@ async fn main() {
     }
     // Do initial sync.
     syncer.initial_sync().await;
-    if syncer.is_stopped().await {
-        return;
-    }
     // Run syncer.
-    handles.push(tokio::spawn(async move {
-        syncer.run().await;
-    }));
+    syncer.run().await;
     // Join for the threads.
     for handle in handles.iter_mut() {
         handle.await.expect("Failed to await a tokio JoinHandle.");
