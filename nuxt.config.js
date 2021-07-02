@@ -45,8 +45,8 @@ export default {
 					symbol: "BTC",
 					satoshi: "satoshi",
 				},
-				apiEndpoint: 'https://btc.chainseeker.info/api',
-				wsEndpoint: 'wss://btc.chainseeker.info/ws',
+				apiEndpoint: 'https://btc-v3.chainseeker.info/api',
+				wsEndpoint: 'wss://btc-v3.chainseeker.info/ws',
 			},
 			tbtc: {
 				coin: {
@@ -54,8 +54,8 @@ export default {
 					symbol: "tBTC",
 					satoshi: "satoshi",
 				},
-				apiEndpoint: 'https://tbtc.chainseeker.info/api',
-				wsEndpoint: 'wss://tbtc.chainseeker.info/ws',
+				apiEndpoint: 'https://tbtc-v3.chainseeker.info/api',
+				wsEndpoint: 'wss://tbtc-v3.chainseeker.info/ws',
 			},
 			local: {
 				coin: {
