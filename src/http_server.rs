@@ -517,9 +517,11 @@ impl HttpServer {
         }
     }
     fn decode_script_or_address(script_or_address: &str) -> Option<Script> {
-        let addr = Address::from_str(script_or_address);
-        if addr.is_ok() {
-            return Some(addr.unwrap().script_pubkey());
+        match Address::from_str(script_or_address) {
+            Ok(addr) => return Some(addr.script_pubkey()),
+            Err(err) => {
+                println!("Failed to decode address: {}.", err);
+            }
         }
         let script = Script::from_hex(script_or_address);
         if script.is_ok() {
