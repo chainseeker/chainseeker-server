@@ -41,6 +41,11 @@ impl Syncer {
     fn coin_config(&self) -> &CoinConfig {
         &self.config.coins[&self.coin]
     }
+    async fn shrink_to_fit(&mut self) {
+        self.http_server.utxo_server.write().await.shrink_to_fit();
+        self.http_server.rich_list.write().await.shrink_to_fit();
+        self.rich_list_builder.shrink_to_fit();
+    }
     async fn process_block(&mut self, initial: bool, height: u32, block: &Block) {
         let begin = Instant::now();
         // Process for UTXOs.
@@ -226,6 +231,7 @@ impl Syncer {
         let rich_list = rich_list_builder.finalize();
         *self.http_server.rich_list.write().await = rich_list;
         self.rich_list_builder = rich_list_builder;
+        self.shrink_to_fit().await;
         println!("Syncer.load_utxo(): executed in {}ms.", to_locale_string(begin.elapsed().as_millis()));
     }
     pub async fn initial_sync(&mut self) -> u32 {

@@ -47,6 +47,9 @@ impl RichList {
     pub fn size(&self) -> usize {
         self.entries.iter().map(|entry| entry.script_pubkey.len() + size_of::<u64>()).sum()
     }
+    pub fn shrink_to_fit(&mut self) {
+        self.entries.shrink_to_fit();
+    }
     pub fn get_in_range(&self, range: Range<usize>) -> Vec<RichListEntry> {
         if self.entries.len() < 1 {
             return Vec::new();
@@ -76,6 +79,9 @@ impl RichListBuilder {
     }
     pub fn size(&self) -> usize {
         self.map.iter().map(|(script, _val)| script.len() + size_of::<u64>()).sum()
+    }
+    pub fn shrink_to_fit(&mut self) {
+        self.map.shrink_to_fit();
     }
     pub fn push(&mut self, utxo: &UtxoEntry) {
         let value = self.map.get(&utxo.script_pubkey).unwrap_or(&0u64) + utxo.value;

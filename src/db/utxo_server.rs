@@ -87,7 +87,10 @@ impl UtxoServerInMemory {
         self.db.capacity()
     }
     pub fn size(&self) -> usize {
-        self.db.iter().map(|(script, _value)| script.len() + 44).sum()
+        self.db.iter().map(|(script, value)| script.len() + 44 * value.len()).sum()
+    }
+    pub fn shrink_to_fit(&mut self) {
+        self.db.shrink_to_fit();
     }
     pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         match self.db.get(script_pubkey) {
@@ -110,7 +113,7 @@ impl UtxoServerInMemory {
         };
         values.push(v);
     }
-    pub fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
+    fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
         let values = self.db.get_mut(script_pubkey).unwrap();
         *values = values.iter().filter(|&utxo_value| {
             !(utxo_value.txid == *txid && utxo_value.vout == vout)
