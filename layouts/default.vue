@@ -4,7 +4,14 @@
 			<v-container>
 				<nav>
 					<v-toolbar>
-						<v-toolbar-title><NuxtLink :to="`/${$config.coin}`" style="color: inherit">chainseeker</NuxtLink></v-toolbar-title>
+						<v-toolbar-title>
+							<NuxtLink to="/" style="color: inherit">
+								chainseeker
+							</NuxtLink>
+							<NuxtLink :to="`/${$config.coin}`" style="color: inherit" class="ml-2">
+								<small>[{{ $config.coinConfig.coin.symbol }}]</small>
+							</NuxtLink>
+						</v-toolbar-title>
 						<div class="ml-4"><NuxtLink :to="`/${$config.coin}/rich_list`">Rich List</NuxtLink></div>
 						<div class="ml-2"><a href="https://chainseeker.docs.apiary.io/" target="_blank">REST API</a></div>
 						<v-spacer />
