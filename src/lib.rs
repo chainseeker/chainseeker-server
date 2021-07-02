@@ -85,13 +85,17 @@ pub struct Config {
     pub coins: std::collections::HashMap<String, CoinConfig>,
 }
 
-pub fn load_config() -> Config {
+pub fn load_config(coin: &str) -> CoinConfig {
     let config_path = format!("{}/config.toml", data_dir());
     let mut config_file = std::fs::File::open(&config_path)
         .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
     let mut config_str = String::new();
     config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
-    toml::from_str(&config_str).expect("Failed to parse config file.")
+    let mut config: Config = toml::from_str(&config_str).expect("Failed to parse config file.");
+    match config.coins.remove(coin) {
+        Some(coin_config) => coin_config,
+        None => panic!("Cannot find the specified coin in your config."),
+    }
 }
 
 pub fn consensus_encode<E>(enc: &E) -> Vec<u8>
