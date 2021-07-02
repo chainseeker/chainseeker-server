@@ -47,9 +47,12 @@ impl RichList {
         if self.map.len() < 1 {
             return Vec::new();
         }
-        let start = min(range.start, self.map.len() - 1);
+        if range.start >= self.map.len() {
+            return Vec::new();
+        }
+        let start = range.start;
         let end = min(range.end, self.map.len());
-        let mut ret = Vec::new();
+        let mut ret = Vec::with_capacity(end - start);
         for i in start..end {
             let data = self.map.get_index(i);
             if data.is_none() {

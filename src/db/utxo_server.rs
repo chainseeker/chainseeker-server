@@ -102,7 +102,7 @@ impl UtxoServerInMemory {
         let values = match self.db.get_mut(&utxo.script_pubkey) {
             Some(values) => values,
             None => {
-                self.db.insert(utxo.script_pubkey.clone(), Vec::new());
+                self.db.insert(utxo.script_pubkey.clone(), Vec::with_capacity(1));
                 self.db.get_mut(&utxo.script_pubkey).unwrap()
             },
         };
