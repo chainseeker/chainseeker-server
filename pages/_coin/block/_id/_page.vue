@@ -68,11 +68,15 @@
 					</tr>
 					<tr>
 						<th>#transactions</th>
-						<td colspan="3">{{ block.txs.length.toLocaleString() }}</td>
+						<td colspan="3">{{ block.txids.length.toLocaleString() }}</td>
 					</tr>
 					<tr>
 						<th>Block Reward</th>
-						<td><Amount :value="block.txs[0].vout[0].value" /></td>
+						<td><Amount :value="coinbase.vout[0].value" /></td>
+						<th>Generated Coins</th>
+						<td><Amount :value="generatedAmount" /></td>
+					</tr>
+					<tr>
 						<th>Transaction Fee in Total</th>
 						<td><Amount :value="fee" /></td>
 					</tr>
@@ -80,12 +84,16 @@
 			</template>
 		</v-simple-table>
 		<API :path="`block/${block.hash}`" />
-		<h2>Transactions in the Block</h2>
-		<div v-for="(tx, n) in block.txs" class="my-4">
+		<h2>Transactions in this Block</h2>
+		<div class="text-center">
+			<v-pagination total-visible=10 :value="page + 1" :length="Math.ceil(block.txids.length / TXS_PER_PAGE)"
+				v-on:input="(page) => $router.push(`/${coin}/block/${block.height}/${page - 1}`)" />
+		</div>
+		<div v-for="(tx, n) in txs" class="my-4">
 			<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
 				<v-col><strong><NuxtLink :to="`../tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
-				<v-col v-if="n !== 0" class="text-right">(fee: <Amount :value="tx.fee" />)</v-col>
-				<v-col v-else         class="text-right">(reward: <Amount :value="-tx.fee" />)</v-col>
+				<v-col v-if="page == 0 && n == 0" class="text-right">(reward: <Amount :value="-tx.fee" />)</v-col>
+				<v-col v-else                     class="text-right">(fee: <Amount :value="tx.fee" />)</v-col>
 			</v-row>
 			<v-row>
 				<TxMovement :tx="tx" />
@@ -100,33 +108,61 @@ import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
 
+const TXS_PER_PAGE = 10;
+
 @Component
 export default class Home extends Vue {
-	status: cs.Status | null = null;
-	block?: cs.BlockWithTxs | null = null;
+	TXS_PER_PAGE: number = TXS_PER_PAGE;
+	coin?: string;
+	page?: number;
+	status?: cs.Status;
+	block?: cs.BlockWithTxids;
+	coinbase?: cs.Transaction;
+	txs: cs.Transaction[] = [];
+	generatedAmount?: number;
 	fee: number = 0;
 	head() {
 		return { title: `Block ${this.block!.hash!} - chainseeker` };
 	}
 	async asyncData({ params, error, $config }: Context) {
+		const coin = params.coin;
+		const page = params.page ? Number.parseInt(params.page) : 0;
 		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		const status = await cs.getStatus();
 		// Fetch block.
 		try {
-			const block = await cs.getBlockWithTxs(params.id);
-			// Compute fee.
-			let fee = 0;
-			for(let n=1; n<block.txs.length; n++) {
-				let tx = block.txs[n];
-				fee += tx.vin.reduce((acc, vin) => acc + vin.value, 0);
-				fee -= tx.vout.reduce((acc, vout) => acc + vout.value, 0);
+			const block = await cs.getBlockWithTxids(params.id);
+			// Fetch transactions.
+			const txPromises: Promise<cs.Transaction>[] = [];
+			for(let i=page*TXS_PER_PAGE; i<Math.min(block.txids.length, (page+1)*TXS_PER_PAGE); i++) {
+				txPromises.push(cs.getTransaction(block.txids[i]));
 			}
+			const txs = await Promise.all(txPromises);
+			// Fetch coinbase transaction.
+			const coinbase = await (async () => {
+				if(page == 0) {
+					return txs[0];
+				} else {
+					return await cs.getTransaction(block.txids[0]);
+				}
+			})();
+			// Compute the amount of newly generated coins.
+			const blockReward = $config.coinConfig.coin.blockReward;
+			const generatedAmount = blockReward.initial * Math.pow(0.5, Math.floor(block.height / blockReward.halving));
+			// Compute fee.
+			const fee = coinbase.vout[0].value - generatedAmount;
 			return {
+				coin,
+				page,
 				status,
 				block,
+				coinbase,
+				txs,
+				generatedAmount,
 				fee,
 			};
 		} catch(e) {
+			console.log(e);
 			error({ statusCode: 404, message: 'Block Not Found.' });
 		}
 	}

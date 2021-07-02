@@ -23,6 +23,7 @@
 					</v-toolbar>
 				</nav>
 				<Nuxt />
+				<Footer />
 			</v-container>
 		</v-main>
 	</v-app>

@@ -44,6 +44,10 @@ export default {
 					name: "Bitcoin (Mainnet)",
 					symbol: "BTC",
 					satoshi: "satoshi",
+					blockReward: {
+						initial: 5000000000,
+						halving: 210000
+					},
 				},
 				apiEndpoint: 'https://btc-v3.chainseeker.info/api',
 				wsEndpoint: 'wss://btc-v3.chainseeker.info/ws',
@@ -53,6 +57,10 @@ export default {
 					name: "Bitcoin (Testnet)",
 					symbol: "tBTC",
 					satoshi: "satoshi",
+					blockReward: {
+						initial: 5000000000,
+						halving: 210000
+					},
 				},
 				apiEndpoint: 'https://tbtc-v3.chainseeker.info/api',
 				wsEndpoint: 'wss://tbtc-v3.chainseeker.info/ws',
@@ -62,6 +70,10 @@ export default {
 					name: "Bitcoin (Local)",
 					symbol: "lBTC",
 					satoshi: "satoshi",
+					blockReward: {
+						initial: 5000000000,
+						halving: 210000
+					},
 				},
 				apiEndpoint: 'http://localhost:8000/api',
 				wsEndpoint: 'ws://localhost:8001',
