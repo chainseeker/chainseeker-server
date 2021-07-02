@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 
 use serde::ser::{Serializer, SerializeStruct};
-use bitcoin::{Txid, Script, Block};
+use bitcoin::{Txid, Script, Block, WScriptHash};
 
 use crate::*;
 
@@ -71,7 +71,7 @@ impl Deserialize for UtxoServerValue {
 
 #[derive(Debug, Clone)]
 pub struct UtxoServerInMemory {
-    db: IndexMap<Script, Vec<UtxoServerValue>>,
+    db: IndexMap<WScriptHash, Vec<UtxoServerValue>>,
 }
 
 impl UtxoServerInMemory {
@@ -93,17 +93,18 @@ impl UtxoServerInMemory {
         self.db.shrink_to_fit();
     }
     pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
-        match self.db.get(script_pubkey) {
+        match self.db.get(&script_pubkey.wscript_hash()) {
             Some(values) => (*values).clone(),
             None => Vec::new(),
         }
     }
     pub async fn push(&mut self, utxo: &UtxoEntry) {
-        let values = match self.db.get_mut(&utxo.script_pubkey) {
+        let wscript_hash = utxo.script_pubkey.wscript_hash();
+        let values = match self.db.get_mut(&wscript_hash) {
             Some(values) => values,
             None => {
-                self.db.insert(utxo.script_pubkey.clone(), Vec::with_capacity(1));
-                self.db.get_mut(&utxo.script_pubkey).unwrap()
+                self.db.insert(wscript_hash.clone(), Vec::with_capacity(1));
+                self.db.get_mut(&wscript_hash).unwrap()
             },
         };
         let v = UtxoServerValue {
@@ -114,7 +115,7 @@ impl UtxoServerInMemory {
         values.push(v);
     }
     fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
-        let values = self.db.get_mut(script_pubkey).unwrap();
+        let values = self.db.get_mut(&script_pubkey.wscript_hash()).unwrap();
         *values = values.iter().filter(|&utxo_value| {
             !(utxo_value.txid == *txid && utxo_value.vout == vout)
         }).cloned().collect();
