@@ -516,22 +516,22 @@ impl HttpServer {
             Err(res) => Ok(res),
         }
     }
-    fn decode_script_or_address(script_or_address: &str) -> Result<Script, ()> {
+    fn decode_script_or_address(script_or_address: &str) -> Option<Script> {
         let addr = Address::from_str(script_or_address);
         if addr.is_ok() {
-            return Ok(addr.unwrap().script_pubkey());
+            return Some(addr.unwrap().script_pubkey());
         }
         let script = Script::from_hex(script_or_address);
         if script.is_ok() {
-            return Ok(script.unwrap());
+            return Some(script.unwrap());
         }
-        Err(())
+        None
     }
     /// `/txids/:script_or_address` endpoint.
     async fn txids_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         let script = Self::decode_script_or_address(req.param("script_or_address").unwrap());
-        if script.is_err() {
+        if script.is_none() {
             return Ok(Self::not_found("Failed to decode input script or address."));
         }
         let txids = server.addr_index_db.read().await.get(&script.unwrap());
@@ -542,7 +542,7 @@ impl HttpServer {
     async fn txs_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         let script = Self::decode_script_or_address(req.param("script_or_address").unwrap());
-        if script.is_err() {
+        if script.is_none() {
             return Ok(Self::not_found("Failed to decode input script or address."));
         }
         let txids = server.addr_index_db.read().await.get(&script.unwrap());
@@ -568,7 +568,7 @@ impl HttpServer {
     async fn utxos_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         let script = Self::decode_script_or_address(req.param("script_or_address").unwrap());
-        if script.is_err() {
+        if script.is_none() {
             return Ok(Self::not_found("Failed to decode input script or address."));
         }
         let values = server.utxo_server.read().await.get(&script.unwrap()).await;
