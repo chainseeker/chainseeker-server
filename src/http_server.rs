@@ -44,7 +44,7 @@ pub struct RestVin {
 }
 
 impl RestVin {
-    pub fn new(txin: &TxIn, previous_txout: &Option<TxOut>, network: Network) -> Self {
+    pub fn new(txin: &TxIn, previous_txout: &Option<TxOut>, config: &CoinConfig) -> Self {
         Self {
             txid: txin.previous_output.txid.to_string(),
             vout: txin.previous_output.vout,
@@ -56,10 +56,7 @@ impl RestVin {
                 None => 0,
             },
             address: match previous_txout {
-                Some(previous_txout) => match Address::from_script(&previous_txout.script_pubkey, network) {
-                    Some(address) => Some(format!("{}", address)),
-                    None => None,
-                },
+                Some(previous_txout) => script_to_address_string(&previous_txout.script_pubkey, config),
                 None => None,
             },
         }
@@ -75,8 +72,9 @@ pub struct RestScriptPubKey {
 }
 
 impl RestScriptPubKey {
-    pub fn new(script_pubkey: &Script, network: Network) -> Self {
-        let address = Address::from_script(&script_pubkey, network);
+    pub fn new(script_pubkey: &Script, config: &CoinConfig) -> Self {
+        let address = Address::from_script(&script_pubkey, Network::Bitcoin /* any */);
+        let address_str = script_to_address_string(&script_pubkey, config);
         Self {
             asm: script_pubkey.asm(),
             hex: script_pubkey.to_string(),
@@ -92,10 +90,7 @@ impl RestScriptPubKey {
                 }
                 None => "unknown",
             }.to_string(),
-            address: match address {
-                Some(address) => Some(format!("{}", address)),
-                None => None,
-            },
+            address: address_str,
         }
     }
 }
@@ -109,11 +104,11 @@ pub struct RestVout {
 }
 
 impl RestVout {
-    pub fn new(txout: &TxOut, n: usize, network: Network) -> Self {
+    pub fn new(txout: &TxOut, n: usize, config: &CoinConfig) -> Self {
         Self {
             value: txout.value,
             n,
-            script_pub_key: RestScriptPubKey::new(&txout.script_pubkey, network),
+            script_pub_key: RestScriptPubKey::new(&txout.script_pubkey, config),
         }
     }
 }
@@ -137,17 +132,17 @@ pub struct RestTx {
 }
 
 impl RestTx {
-    pub fn from_tx_db_value(value: &TxDBValue, network: Network) -> Self {
+    pub fn from_tx_db_value(value: &TxDBValue, config: &CoinConfig) -> Self {
         let tx = &value.tx;
         let mut input_value = 0;
         let mut vin = Vec::new();
         let mut previous_txout_index = 0;
         for input in tx.input.iter() {
             if input.previous_output.is_null() {
-                vin.push(RestVin::new(input, &None, network));
+                vin.push(RestVin::new(input, &None, config));
             } else {
                 input_value += value.previous_txouts[previous_txout_index].value;
-                vin.push(RestVin::new(input, &Some(value.previous_txouts[previous_txout_index].clone()), network));
+                vin.push(RestVin::new(input, &Some(value.previous_txouts[previous_txout_index].clone()), config));
                 previous_txout_index += 1;
             }
         }
@@ -165,7 +160,7 @@ impl RestTx {
             version: tx.version,
             locktime: tx.lock_time,
             vin,
-            vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, network)).collect(),
+            vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, config)).collect(),
             // TODO: compute for coinbase transactions!
             fee: (input_value as i64) - (output_value as i64),
         }
@@ -191,7 +186,7 @@ pub struct RestBlockHeader {
 }
 
 impl RestBlockHeader {
-    pub fn from_block_content(block_content: &BlockContentDBValue, network: Network) -> Self {
+    pub fn from_block_content(block_content: &BlockContentDBValue, config: &CoinConfig) -> Self {
         let block_header = &block_content.block_header;
         let mut hash = consensus_encode(&block_header.block_hash());
         hash.reverse();
@@ -208,7 +203,7 @@ impl RestBlockHeader {
             merkleroot       : hex::encode(&merkle_root),
             time             : block_header.time,
             bits             : format!("{:x}", block_header.bits),
-            difficulty       : block_header.difficulty(network),
+            difficulty       : get_difficulty(block_header, config),
             nonce            : block_header.nonce,
             size             : block_content.size,
             strippedsize     : block_content.strippedsize,
@@ -237,8 +232,8 @@ pub struct RestBlockWithTxids {
 }
 
 impl RestBlockWithTxids {
-    pub fn from_block_content(block_content: &BlockContentDBValue, network: Network) -> Self {
-        let rest_block_header = RestBlockHeader::from_block_content(block_content, network);
+    pub fn from_block_content(block_content: &BlockContentDBValue, config: &CoinConfig) -> Self {
+        let rest_block_header = RestBlockHeader::from_block_content(block_content, config);
         Self {
             height           : rest_block_header.height,
             header           : rest_block_header.header,
@@ -277,11 +272,11 @@ pub struct RestBlockWithTxs {
 }
 
 impl RestBlockWithTxs {
-    pub fn from_block_content(tx_db: &TxDB, block_content: &BlockContentDBValue, network: Network) -> Self {
-        let rest_block_header = RestBlockHeader::from_block_content(block_content, network);
+    pub fn from_block_content(tx_db: &TxDB, block_content: &BlockContentDBValue, config: &CoinConfig) -> Self {
+        let rest_block_header = RestBlockHeader::from_block_content(block_content, config);
         let txs = block_content.txids.iter().map(|txid| {
             let tx = tx_db.get(txid).unwrap();
-            RestTx::from_tx_db_value(&tx, network)
+            RestTx::from_tx_db_value(&tx, config)
         }).collect::<Vec<RestTx>>();
         Self {
             height           : rest_block_header.height,
@@ -310,8 +305,8 @@ pub struct RestRichListEntry {
 }
 
 impl RestRichListEntry {
-    pub fn from_rich_list_entry(entry: &RichListEntry, network: Network) -> Self {
-        let script_pub_key = RestScriptPubKey::new(&entry.script_pubkey, network);
+    pub fn from_rich_list_entry(entry: &RichListEntry, config: &CoinConfig) -> Self {
+        let script_pub_key = RestScriptPubKey::new(&entry.script_pubkey, config);
         Self {
             script_pub_key,
             value: entry.value,
@@ -402,14 +397,8 @@ impl HttpServer {
             Err(_) => Self::internal_error("Failed to encode to JSON."),
         }
     }
-    fn network(coin: &str) -> Network {
-        match coin {
-            "btc"  => Network::Bitcoin,
-            "tbtc" => Network::Testnet,
-            "rbtc" => Network::Regtest,
-            "sbtc" => Network::Signet,
-            _ => panic!("Coin not supported."),
-        }
+    fn coin_config(&self) -> &CoinConfig {
+        &self.config.coins[&self.coin]
     }
     /// `/status` endpoint.
     async fn status_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -426,9 +415,8 @@ impl HttpServer {
             Ok(txid) => txid,
             Err(_) => return Ok(Self::not_found("Failed to decode txid.")),
         };
-        let network = Self::network(&server.coin);
         match server.tx_db.read().await.get(&txid) {
-            Some(value) => Ok(Self::json(RestTx::from_tx_db_value(&value, network))),
+            Some(value) => Ok(Self::json(RestTx::from_tx_db_value(&value, &server.coin_config()))),
             None => Ok(Self::not_found("Transaction not found.")),
         }
     }
@@ -509,9 +497,9 @@ impl HttpServer {
     }
     /// `/block_with_txids/:hash_or_height` endpoint.
     async fn block_with_txids_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let network = Self::network(&req.data::<HttpServer>().unwrap().coin);
+        let server = req.data::<HttpServer>().unwrap();
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockWithTxids::from_block_content(&block_content, network))),
+            Ok(block_content) => Ok(Self::json(RestBlockWithTxids::from_block_content(&block_content, &server.coin_config()))),
             Err(res) => Ok(res),
         }
     }
@@ -519,17 +507,16 @@ impl HttpServer {
     async fn block_with_txs_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         let tx_db = server.tx_db.read().await;
-        let network = Self::network(&server.coin);
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockWithTxs::from_block_content(&tx_db, &block_content, network))),
+            Ok(block_content) => Ok(Self::json(RestBlockWithTxs::from_block_content(&tx_db, &block_content, &server.coin_config()))),
             Err(res) => Ok(res),
         }
     }
     /// `/block/:hash_or_height` endpoint.
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let network = Self::network(&req.data::<HttpServer>().unwrap().coin);
+        let server = req.data::<HttpServer>().unwrap();
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockHeader::from_block_content(&block_content, network))),
+            Ok(block_content) => Ok(Self::json(RestBlockHeader::from_block_content(&block_content, &server.coin_config()))),
             Err(res) => Ok(res),
         }
     }
@@ -568,7 +555,7 @@ impl HttpServer {
         let txs = txids.iter().map(|txid| {
             let tx_db_value = tx_db.get(txid);
             match tx_db_value {
-                Some(v) => Some(RestTx::from_tx_db_value(&v, Self::network(&server.coin))),
+                Some(v) => Some(RestTx::from_tx_db_value(&v, &server.coin_config())),
                 None => {
                     txids_not_found.push(txid);
                     None
@@ -610,7 +597,7 @@ impl HttpServer {
         let server = req.data::<HttpServer>().unwrap();
         let rich_list = server.rich_list.read().await;
         let addresses = rich_list.get_in_range(offset..offset+limit).iter()
-            .map(|entry| RestRichListEntry::from_rich_list_entry(entry, Self::network(&server.coin)))
+            .map(|entry| RestRichListEntry::from_rich_list_entry(entry, &server.coin_config()))
             .collect::<Vec<RestRichListEntry>>();
         Ok(Self::json(&addresses))
     }

@@ -2,6 +2,7 @@ use std::time::Instant;
 use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use tokio::sync::RwLock;
+//use bitcoin::{Address, Network};
 
 use super::*;
 
@@ -214,6 +215,17 @@ impl Syncer {
             if utxo.value <= 0 {
                 continue;
             }
+            /*
+            let address = Address::from_script(&utxo.script_pubkey, Network::Bitcoin);
+            // Ignore script pubkeys which cannot be represented as an address.
+            if address.is_none() {
+                continue;
+            }
+            // Ignore non-standard addresses.
+            if !address.unwrap().is_standard() {
+                continue;
+            }
+            */
             utxo_server_tx.send(utxo.clone()).await.unwrap();
             rich_list_tx.send(utxo).await.unwrap();
         }

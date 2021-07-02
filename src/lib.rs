@@ -2,7 +2,12 @@ use std::io::{Read, Write};
 use num_format::{Locale, ToFormattedStr, ToFormattedString};
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::consensus::{Encodable, Decodable};
-use bitcoin::{BlockHash, Block};
+use bitcoin::{BlockHash, Block, BlockHeader, Address, Script, Network};
+use bitcoin::util::uint::Uint256;
+use bitcoin::util::address::Payload;
+use bitcoin::util::base58;
+use bitcoin::bech32;
+use bitcoin::bech32::ToBase32;
 
 pub mod rocks_db;
 pub use rocks_db::*;
@@ -62,6 +67,9 @@ pub fn put_synced_height(coin: &str, height: u32) {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CoinConfig {
+    pub p2pkh_version: u8,
+    pub p2sh_version: u8,
+    pub segwit_hrp: String,
     pub rpc_endpoint: String,
     pub rpc_user: String,
     pub rpc_pass: String,
@@ -98,6 +106,43 @@ pub fn consensus_decode<D>(dec: &[u8]) -> D
     where D: Decodable,
 {
     D::consensus_decode(dec).unwrap()
+}
+
+fn address_to_string(addr: &Address, config: &CoinConfig) -> String {
+    match addr.payload {
+        Payload::PubkeyHash(ref hash) => {
+            let mut prefixed = [0; 21];
+            prefixed[0] = config.p2pkh_version;
+            prefixed[1..].copy_from_slice(&hash[..]);
+            base58::check_encode_slice(&prefixed[..])
+        }
+        Payload::ScriptHash(ref hash) => {
+            let mut prefixed = [0; 21];
+            prefixed[0] = config.p2sh_version;
+            prefixed[1..].copy_from_slice(&hash[..]);
+            base58::check_encode_slice(&prefixed[..])
+        }
+        Payload::WitnessProgram {
+            version: ver,
+            program: ref prog,
+        } => {
+            let vec = vec![vec![ver.to_u8()], prog.clone()].concat();
+            bech32::encode(&config.segwit_hrp, &vec.to_base32()).unwrap()
+        }
+    }
+}
+
+fn script_to_address_string(script: &Script, config: &CoinConfig) -> Option<String> {
+    let addr = Address::from_script(script, Network::Bitcoin /* any */);
+    match addr {
+        Some(addr) => Some(address_to_string(&addr, config)),
+        None => None,
+    }
+}
+
+fn get_difficulty(block_header: &BlockHeader, _config: &CoinConfig) -> u64 {
+    let max_target = Uint256::from_u64(0xFFFF).unwrap() << 208;
+    (max_target / block_header.target()).low_u64()
 }
 
 pub fn bytes_to_u16(buf: &[u8]) -> u16 {

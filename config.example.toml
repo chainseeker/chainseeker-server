@@ -1,6 +1,9 @@
 http_ip = "127.0.0.1"
 
 [coins.btc]
+p2pkh_version = 0
+p2sh_version = 5
+segwit_hrp = "bc"
 rpc_endpoint = "http://localhost:8332"
 rpc_user = "bitcoin"
 rpc_pass = "bitcoinrpc"
@@ -10,6 +13,9 @@ http_port = 6000
 ws_endpoint = "127.0.0.1:7000"
 
 [coins.tbtc]
+p2pkh_version = 111
+p2sh_version = 195
+segwit_hrp = "tb"
 rpc_endpoint = "http://localhost:18332"
 rpc_user = "bitcoin"
 rpc_pass = "bitcoinrpc"
@@ -19,6 +25,9 @@ http_port = 6001
 ws_endpoint = "127.0.0.1:7001"
 
 [coins.rbtc]
+p2pkh_version = 111
+p2sh_version = 195
+segwit_hrp = "bcrt"
 rpc_endpoint = "http://localhost:18443"
 rpc_user = "bitcoin"
 rpc_pass = "bitcoinrpc"
@@ -28,6 +37,9 @@ http_port = 6002
 ws_endpoint = "127.0.0.1:7002"
 
 [coins.sbtc]
+p2pkh_version = 111
+p2sh_version = 195
+segwit_hrp = "tb"
 rpc_endpoint = "http://localhost:38332"
 rpc_user = "bitcoin"
 rpc_pass = "bitcoinrpc"
