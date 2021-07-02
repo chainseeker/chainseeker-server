@@ -276,9 +276,18 @@ impl Syncer {
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
         println!("Waiting for a ZeroMQ message...");
+        let mut last_sync = Instant::now();
         loop {
             if *self.stop.read().await {
                 break;
+            }
+            // If we do not receive any block for some time (by missing ZMQ connection?), try to sync.
+            const FORCE_SYNCE_THRESHOLD_SECS: u64 = 60;
+            if last_sync.elapsed().as_secs() > FORCE_SYNCE_THRESHOLD_SECS {
+                println!("No block received for {} secs, try syncing...", FORCE_SYNCE_THRESHOLD_SECS);
+                self.sync(false).await;
+                last_sync = Instant::now();
+                continue;
             }
             let multipart = socket.recv_multipart(1);
             if multipart.is_err() {
