@@ -8,7 +8,7 @@ use super::*;
 
 pub struct Syncer {
     coin: String,
-    config: CoinConfig,
+    config: Config,
     utxo_db: UtxoDB,
     rest: bitcoin_rest::Context,
     stop: Arc<RwLock<bool>>,
@@ -16,7 +16,7 @@ pub struct Syncer {
 }
 
 impl Syncer {
-    pub async fn new(coin: &str, config: &CoinConfig) -> Self {
+    pub async fn new(coin: &str, config: &Config) -> Self {
         let rest = get_rest(config);
         let syncer = Self {
             coin: coin.to_string(),

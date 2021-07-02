@@ -44,7 +44,7 @@ pub struct RestVin {
 }
 
 impl RestVin {
-    pub fn new(txin: &TxIn, previous_txout: &Option<TxOut>, config: &CoinConfig) -> Self {
+    pub fn new(txin: &TxIn, previous_txout: &Option<TxOut>, config: &Config) -> Self {
         Self {
             txid: txin.previous_output.txid.to_string(),
             vout: txin.previous_output.vout,
@@ -72,7 +72,7 @@ pub struct RestScriptPubKey {
 }
 
 impl RestScriptPubKey {
-    pub fn new(script_pubkey: &Script, config: &CoinConfig) -> Self {
+    pub fn new(script_pubkey: &Script, config: &Config) -> Self {
         let address = Address::from_script(&script_pubkey, Network::Bitcoin /* any */);
         let address_str = script_to_address_string(&script_pubkey, config);
         Self {
@@ -104,7 +104,7 @@ pub struct RestVout {
 }
 
 impl RestVout {
-    pub fn new(txout: &TxOut, n: usize, config: &CoinConfig) -> Self {
+    pub fn new(txout: &TxOut, n: usize, config: &Config) -> Self {
         Self {
             value: txout.value,
             n,
@@ -132,7 +132,7 @@ pub struct RestTx {
 }
 
 impl RestTx {
-    pub fn from_tx_db_value(value: &TxDBValue, config: &CoinConfig) -> Self {
+    pub fn from_tx_db_value(value: &TxDBValue, config: &Config) -> Self {
         let tx = &value.tx;
         let mut input_value = 0;
         let mut vin = Vec::new();
@@ -186,7 +186,7 @@ pub struct RestBlockHeader {
 }
 
 impl RestBlockHeader {
-    pub fn from_block_content(block_content: &BlockContentDBValue, config: &CoinConfig) -> Self {
+    pub fn from_block_content(block_content: &BlockContentDBValue, config: &Config) -> Self {
         let block_header = &block_content.block_header;
         let mut hash = consensus_encode(&block_header.block_hash());
         hash.reverse();
@@ -232,7 +232,7 @@ pub struct RestBlockWithTxids {
 }
 
 impl RestBlockWithTxids {
-    pub fn from_block_content(block_content: &BlockContentDBValue, config: &CoinConfig) -> Self {
+    pub fn from_block_content(block_content: &BlockContentDBValue, config: &Config) -> Self {
         let rest_block_header = RestBlockHeader::from_block_content(block_content, config);
         Self {
             height           : rest_block_header.height,
@@ -272,7 +272,7 @@ pub struct RestBlockWithTxs {
 }
 
 impl RestBlockWithTxs {
-    pub fn from_block_content(tx_db: &TxDB, block_content: &BlockContentDBValue, config: &CoinConfig) -> Self {
+    pub fn from_block_content(tx_db: &TxDB, block_content: &BlockContentDBValue, config: &Config) -> Self {
         let rest_block_header = RestBlockHeader::from_block_content(block_content, config);
         let txs = block_content.txids.iter().map(|txid| {
             let tx = tx_db.get(txid).unwrap();
@@ -305,7 +305,7 @@ pub struct RestRichListEntry {
 }
 
 impl RestRichListEntry {
-    pub fn from_rich_list_entry(entry: &RichListEntry, config: &CoinConfig) -> Self {
+    pub fn from_rich_list_entry(entry: &RichListEntry, config: &Config) -> Self {
         let script_pub_key = RestScriptPubKey::new(&entry.script_pubkey, config);
         Self {
             script_pub_key,
@@ -342,7 +342,7 @@ impl RestBlockSummary {
 #[derive(Debug, Clone)]
 pub struct HttpServer {
     coin: String,
-    config: CoinConfig,
+    config: Config,
     // (height, RestBlockSummary)
     block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
     pub block_db: Arc<RwLock<BlockDB>>,
@@ -353,7 +353,7 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(coin: &str, config: &CoinConfig) -> Self {
+    pub fn new(coin: &str, config: &Config) -> Self {
         Self{
             coin: coin.to_string(),
             config: (*config).clone(),

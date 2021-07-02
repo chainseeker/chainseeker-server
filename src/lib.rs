@@ -39,7 +39,7 @@ pub fn data_dir() -> String {
     format!("{}/{}", home, DEFAULT_DATA_DIR)
 }
 
-pub fn get_rest(config: &CoinConfig) -> bitcoin_rest::Context {
+pub fn get_rest(config: &Config) -> bitcoin_rest::Context {
     bitcoin_rest::new(&config.rest_endpoint)
 }
 
@@ -66,7 +66,7 @@ pub fn put_synced_height(coin: &str, height: u32) {
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct CoinConfig {
+pub struct Config {
     pub p2pkh_version: u8,
     pub p2sh_version : u8,
     pub segwit_hrp   : String,
@@ -111,7 +111,7 @@ struct TomlConfig {
     coins        : std::collections::HashMap<String, TomlConfigEntry>,
 }
 
-pub fn load_config(coin: &str) -> CoinConfig {
+pub fn load_config(coin: &str) -> Config {
     let config_path = format!("{}/config.toml", data_dir());
     let mut config_file = std::fs::File::open(&config_path)
         .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
@@ -123,7 +123,7 @@ pub fn load_config(coin: &str) -> CoinConfig {
         panic!("Cannot find the specified coin in your config.");
     }
     let coin_config = coin_config.unwrap();
-    CoinConfig {
+    Config {
         p2pkh_version: coin_config.p2pkh_version.unwrap_or(config.p2pkh_version.unwrap_or(0)),
         p2sh_version : coin_config.p2sh_version .unwrap_or(config.p2sh_version .unwrap_or(5)),
         segwit_hrp   : coin_config.segwit_hrp   .unwrap_or(config.segwit_hrp   .unwrap_or("bc".to_string())),
@@ -152,7 +152,7 @@ pub fn consensus_decode<D>(dec: &[u8]) -> D
     D::consensus_decode(dec).unwrap()
 }
 
-fn address_to_string(addr: &Address, config: &CoinConfig) -> String {
+fn address_to_string(addr: &Address, config: &Config) -> String {
     match addr.payload {
         Payload::PubkeyHash(ref hash) => {
             let mut prefixed = [0; 21];
@@ -176,7 +176,7 @@ fn address_to_string(addr: &Address, config: &CoinConfig) -> String {
     }
 }
 
-pub fn script_to_address_string(script: &Script, config: &CoinConfig) -> Option<String> {
+pub fn script_to_address_string(script: &Script, config: &Config) -> Option<String> {
     let addr = Address::from_script(script, Network::Bitcoin /* any */);
     match addr {
         Some(addr) => Some(address_to_string(&addr, config)),
@@ -193,7 +193,7 @@ pub fn uint256_as_f64(num: &Uint256) -> f64 {
     ret
 }
 
-pub fn get_difficulty(block_header: &BlockHeader, _config: &CoinConfig) -> f64 {
+pub fn get_difficulty(block_header: &BlockHeader, _config: &Config) -> f64 {
     let max_target = Uint256::from_u64(0xFFFF).unwrap() << 208;
     uint256_as_f64(&max_target) / uint256_as_f64(&block_header.target())
 }
