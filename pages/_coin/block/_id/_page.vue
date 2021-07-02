@@ -3,7 +3,7 @@
 		<h1>Block <small>#{{ block.height.toLocaleString() }}</small></h1>
 		<div class="text-center">
 			<v-pagination total-visible=10 :value="block.height" :length="status.blocks"
-				v-on:input="(height) => $router.push('/block/' + height)" />
+				v-on:input="(height) => $router.push(`/${coin}/block/${height}`)" />
 		</div>
 		<div class="my-8">
 			<v-row>
