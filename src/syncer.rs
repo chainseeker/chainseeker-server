@@ -8,7 +8,7 @@ use super::*;
 
 pub struct Syncer {
     coin: String,
-    config: Config,
+    config: CoinConfig,
     utxo_db: UtxoDB,
     rest: bitcoin_rest::Context,
     stop: Arc<RwLock<bool>>,
@@ -16,8 +16,8 @@ pub struct Syncer {
 }
 
 impl Syncer {
-    pub async fn new(coin: &str, config: &Config) -> Self {
-        let rest = get_rest(&config.coins[coin]);
+    pub async fn new(coin: &str, config: &CoinConfig) -> Self {
+        let rest = get_rest(config);
         let syncer = Self {
             coin: coin.to_string(),
             config: (*config).clone(),
@@ -36,9 +36,6 @@ impl Syncer {
     }
     pub async fn is_stopped(&self) -> bool {
         *self.stop.read().await
-    }
-    fn coin_config(&self) -> &CoinConfig {
-        &self.config.coins[&self.coin]
     }
     async fn shrink_to_fit(&mut self) {
         self.http_server.utxo_server.write().await.shrink_to_fit();
@@ -275,8 +272,7 @@ impl Syncer {
         // Subscribe to ZeroMQ.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
-        let coin_config = self.coin_config();
-        socket.connect(&coin_config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
+        socket.connect(&self.config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
         println!("Waiting for a ZeroMQ message...");

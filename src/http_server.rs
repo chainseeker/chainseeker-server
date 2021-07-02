@@ -342,7 +342,7 @@ impl RestBlockSummary {
 #[derive(Debug, Clone)]
 pub struct HttpServer {
     coin: String,
-    config: Config,
+    config: CoinConfig,
     // (height, RestBlockSummary)
     block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
     pub block_db: Arc<RwLock<BlockDB>>,
@@ -353,7 +353,7 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(coin: &str, config: &Config) -> Self {
+    pub fn new(coin: &str, config: &CoinConfig) -> Self {
         Self{
             coin: coin.to_string(),
             config: (*config).clone(),
@@ -397,9 +397,6 @@ impl HttpServer {
             Err(_) => Self::internal_error("Failed to encode to JSON."),
         }
     }
-    fn coin_config(&self) -> &CoinConfig {
-        &self.config.coins[&self.coin]
-    }
     /// `/status` endpoint.
     async fn status_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
@@ -416,16 +413,15 @@ impl HttpServer {
             Err(_) => return Ok(Self::not_found("Failed to decode txid.")),
         };
         match server.tx_db.read().await.get(&txid) {
-            Some(value) => Ok(Self::json(RestTx::from_tx_db_value(&value, &server.coin_config()))),
+            Some(value) => Ok(Self::json(RestTx::from_tx_db_value(&value, &server.config))),
             None => Ok(Self::not_found("Transaction not found.")),
         }
     }
     /// `/tx/broadcast` endpoint.
     async fn tx_broadcast_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        let coin_config = &server.config.coins[&server.coin];
-        let auth = Auth::UserPass(coin_config.rpc_user.clone(), coin_config.rpc_pass.clone());
-        let rpc = Client::new(coin_config.rpc_endpoint.clone(), auth).unwrap();
+        let auth = Auth::UserPass(server.config.rpc_user.clone(), server.config.rpc_pass.clone());
+        let rpc = Client::new(server.config.rpc_endpoint.clone(), auth).unwrap();
         let hex = hyper::body::to_bytes(req.into_body()).await.unwrap();
         let hex = String::from_utf8(hex.to_vec());
         if hex.is_err() {
@@ -499,7 +495,7 @@ impl HttpServer {
     async fn block_with_txids_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockWithTxids::from_block_content(&block_content, &server.coin_config()))),
+            Ok(block_content) => Ok(Self::json(RestBlockWithTxids::from_block_content(&block_content, &server.config))),
             Err(res) => Ok(res),
         }
     }
@@ -508,7 +504,7 @@ impl HttpServer {
         let server = req.data::<HttpServer>().unwrap();
         let tx_db = server.tx_db.read().await;
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockWithTxs::from_block_content(&tx_db, &block_content, &server.coin_config()))),
+            Ok(block_content) => Ok(Self::json(RestBlockWithTxs::from_block_content(&tx_db, &block_content, &server.config))),
             Err(res) => Ok(res),
         }
     }
@@ -516,7 +512,7 @@ impl HttpServer {
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockHeader::from_block_content(&block_content, &server.coin_config()))),
+            Ok(block_content) => Ok(Self::json(RestBlockHeader::from_block_content(&block_content, &server.config))),
             Err(res) => Ok(res),
         }
     }
@@ -555,7 +551,7 @@ impl HttpServer {
         let txs = txids.iter().map(|txid| {
             let tx_db_value = tx_db.get(txid);
             match tx_db_value {
-                Some(v) => Some(RestTx::from_tx_db_value(&v, &server.coin_config())),
+                Some(v) => Some(RestTx::from_tx_db_value(&v, &server.config)),
                 None => {
                     txids_not_found.push(txid);
                     None
@@ -597,7 +593,7 @@ impl HttpServer {
         let server = req.data::<HttpServer>().unwrap();
         let rich_list = server.rich_list.read().await;
         let addresses = rich_list.get_in_range(offset..offset+limit).iter()
-            .map(|entry| RestRichListEntry::from_rich_list_entry(entry, &server.coin_config()))
+            .map(|entry| RestRichListEntry::from_rich_list_entry(entry, &server.config))
             .collect::<Vec<RestRichListEntry>>();
         Ok(Self::json(&addresses))
     }

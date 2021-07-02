@@ -13,7 +13,7 @@ async fn main() {
     let config = load_config();
     let coin_config = &config.coins[&coin];
     // Create Syncer instance.
-    let mut syncer = Syncer::new(&coin, &config).await;
+    let mut syncer = Syncer::new(&coin, &coin_config).await;
     let mut handles = Vec::new();
     // Run HTTP server.
     {
