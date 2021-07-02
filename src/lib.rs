@@ -68,21 +68,47 @@ pub fn put_synced_height(coin: &str, height: u32) {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CoinConfig {
     pub p2pkh_version: u8,
-    pub p2sh_version: u8,
-    pub segwit_hrp: String,
-    pub rpc_endpoint: String,
-    pub rpc_user: String,
-    pub rpc_pass: String,
+    pub p2sh_version : u8,
+    pub segwit_hrp   : String,
+    pub rpc_endpoint : String,
+    pub rpc_user     : String,
+    pub rpc_pass     : String,
     pub rest_endpoint: String,
-    pub zmq_endpoint: String,
-    pub http_ip: String,
-    pub http_port: u16,
-    pub ws_endpoint: String,
+    pub zmq_endpoint : String,
+    pub http_ip      : String,
+    pub http_port    : u16,
+    pub ws_endpoint  : String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct Config {
-    pub coins: std::collections::HashMap<String, CoinConfig>,
+struct TomlConfigEntry {
+    p2pkh_version: Option<u8>,
+    p2sh_version : Option<u8>,
+    segwit_hrp   : Option<String>,
+    rpc_endpoint : Option<String>,
+    rpc_user     : Option<String>,
+    rpc_pass     : Option<String>,
+    rest_endpoint: Option<String>,
+    zmq_endpoint : Option<String>,
+    http_ip      : Option<String>,
+    http_port    : Option<u16>,
+    ws_endpoint  : Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct TomlConfig {
+    p2pkh_version: Option<u8>,
+    p2sh_version : Option<u8>,
+    segwit_hrp   : Option<String>,
+    rpc_endpoint : Option<String>,
+    rpc_user     : Option<String>,
+    rpc_pass     : Option<String>,
+    rest_endpoint: Option<String>,
+    zmq_endpoint : Option<String>,
+    http_ip      : Option<String>,
+    http_port    : Option<u16>,
+    ws_endpoint  : Option<String>,
+    coins        : std::collections::HashMap<String, TomlConfigEntry>,
 }
 
 pub fn load_config(coin: &str) -> CoinConfig {
@@ -91,10 +117,24 @@ pub fn load_config(coin: &str) -> CoinConfig {
         .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
     let mut config_str = String::new();
     config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
-    let mut config: Config = toml::from_str(&config_str).expect("Failed to parse config file.");
-    match config.coins.remove(coin) {
-        Some(coin_config) => coin_config,
-        None => panic!("Cannot find the specified coin in your config."),
+    let mut config: TomlConfig = toml::from_str(&config_str).expect("Failed to parse config file.");
+    let coin_config = config.coins.remove(coin);
+    if coin_config.is_none() {
+        panic!("Cannot find the specified coin in your config.");
+    }
+    let coin_config = coin_config.unwrap();
+    CoinConfig {
+        p2pkh_version: coin_config.p2pkh_version.unwrap_or(config.p2pkh_version.unwrap_or(0)),
+        p2sh_version : coin_config.p2sh_version .unwrap_or(config.p2sh_version .unwrap_or(5)),
+        segwit_hrp   : coin_config.segwit_hrp   .unwrap_or(config.segwit_hrp   .unwrap_or("bc".to_string())),
+        rpc_endpoint : coin_config.rpc_endpoint .unwrap_or(config.rpc_endpoint .unwrap_or("http://localhost:8332".to_string())),
+        rpc_user     : coin_config.rpc_user     .unwrap_or(config.rpc_user     .unwrap_or("bitcoin".to_string())),
+        rpc_pass     : coin_config.rpc_pass     .unwrap_or(config.rpc_pass     .unwrap_or("bitcoinrpc".to_string())),
+        rest_endpoint: coin_config.rest_endpoint.unwrap_or(config.rest_endpoint.unwrap_or("http://localhost:8332/rest/".to_string())),
+        zmq_endpoint : coin_config.zmq_endpoint .unwrap_or(config.zmq_endpoint .unwrap_or("tcp://localhost:28332".to_string())),
+        http_ip      : coin_config.http_ip      .unwrap_or(config.http_ip      .unwrap_or("127.0.0.1".to_string())),
+        http_port    : coin_config.http_port    .unwrap_or(config.http_port    .unwrap_or(8000)),
+        ws_endpoint  : coin_config.ws_endpoint  .unwrap_or(config.ws_endpoint  .unwrap_or("127.0.0.1:8001".to_string())),
     }
 }
 

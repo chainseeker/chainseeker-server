@@ -63,8 +63,8 @@ export default {
 					symbol: "lBTC",
 					satoshi: "satoshi",
 				},
-				apiEndpoint: 'http://localhost:6001/api',
-				wsEndpoint: 'ws://localhost:7001',
+				apiEndpoint: 'http://localhost:8000/api',
+				wsEndpoint: 'ws://localhost:8001',
 			},
 		}
 	},
