@@ -132,7 +132,7 @@ fn address_to_string(addr: &Address, config: &CoinConfig) -> String {
     }
 }
 
-fn script_to_address_string(script: &Script, config: &CoinConfig) -> Option<String> {
+pub fn script_to_address_string(script: &Script, config: &CoinConfig) -> Option<String> {
     let addr = Address::from_script(script, Network::Bitcoin /* any */);
     match addr {
         Some(addr) => Some(address_to_string(&addr, config)),
@@ -140,9 +140,18 @@ fn script_to_address_string(script: &Script, config: &CoinConfig) -> Option<Stri
     }
 }
 
-fn get_difficulty(block_header: &BlockHeader, _config: &CoinConfig) -> u64 {
+pub fn uint256_as_f64(num: &Uint256) -> f64 {
+    let be = num.to_be_bytes();
+    let mut ret = 0f64;
+    for i in 0..32 {
+        ret += (be[31 - i] as f64) * 2f64.powi(8 * i as i32);
+    }
+    ret
+}
+
+pub fn get_difficulty(block_header: &BlockHeader, _config: &CoinConfig) -> f64 {
     let max_target = Uint256::from_u64(0xFFFF).unwrap() << 208;
-    (max_target / block_header.target()).low_u64()
+    uint256_as_f64(&max_target) / uint256_as_f64(&block_header.target())
 }
 
 pub fn bytes_to_u16(buf: &[u8]) -> u16 {
@@ -240,6 +249,10 @@ pub fn to_locale_string<T>(num: T) -> String
 #[cfg(test)]
 mod test {
     use super::*;
+    #[test]
+    fn uint256_as_f64_12345() {
+        assert_eq!(uint256_as_f64(&Uint256::from_u64(12345).unwrap()), 12345f64);
+    }
     #[test]
     fn synced_height() {
         put_synced_height("test", 123456);
