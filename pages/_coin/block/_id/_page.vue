@@ -5,84 +5,191 @@
 			<v-pagination total-visible=10 :value="block.height" :length="status.blocks"
 				v-on:input="(height) => $router.push('/block/' + height)" />
 		</div>
-		<v-simple-table>
-			<template v-slot:default>
-				<tbody>
+		<div class="my-8">
+			<v-row>
+				<v-col md=2><strong>Block ID</strong></v-col>
+				<v-col md=10>
 					<v-tooltip bottom>
 						<template v-slot:activator="{ on, attrs }">
-							<tr v-bind="attrs" v-on="on">
-								<th>Block ID</th>
-								<td colspan="3">{{ block.hash }}</td>
-							</tr>
+							<span v-bind="attrs" v-on="on">
+								{{ block.hash }}
+							</span>
 						</template>
 						<span>The hash of the block header (reversed).</span>
 					</v-tooltip>
+				</v-col>
+			</v-row>
+			<v-row>
+				<v-col md=2><strong>Previous Block ID</strong></v-col>
+				<v-col md=10>
 					<v-tooltip bottom>
 						<template v-slot:activator="{ on, attrs }">
-							<tr v-bind="attrs" v-on="on">
-								<th>Previous Block ID</th>
-								<td colspan="3"><NuxtLink :to="`./${block.previousblockhash}`">{{ block.previousblockhash }}</NuxtLink></td>
-							</tr>
+							<span v-bind="attrs" v-on="on">
+								<NuxtLink :to="`./${block.previousblockhash}`">{{ block.previousblockhash }}</NuxtLink>
+							</span>
 						</template>
 						<span>The hash of the previous block mined.</span>
 					</v-tooltip>
+				</v-col>
+			</v-row>
+			<v-row>
+				<v-col md=2><strong>Merkle Root</strong></v-col>
+				<v-col md=10>
 					<v-tooltip bottom>
 						<template v-slot:activator="{ on, attrs }">
-							<tr v-bind="attrs" v-on="on">
-								<th>Merkle Root</th>
-								<td colspan="3">{{ block.merkleroot }}</td>
-							</tr>
+							<span v-bind="attrs" v-on="on">
+								{{ block.merkleroot }}
+							</span>
 						</template>
 						<span>Merkle root of the transactions included in this block.</span>
 					</v-tooltip>
-					<tr>
-						<th>Time</th>
-						<td>{{ new Date(1000 * block.time).toLocaleString() }}</td>
-						<th>Version</th>
-						<td>{{ block.version }} (0x{{ block.version.toString(16).padStart(8, '0') }})</td>
-					</tr>
-					<tr>
-						<th>Bits</th>
-						<td>{{ block.bits }}</td>
-						<th>Difficulty</th>
-						<td>{{ block.difficulty }}</td>
-					</tr>
-					<tr>
-						<th>Nonce</th>
-						<td colspan="3">{{ block.nonce }} (0x{{ block.nonce.toString(16).padStart(8, '0') }})</td>
-					</tr>
+				</v-col>
+			</v-row>
+			<v-row>
+				<v-col md=2><strong>Time</strong></v-col>
+				<v-col md=4>
 					<v-tooltip bottom>
 						<template v-slot:activator="{ on, attrs }">
-							<tr v-bind="attrs" v-on="on">
-								<th>Size</th>
-								<td colspan="3">{{ block.size.toLocaleString() }} bytes</td>
-							</tr>
+							<span v-bind="attrs" v-on="on">
+								{{ new Date(1000 * block.time).toLocaleString() }}
+							</span>
+						</template>
+						<span>The time of this block mined.</span>
+					</v-tooltip>
+				</v-col>
+				<v-col md=2><strong>Version</strong></v-col>
+				<v-col md=4>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								{{ block.version }} (0x{{ block.version.toString(16).padStart(8, '0') }})
+							</span>
+						</template>
+						<span>The version bitmap.</span>
+					</v-tooltip>
+				</v-col>
+			</v-row>
+			<v-row>
+				<v-col md=2><strong>Bits</strong></v-col>
+				<v-col md=4>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								{{ block.bits }}
+							</span>
+						</template>
+						<span>The difficulty bits.</span>
+					</v-tooltip>
+				</v-col>
+				<v-col md=2><strong>Difficulty</strong></v-col>
+				<v-col md=4>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								{{ block.difficulty }}
+							</span>
+						</template>
+						<span>The difficulty target.</span>
+					</v-tooltip>
+				</v-col>
+			</v-row>
+			<v-row>
+				<v-col md=2><strong>Nonce</strong></v-col>
+				<v-col md=4>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								{{ block.nonce }} (0x{{ block.nonce.toString(16).padStart(8, '0') }})
+							</span>
+						</template>
+						<span>Nonce</span>
+					</v-tooltip>
+				</v-col>
+				<v-col md=2><strong>#transactions</strong></v-col>
+				<v-col md=4>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								{{ block.txids.length.toLocaleString() }}
+							</span>
+						</template>
+						<span>The number of transactions included in the block.</span>
+					</v-tooltip>
+				</v-col>
+			</v-row>
+			<v-row>
+				<v-col md=2><strong>Size</strong></v-col>
+				<v-col md=2>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								{{ block.size.toLocaleString() }} bytes
+							</span>
 						</template>
 						<span>The size of the block (includes witness data).</span>
 					</v-tooltip>
-					<tr>
-						<th>Stripped Size</th>
-						<td>{{ block.strippedsize.toLocaleString() }} bytes</td>
-						<th>Weight</th>
-						<td>{{ block.weight.toLocaleString() }} WU</td>
-					</tr>
-					<tr>
-						<th>#transactions</th>
-						<td colspan="3">{{ block.txids.length.toLocaleString() }}</td>
-					</tr>
-					<tr>
-						<th>Block Reward</th>
-						<td><Amount :value="coinbase.vout[0].value" /></td>
-						<th>Generated Coins</th>
-						<td><Amount :value="generatedAmount" /></td>
-					</tr>
-					<tr>
-						<th>Transaction Fee in Total</th>
-						<td><Amount :value="fee" /></td>
-					</tr>
-				</tbody>
-			</template>
-		</v-simple-table>
+				</v-col>
+				<v-col md=2><strong>Stripped Size</strong></v-col>
+				<v-col md=2>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								{{ block.strippedsize.toLocaleString() }} bytes
+							</span>
+						</template>
+						<span>The size of the block (exclude witness data).</span>
+					</v-tooltip>
+				</v-col>
+				<v-col md=2><strong>Weight</strong></v-col>
+				<v-col md=2>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								{{ block.weight.toLocaleString() }} WU
+							</span>
+						</template>
+						<span>The block weight (4 * non-witness data + witness data).</span>
+					</v-tooltip>
+				</v-col>
+			</v-row>
+			<v-row>
+				<v-col md=2><strong>Block Reward</strong></v-col>
+				<v-col md=4>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								<Amount :value="coinbase.vout[0].value" />
+							</span>
+						</template>
+						<span>Total claimed block reward.</span>
+					</v-tooltip>
+				</v-col>
+				<v-col md=2><strong>Generated Coins</strong></v-col>
+				<v-col md=4>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								<Amount :value="generatedAmount" />
+							</span>
+						</template>
+						<span>Newly generated coins in the block.</span>
+					</v-tooltip>
+				</v-col>
+			</v-row>
+			<v-row>
+				<v-col md=2><strong>Transaction Fee in Total</strong></v-col>
+				<v-col md=10>
+					<v-tooltip bottom>
+						<template v-slot:activator="{ on, attrs }">
+							<span v-bind="attrs" v-on="on">
+								<Amount :value="fee" />
+							</span>
+						</template>
+						<span>The total transaction fee.</span>
+					</v-tooltip>
+				</v-col>
+			</v-row>
+		</div>
 		<API :path="`block/${block.hash}`" />
 		<h2>Transactions in this Block</h2>
 		<div class="text-center">
