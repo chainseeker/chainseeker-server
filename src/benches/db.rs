@@ -69,9 +69,9 @@ fn bench_db(c: &mut Criterion) {
     }
     c.bench_function("RichList", |b| b.iter(|| {
         let _print_gag = gag::Gag::stdout().unwrap();
-        let mut rich_list_builder = RichListBuilder::new();
-        rich_list_builder.process_block(&block, &previous_utxos);
-        let _rich_list = rich_list_builder.finalize();
+        let mut rich_list = RichList::new();
+        rich_list.process_block(&block, &previous_utxos);
+        rich_list.finalize();
     }));
     let addr_index_db = AddressIndexDB::new(COIN, true);
     c.bench_function("AddressIndexDB", |b| b.iter(|| {

@@ -179,7 +179,7 @@ impl Syncer {
     async fn load_utxo(&mut self) {
         let begin = Instant::now();
         let print_stat = |i: u32, force: bool| {
-            if i % 1000 == 0 || force {
+            if i % 100_000 == 0 || force {
                 print!("\rLoading UTXOs ({} entries processed)...", to_locale_string(i));
                 flush_stdout();
             }
