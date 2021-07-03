@@ -11,11 +11,11 @@
 					<v-card-text>
 						<div>
 							<NuxtLink :to="coin">
-								<img :src="status[coin].icon" :alt="`${coinConfig.coin.name} icon`" width="100%" />
+								<img :src="icons[coin]" :alt="`${coinConfig.coin.name} icon`" width="100%" />
 							</NuxtLink>
 						</div>
 						<div class="mt-4">
-							<template v-if="status[coin].blocks">
+							<template v-if="status[coin]">
 								<p>Synced height: {{ status[coin].blocks.toLocaleString() }}</p>
 								<p>
 									<v-badge :color="Date.now() - 1000 * status[coin].lastBlock.time < 60 * 60 * 1000 ? 'green' : 'red'" inline>
@@ -47,7 +47,6 @@ const MAX_LATEST_BLOCKS = 5;
 const MAX_LATEST_TXS = 5;
 
 interface CoinStatus {
-	icon: any,
 	blocks: number,
 	lastBlock: cs.BlockHeader,
 }
@@ -56,28 +55,27 @@ interface CoinStatus {
 	layout: 'base',
 })
 export default class Home extends Vue {
+	icons: { [key: string]: any } = {};
 	status: { [key: string]: CoinStatus } = {};
 	async asyncData({ params, error, $config }: Context) {
+		const icons: { [key: string]: any } = {};
 		const status: { [key: string]: CoinStatus } = {};
 		for(const coin in $config.coins) {
 			if(coin === 'local') continue;
-			const icon = require(`~/assets/img/coins/${coin}.png`);
+			icons[coin] = require(`~/assets/img/coins/${coin}.png`);
 			const cs = new Chainseeker($config.coins[coin].apiEndpoint);
 			try {
 				const { blocks } = await cs.getStatus();
 				const lastBlock = await cs.getBlockHeader(blocks);
 				status[coin] = {
-					icon,
 					blocks,
 					lastBlock,
 				};
 			} catch(e) {
-				status[coin] = {
-					icon,
-				};
 			}
 		}
 		return {
+			icons,
 			status,
 		};
 	}
