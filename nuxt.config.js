@@ -78,6 +78,19 @@ export default {
 				apiEndpoint: 'https://sbtc-v3.chainseeker.info/api',
 				wsEndpoint: 'wss://sbtc-v3.chainseeker.info/ws',
 			},
+			mona: {
+				coin: {
+					name: "Monacoin",
+					symbol: "MONA",
+					satoshi: "watanabe",
+					blockReward: {
+						initial: 5000000000,
+						halving: 1051200
+					},
+				},
+				apiEndpoint: 'https://mona-v3.chainseeker.info/api',
+				wsEndpoint: 'wss://mona-v3.chainseeker.info/ws',
+			},
 			local: {
 				coin: {
 					name: "Bitcoin (Local)",
