@@ -6,7 +6,7 @@
 		</h1>
 		<div class="text-center">
 			<v-pagination total-visible=10 :value="page + 1" :length="Math.ceil(richListCount / PER_PAGE)"
-				v-on:input="(page) => $router.push('/rich_list/' + (+page - 1))" />
+				v-on:input="(page) => $router.push(`/${$route.params.coin}/rich_list/${(+page - 1)}`)" />
 		</div>
 		<v-simple-table>
 			<template v-slot:default>

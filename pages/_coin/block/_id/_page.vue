@@ -3,7 +3,7 @@
 		<h1>Block <small>#{{ block.height.toLocaleString() }}</small></h1>
 		<div class="text-center">
 			<v-pagination total-visible=10 :value="block.height" :length="status.blocks"
-				v-on:input="(height) => $router.push(`/${coin}/block/${height}`)" />
+				v-on:input="(height) => $router.push(`/${$route.params.coin}/block/${height}`)" />
 		</div>
 		<div class="my-8">
 			<v-row>
@@ -194,7 +194,7 @@
 		<h2>Transactions in this Block</h2>
 		<div class="text-center">
 			<v-pagination total-visible=10 :value="page + 1" :length="Math.ceil(block.txids.length / TXS_PER_PAGE)"
-				v-on:input="(page) => $router.push(`/${coin}/block/${block.height}/${page - 1}`)" />
+				v-on:input="(page) => $router.push(`/${$route.params.coin}/block/${block.height}/${page - 1}`)" />
 		</div>
 		<div v-for="(tx, n) in txs" class="my-4">
 			<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
@@ -220,7 +220,6 @@ const TXS_PER_PAGE = 10;
 @Component
 export default class Home extends Vue {
 	TXS_PER_PAGE: number = TXS_PER_PAGE;
-	coin?: string;
 	page?: number;
 	status?: cs.Status;
 	block?: cs.BlockWithTxids;
@@ -232,7 +231,6 @@ export default class Home extends Vue {
 		return { title: `Block ${this.block!.hash!} - chainseeker` };
 	}
 	async asyncData({ params, error, $config }: Context) {
-		const coin = params.coin;
 		const page = params.page ? Number.parseInt(params.page) : 0;
 		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		const status = await cs.getStatus();
@@ -259,7 +257,6 @@ export default class Home extends Vue {
 			// Compute fee.
 			const fee = coinbase.vout[0].value - generatedAmount;
 			return {
-				coin,
 				page,
 				status,
 				block,
