@@ -61,6 +61,12 @@
 						<template v-slot:item.value="{ item }">
 							<Amount :value="item.value" />
 						</template>
+						<template v-slot:body.append>
+							<tr>
+								<th colspan="2" class="text-right">Total</th>
+								<th><Amount :value="utxos.reduce((acc, utxo) => acc + utxo.value, 0)" /></th>
+							</tr>
+						</template>
 					</v-data-table>
 				</v-tab-item>
 			</v-tabs-items>
