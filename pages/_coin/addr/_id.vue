@@ -32,7 +32,9 @@
 					</v-data-table>
 				</v-tab-item>
 				<v-tab-item key="txs">
-					<div v-for="tx in txs" class="my-4">
+					<v-pagination total-visible=10 :value="txsPage + 1" :length="Math.ceil(txids.length / TXS_PER_PAGE)"
+						v-on:input="(page) => { txsPage = page - 1; fetchTxs(); }" />
+					<div v-for="tx in txs" :key="tx.txid" class="my-4">
 						<v-row style="border-bottom: 1px solid gray; border-left: 5px solid #ccc;">
 							<v-col><strong><NuxtLink :to="`../tx/${tx.txid}`">{{ tx.txid }}</NuxtLink></strong></v-col>
 							<v-col v-if="tx.confirmedHeight >= 0" class="text-right">
@@ -72,11 +74,16 @@ import { Vue, Component } from 'nuxt-property-decorator';
 import { Chainseeker } from 'chainseeker';
 import * as cs from 'chainseeker/dist/types';
 
+const TXS_PER_PAGE = 10;
+
 @Component
 export default class Home extends Vue {
+	TXS_PER_PAGE: number = TXS_PER_PAGE;
 	address: string | null = null;
 	status: cs.Status | null = null;
 	txids: { txid: string }[] | null = null;
+	txsPage: number = 0;
+	txsBuffer: cs.Transaction[] = [];
 	txs: cs.Transaction[] = [];
 	utxos: cs.Utxo[]  = [];
 	tab: string | null = null;
@@ -106,6 +113,9 @@ export default class Home extends Vue {
 				address,
 				status,
 				txids,
+				txsPage: 0,
+				txsBuffer: [],
+				txs: [],
 				utxos,
 			};
 		} catch(e) {
@@ -114,7 +124,14 @@ export default class Home extends Vue {
 	}
 	async fetchTxs() {
 		const cs = new Chainseeker(this.$config.coinConfig.apiEndpoint);
-		this.txs = await cs.getTxs(this.address!);
+		this.txs = [];
+		for(let i=this.txsPage*TXS_PER_PAGE; i<Math.min(this.txids!.length, (this.txsPage+1)*TXS_PER_PAGE); i++) {
+			if(this.txsBuffer[i]) {
+				this.txs.push(this.txsBuffer[i]);
+			} else {
+				this.txs.push(this.txsBuffer[i] = await cs.getTransaction(this.txids![i].txid));
+			}
+		}
 	}
 }
 </script>
