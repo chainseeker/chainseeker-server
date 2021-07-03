@@ -65,6 +65,19 @@ export default {
 				apiEndpoint: 'https://tbtc-v3.chainseeker.info/api',
 				wsEndpoint: 'wss://tbtc-v3.chainseeker.info/ws',
 			},
+			sbtc: {
+				coin: {
+					name: "Bitcoin (Signet)",
+					symbol: "sBTC",
+					satoshi: "satoshi",
+					blockReward: {
+						initial: 5000000000,
+						halving: 210000
+					},
+				},
+				apiEndpoint: 'https://sbtc-v3.chainseeker.info/api',
+				wsEndpoint: 'wss://sbtc-v3.chainseeker.info/ws',
+			},
 			local: {
 				coin: {
 					name: "Bitcoin (Local)",
