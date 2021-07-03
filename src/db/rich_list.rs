@@ -43,6 +43,9 @@ impl RichList {
         let v = self.map.get_mut(script_pubkey).unwrap();
         *v -= value;
     }
+    pub fn get_index_of(&self, script_pubkey: &Script) -> Option<usize> {
+        self.map.get_index_of(script_pubkey)
+    }
     pub fn get_in_range(&self, range: Range<usize>) -> Vec<RichListEntry> {
         if self.map.len() < 1 {
             return Vec::new();

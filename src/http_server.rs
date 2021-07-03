@@ -582,6 +582,18 @@ impl HttpServer {
         let json = format!("{{\"count\":{}}}", server.rich_list.read().await.len());
         Ok(Self::ok(json))
     }
+    /// `/rich_list_addr_rank/:script_or_address` endpoint.
+    async fn rich_list_addr_rank_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        let server = req.data::<HttpServer>().unwrap();
+        let script = Self::decode_script_or_address(req.param("script_or_address").unwrap());
+        if script.is_none() {
+            return Ok(Self::not_found("Failed to decode input script or address."));
+        }
+        match server.rich_list.read().await.get_index_of(&script.unwrap()) {
+            Some(rank) => Ok(Self::ok(format!("{{\"rank\":{}}}", rank + 1))),
+            None => Ok(Self::ok("{\"rank\":null}".to_string())),
+        }
+    }
     /// `/rich_list/:offset/:limit` endpoint.
     async fn rich_list_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let offset: usize = match req.param("offset").unwrap().parse() {
@@ -620,6 +632,7 @@ impl HttpServer {
             .get("/api/v1/txs/:script_or_address", Self::txs_handler)
             .get("/api/v1/utxos/:script_or_address", Self::utxos_handler)
             .get("/api/v1/rich_list_count", Self::rich_list_count_handler)
+            .get("/api/v1/rich_list_addr_rank/:script_or_address", Self::rich_list_addr_rank_handler)
             .get("/api/v1/rich_list/:offset/:limit", Self::rich_list_handler)
             .any(|_req| async {
                 Ok(Self::not_found("invalid URL."))
