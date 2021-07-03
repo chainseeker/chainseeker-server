@@ -14,7 +14,7 @@
 								</NuxtLink>
 							</span>
 						</v-toolbar-title>
-						<div class="ml-4"><NuxtLink :to="`/${$config.coin}/rich_list`">Rich List</NuxtLink></div>
+						<div class="ml-4"><NuxtLink :to="`/${$route.params.coin}/rich_list`">Rich List</NuxtLink></div>
 						<div class="ml-2"><a href="https://chainseeker.docs.apiary.io/" target="_blank">REST API</a></div>
 						<v-spacer />
 						<v-form v-on:submit="search">
