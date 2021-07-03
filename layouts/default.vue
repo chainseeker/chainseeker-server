@@ -5,8 +5,8 @@
 				<nav>
 					<v-toolbar>
 						<v-toolbar-title>
-							<NuxtLink to="/" style="color: inherit; vertical-align: 40%;">
-								chainseeker
+							<NuxtLink to="/" style="color: inherit; vertical-align: 0;">
+								<img src="~/assets/img/logo-wide-small.png" alt="site logo" style="max-height: 40px;" />
 							</NuxtLink>
 							<span v-for="(config, coin) in $config.coins" :key="coin">
 								<NuxtLink v-if="coin !== 'local'" :to="`/${coin}`" style="color: #666; font-size: 80%;" class="ml-2">
@@ -21,7 +21,7 @@
 							<v-container style="margin-top:2ex">
 								<v-row>
 									<v-col>
-										<v-text-field v-model="query" label="blockid, height, txid, address" style="width: 30em" />
+										<v-text-field v-model="query" label="blockid, height, txid, address" style="width: 20em" />
 									</v-col>
 									<v-col>
 										<v-btn type="submit">Search</v-btn>

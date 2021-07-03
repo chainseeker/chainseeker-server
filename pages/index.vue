@@ -1,6 +1,9 @@
 <template>
 	<div>
-		<h1>chainseeker - an open-source blockchain explorer.</h1>
+		<h1 class="text-center">
+			<img src="~/assets/img/logo-wide.png" alt="site logo" style="max-width: 600px;" /><br />
+			[- open-source blockchain explorer -]
+		</h1>
 		<v-row class="mt-8">
 			<v-col md=3 v-for="(coinConfig, coin) in $config.coins" v-if="coin != 'local'" :key="coin">
 				<v-card>
