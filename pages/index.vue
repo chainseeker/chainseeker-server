@@ -12,12 +12,20 @@
 							</NuxtLink>
 						</div>
 						<div class="mt-4">
-							<p>Synced height: {{ status[coin].blocks.toLocaleString() }}</p>
-							<p>
-								<v-badge :color="Date.now() - 1000 * status[coin].lastBlock.time < 60 * 60 * 1000 ? 'green' : 'red'" inline>
-									Last block: {{ new Date(1000 * status[coin].lastBlock.time).toLocaleString() }}
-								</v-badge>
-							</p>
+							<template v-if="status[coin].blocks">
+								<p>Synced height: {{ status[coin].blocks.toLocaleString() }}</p>
+								<p>
+									<v-badge :color="Date.now() - 1000 * status[coin].lastBlock.time < 60 * 60 * 1000 ? 'green' : 'red'" inline>
+										Last block: {{ new Date(1000 * status[coin].lastBlock.time).toLocaleString() }}
+									</v-badge>
+								</p>
+							</template>
+							<template v-else>
+								<v-alert type="error">
+									Server is down.
+								</v-alert>
+								<p>If the error continues, please contact the admin.</p>
+							</template>
 						</div>
 					</v-card-text>
 				</v-card>
@@ -52,13 +60,19 @@ export default class Home extends Vue {
 			if(coin === 'local') continue;
 			const icon = require(`~/assets/img/coins/${coin}.png`);
 			const cs = new Chainseeker($config.coins[coin].apiEndpoint);
-			const { blocks } = await cs.getStatus();
-			const lastBlock = await cs.getBlockHeader(blocks);
-			status[coin] = {
-				icon,
-				blocks,
-				lastBlock,
-			};
+			try {
+				const { blocks } = await cs.getStatus();
+				const lastBlock = await cs.getBlockHeader(blocks);
+				status[coin] = {
+					icon,
+					blocks,
+					lastBlock,
+				};
+			} catch(e) {
+				status[coin] = {
+					icon,
+				};
+			}
 		}
 		return {
 			status,
