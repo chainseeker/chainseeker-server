@@ -82,11 +82,15 @@ impl Syncer {
             None => return (),
         };
         loop {
-            let block_hash_rest = self.rest.blockhashbyheight(height).await
-                .expect(&format!("Failed to fetch block at height = {}.", height));
+            //let block_hash_rest = self.rest.blockhashbyheight(height).await
+            //    .expect(&format!("Failed to fetch block at height = {}.", height));
             let block_me = self.http_server.block_db.read().await.get(height).unwrap();
             let block_hash_me = block_me.block_header.block_hash();
-            if block_hash_rest == block_hash_me {
+            //if block_hash_rest == block_hash_me {
+            //    break;
+            //}
+            let block_headers = self.rest.headers(1, &block_hash_me).await.unwrap();
+            if block_headers.len() > 0 {
                 break;
             }
             println!("Reorg detected at block height = {}.", to_locale_string(height));
