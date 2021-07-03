@@ -8,6 +8,7 @@ rpc_pass = "bitcoinrpc"
 zmq_endpoint = "tcp://localhost:28332"
 
 [coins.tbtc]
+genesis_block_hash = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
 p2pkh_version = 111
 p2sh_version = 195
 segwit_hrp = "tb"
@@ -16,6 +17,7 @@ rest_endpoint = "http://localhost:18332/rest/"
 zmq_endpoint = "tcp://localhost:28333"
 
 [coins.rbtc]
+genesis_block_hash = ""
 p2pkh_version = 111
 p2sh_version = 195
 segwit_hrp = "bcrt"
@@ -24,9 +26,19 @@ rest_endpoint = "http://localhost:18443/rest/"
 zmq_endpoint = "tcp://localhost:28334"
 
 [coins.sbtc]
+genesis_block_hash = "00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6"
 p2pkh_version = 111
 p2sh_version = 195
 segwit_hrp = "tb"
 rpc_endpoint = "http://localhost:38332"
 rest_endpoint = "http://localhost:38332/rest/"
 zmq_endpoint = "tcp://localhost:28335"
+
+[coins.mona]
+genesis_block_hash = "ff9f1c0116d19de7c9963845e129f9ed1bfc0b376eb54fd7afa42e0d418c8bb6"
+p2pkh_version = 50
+p2sh_version = 55
+segwit_hrp = "mona"
+rpc_endpoint = "http://localhost:9402"
+rest_endpoint = "http://localhost:9402/rest/"
+zmq_endpoint = "tcp://localhost:29401"

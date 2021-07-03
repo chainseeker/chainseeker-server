@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use num_format::{Locale, ToFormattedStr, ToFormattedString};
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
+use bitcoin_hashes::hex::FromHex;
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{BlockHash, Block, BlockHeader, Address, Script, Network};
 use bitcoin::util::uint::Uint256;
@@ -67,6 +68,7 @@ pub fn put_synced_height(coin: &str, height: u32) {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
+    pub genesis_block_hash: BlockHash,
     pub p2pkh_version: u8,
     pub p2sh_version : u8,
     pub segwit_hrp   : String,
@@ -82,33 +84,35 @@ pub struct Config {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct TomlConfigEntry {
-    p2pkh_version: Option<u8>,
-    p2sh_version : Option<u8>,
-    segwit_hrp   : Option<String>,
-    rpc_endpoint : Option<String>,
-    rpc_user     : Option<String>,
-    rpc_pass     : Option<String>,
-    rest_endpoint: Option<String>,
-    zmq_endpoint : Option<String>,
-    http_ip      : Option<String>,
-    http_port    : Option<u16>,
-    ws_endpoint  : Option<String>,
+    genesis_block_hash: Option<String>,
+    p2pkh_version     : Option<u8>,
+    p2sh_version      : Option<u8>,
+    segwit_hrp        : Option<String>,
+    rpc_endpoint      : Option<String>,
+    rpc_user          : Option<String>,
+    rpc_pass          : Option<String>,
+    rest_endpoint     : Option<String>,
+    zmq_endpoint      : Option<String>,
+    http_ip           : Option<String>,
+    http_port         : Option<u16>,
+    ws_endpoint       : Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct TomlConfig {
-    p2pkh_version: Option<u8>,
-    p2sh_version : Option<u8>,
-    segwit_hrp   : Option<String>,
-    rpc_endpoint : Option<String>,
-    rpc_user     : Option<String>,
-    rpc_pass     : Option<String>,
-    rest_endpoint: Option<String>,
-    zmq_endpoint : Option<String>,
-    http_ip      : Option<String>,
-    http_port    : Option<u16>,
-    ws_endpoint  : Option<String>,
-    coins        : std::collections::HashMap<String, TomlConfigEntry>,
+    genesis_block_hash: Option<String>,
+    p2pkh_version     : Option<u8>,
+    p2sh_version      : Option<u8>,
+    segwit_hrp        : Option<String>,
+    rpc_endpoint      : Option<String>,
+    rpc_user          : Option<String>,
+    rpc_pass          : Option<String>,
+    rest_endpoint     : Option<String>,
+    zmq_endpoint      : Option<String>,
+    http_ip           : Option<String>,
+    http_port         : Option<u16>,
+    ws_endpoint       : Option<String>,
+    coins             : std::collections::HashMap<String, TomlConfigEntry>,
 }
 
 pub fn load_config(coin: &str) -> Config {
@@ -123,7 +127,9 @@ pub fn load_config(coin: &str) -> Config {
         panic!("Cannot find the specified coin in your config.");
     }
     let coin_config = coin_config.unwrap();
+    let genesis_block_hash = BlockHash::from_hex(&coin_config.genesis_block_hash.unwrap_or(config.genesis_block_hash.unwrap_or("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f".to_string()))).unwrap();
     Config {
+        genesis_block_hash,
         p2pkh_version: coin_config.p2pkh_version.unwrap_or(config.p2pkh_version.unwrap_or(0)),
         p2sh_version : coin_config.p2sh_version .unwrap_or(config.p2sh_version .unwrap_or(5)),
         segwit_hrp   : coin_config.segwit_hrp   .unwrap_or(config.segwit_hrp   .unwrap_or("bc".to_string())),

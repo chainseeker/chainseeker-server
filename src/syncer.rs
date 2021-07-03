@@ -111,7 +111,7 @@ impl Syncer {
     }
     async fn sync(&mut self, initial: bool) -> u32 {
         self.process_reorgs().await;
-        let start_height = match get_synced_height(&self.coin) {
+        let mut start_height = match get_synced_height(&self.coin) {
             Some(h) => h + 1,
             None => 0,
         };
@@ -122,9 +122,18 @@ impl Syncer {
         let block_queue = Arc::new(RwLock::new(std::collections::VecDeque::with_capacity(BLOCK_QUEUE_SIZE)));
         if initial {
             let block_queue = block_queue.clone();
+            let start_block_hash = if start_height == 0 {
+                block_queue.write().await.push_back(self.rest.block(&self.config.genesis_block_hash).await.unwrap());
+                start_height = 1;
+                self.config.genesis_block_hash
+            } else {
+                let block_db_value = self.http_server.block_db.read().await.get(start_height - 1).unwrap();
+                block_db_value.block_header.block_hash()
+            };
             let stop = self.stop.clone();
             let rest = self.rest.clone();
             tokio::spawn(async move {
+                let mut current_block_hash = start_block_hash;
                 let mut height = start_height;
                 loop {
                     //let begin = Instant::now();
@@ -134,15 +143,18 @@ impl Syncer {
                     let block_queue_len = block_queue.read().await.len();
                     if block_queue_len >= BLOCK_QUEUE_SIZE {
                         //println!("Block queue is full. Waiting for 100ms...");
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(10));
                         continue;
                     }
-                    for _ in block_queue_len..BLOCK_QUEUE_SIZE {
-                        if height > target_height {
-                            break;
-                        }
-                        let (_block_hash, block) = fetch_block(&rest, height).await;
+                    let count = (BLOCK_QUEUE_SIZE - block_queue_len + 1) as u32;
+                    let count = std::cmp::min(count, target_height - height + 2);
+                    let block_headers = rest.headers(count, &current_block_hash).await.unwrap();
+                    for block_header in block_headers[1..].iter() {
+                        let block_hash = block_header.block_hash();
+                        //assert_eq!(block_hash, rest.blockhashbyheight(height).await.unwrap());
+                        let block = rest.block(&block_hash).await.unwrap();
                         block_queue.write().await.push_back(block);
+                        current_block_hash = block_hash;
                         height += 1;
                     }
                     //println!("Block fetched in {}ms.", begin.elapsed().as_millis());
