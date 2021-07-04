@@ -113,7 +113,7 @@ Performance
 
 ### Results
 
-Date: July 5, 2020, 00: (JST)
+Date: July 5, 2020 (JST)
 
 #### status
 ```
@@ -317,7 +317,7 @@ Req/Bytes counts sampled once per second.
 
 ### Results for Bitcoin Core REST API (just for comparison)
 
-Date: July 5, 2020, 00:19 (JST)
+Date: July 5, 2020 (JST)
 
 #### chaininfo.json
 ```
