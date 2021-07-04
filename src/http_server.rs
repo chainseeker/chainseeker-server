@@ -77,7 +77,7 @@ impl RestScriptPubKey {
         let address_str = script_to_address_string(&script_pubkey, config);
         Self {
             asm: script_pubkey.asm(),
-            hex: script_pubkey.to_string(),
+            hex: hex::encode(script_pubkey.as_bytes()),
             r#type: match address.clone() {
                 Some(address) => match address.address_type() {
                     Some(address_type) => match address_type {
