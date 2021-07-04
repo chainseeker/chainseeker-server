@@ -194,10 +194,12 @@ impl Syncer {
     }
     async fn load_utxo(&mut self) {
         let begin = Instant::now();
-        let print_stat = |i: u32, force: bool| {
-            if i % 100_000 == 0 || force {
+        let mut last_print = Instant::now();
+        let mut print_stat = |i: u32, force: bool| {
+            if last_print.elapsed().as_millis() > 10 || force {
                 print!("\rLoading UTXOs ({} entries processed)...", to_locale_string(i));
                 flush_stdout();
+                last_print = Instant::now();
             }
         };
         let (utxo_server_tx, mut utxo_server_rx) = channel(1024 * 1024);
