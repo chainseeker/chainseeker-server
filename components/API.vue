@@ -5,7 +5,7 @@
 		</div>
 		<div v-if="typeof active !== 'undefined'" style="margin: 10px 0px;">
 			<v-form v-on:submit="call">
-				<v-text-field :prefix="`${$config.apiEndpoint}/v1/`" label="API URL" :value="path" />
+				<v-text-field :prefix="`${$config.coinConfig.apiEndpoint}/v1/`" label="API URL" :value="path" />
 				<div class="text-center">
 					<v-btn type="submit">Call API</v-btn>
 				</div>
@@ -29,7 +29,7 @@ export default class API extends Vue {
 	}
 	async call(e: Event) {
 		e.preventDefault();
-		const url = `${this.$config.apiEndpoint}/v1/${this.path}`;
+		const url = `${this.$config.coinConfig.apiEndpoint}/v1/${this.path}`;
 		const json = await (await fetch(url)).json();
 		this.output = JSON.stringify(json, null, 4);
 		return false;
