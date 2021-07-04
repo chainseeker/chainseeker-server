@@ -106,11 +106,12 @@ pub struct RestUtxo {
 
 impl RestUtxo {
     pub fn new(value: &UtxoServerValue, tx: &Transaction, config: &Config) -> Self {
+        let previous_output = &tx.output[value.vout as usize];
         Self {
             txid: hex::encode(consensus_encode(&value.txid)),
             vout: value.vout,
-            script_pub_key: RestScriptPubKey::new(&tx.output[value.vout as usize].script_pubkey, config),
-            value: value.value,
+            script_pub_key: RestScriptPubKey::new(&previous_output.script_pubkey, config),
+            value: previous_output.value,
         }
     }
 }

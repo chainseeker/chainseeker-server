@@ -10,19 +10,17 @@ pub type UtxoServer = UtxoServerInMemory;
 pub struct UtxoServerValue {
     pub txid: Txid,  // +32 = 32
     pub vout: u32,   // + 4 = 36
-    pub value: u64,  // + 8 = 44
 }
 
 impl ConstantSize for UtxoServerValue {
-    const LEN: usize = 44;
+    const LEN: usize = 36;
 }
 
 impl From<&UtxoServerValue> for Vec<u8> {
     fn from(value: &UtxoServerValue) -> Self {
-        let mut buf: [u8; 44] = [0; 44];
+        let mut buf: [u8; 36] = [0; 36];
         value.txid.consensus_encode(&mut buf[0..32]).expect("Failed to encode txid.");
         buf[32..36].copy_from_slice(&value.vout.to_le_bytes());
-        buf[36..44].copy_from_slice(&value.value.to_le_bytes());
         buf.to_vec()
     }
 }
@@ -35,14 +33,12 @@ impl Serialize for UtxoServerValue {
 
 impl From<&[u8]> for UtxoServerValue {
     fn from(buf: &[u8]) -> UtxoServerValue {
-        assert_eq!(buf.len(), 44);
+        assert_eq!(buf.len(), 36);
         let txid = consensus_decode(&buf[0..32]);
         let vout = bytes_to_u32(&buf[32..36]);
-        let value = bytes_to_u64(&buf[36..44]);
         UtxoServerValue {
             txid,
             vout,
-            value,
         }
     }
 }
@@ -71,7 +67,7 @@ impl UtxoServerInMemory {
         self.db.capacity()
     }
     pub fn size(&self) -> usize {
-        self.db.iter().map(|(script, value)| script.len() + 44 * value.len()).sum()
+        self.db.iter().map(|(script, value)| script.len() + 36 * value.len()).sum()
     }
     pub fn shrink_to_fit(&mut self) {
         self.db.shrink_to_fit();
@@ -94,7 +90,6 @@ impl UtxoServerInMemory {
         let v = UtxoServerValue {
             txid: utxo.txid,
             vout: utxo.vout,
-            value: utxo.value,
         };
         values.push(v);
     }
@@ -134,6 +129,7 @@ impl UtxoServerInMemory {
     }
 }
 
+/*
 #[derive(Debug, Clone, PartialEq, Eq, std::hash::Hash)]
 struct UtxoServerInStorageKey {
     script_pubkey: Script,
@@ -298,3 +294,4 @@ impl UtxoServerInStorageLazy {
         }
     }
 }
+*/
