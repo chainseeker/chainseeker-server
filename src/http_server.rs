@@ -451,7 +451,7 @@ impl HttpServer {
             return Ok(Self::bad_request("Failed to parse input."));
         }
         match rpc.send_raw_transaction(hex.unwrap()) {
-            Ok(txid) => Ok(Self::json(format!("{{\"txid\":\"{}\"}}", txid))),
+            Ok(txid) => Ok(Self::ok(format!("{{\"txid\":\"{}\"}}", txid))),
             Err(_) => Ok(Self::bad_request(&format!("Failed to broadcast transaction."))),
         }
     }
