@@ -21,7 +21,7 @@ Prerequisite
 ------------
 
 **chainseeker-server** requires a Bitcoin Core (or any compatible altcoins) running,
-and both REST (for syncing) and RPC API (for broadcasting transactions) are enabled.
+and both REST (for syncing) and RPC API (for broadcasting transactions) being enabled.
 
 Configure `bitcoin.conf` as below:
 ```toml:bitcoin.conf
@@ -97,8 +97,8 @@ Setup proxy
 
 Configure your web server (such as Nginx or Apache) to proxy HTTP requests to the correct port.
 
-1. Proxy `/` to the `http_port` (default port for mainnet Bitcoin is 6000).
-1. Proxy `/ws` to the port of `ws_endpoint` (default port is 7000).
+1. Proxy `/` to the `http_port` (default port is 8000).
+1. Proxy `/ws` to the port of `ws_endpoint` (default port is 8001).
 
 And then, configure SSL/TLS certificate if required or use proxy services like [CloudFlare](https://www.cloudflare.com/).
 
