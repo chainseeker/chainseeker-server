@@ -7,7 +7,7 @@
 			</div>
 			<div class="float-left" style="padding: 15px 20px;">
 				<p class="my-0">
-					Copyright &copy; chainseeker 2017-{{ new Date().getFullYear() }}. All rights reserved.
+					Copyright <span v-html="'&copy;'" /> chainseeker 2017-{{ new Date().getFullYear() }}. All rights reserved.
 				</p>
 				<p class="my-0">
 					Created &amp; mainted by <NuxtLink to="https://twitter.com/visvirial" target="_blank">@visvirial</NuxtLink>.
