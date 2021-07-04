@@ -13,15 +13,13 @@ ENDPOINT=$2
 
 # Usage: run ENDPOINT
 run() {
-	echo "## $1"
+	echo "#### $1"
 	echo '```'
 	AUTOCANNON_FLAGS="--connections $RPCTHREADS" bench "$ENDPOINT/rest/$1"
 	echo '```'
 	echo
 }
 
-echo "# Benchmark results for Bitcoin Core REST API"
-echo
 run chaininfo.json
 run blockhashbyheight/500000.json
 # height = 500000

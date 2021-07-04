@@ -13,7 +13,7 @@ ENDPOINT=$2
 
 # Usage: run ENDPOINT
 run() {
-	echo "## $1"
+	echo "#### $1"
 	echo '```'
 	AUTOCANNON_FLAGS="--connections $CONNECTIONS" bench "$ENDPOINT/api/v1/$1"
 	echo '```'
@@ -23,8 +23,6 @@ run() {
 BLOCK_HEIGHT=500000
 ADDRESS=bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97
 
-echo "# Benchmark results"
-echo
 run status
 run block/$BLOCK_HEIGHT
 run block_with_txids/$BLOCK_HEIGHT
