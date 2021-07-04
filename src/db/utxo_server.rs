@@ -1,6 +1,4 @@
 use indexmap::IndexMap;
-
-use serde::ser::{Serializer, SerializeStruct};
 use bitcoin::{Txid, Script, Block, WScriptHash};
 
 use crate::*;
@@ -17,20 +15,6 @@ pub struct UtxoServerValue {
 
 impl ConstantSize for UtxoServerValue {
     const LEN: usize = 44;
-}
-
-impl serde::ser::Serialize for UtxoServerValue {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        let mut state = serializer.serialize_struct("UtxoServerValue", 3)?;
-        let mut txid = consensus_encode(&self.txid);
-        txid.reverse();
-        state.serialize_field("txid", &hex::encode(txid))?;
-        state.serialize_field("vout", &self.vout)?;
-        state.serialize_field("value", &self.value)?;
-        state.end()
-    }
 }
 
 impl From<&UtxoServerValue> for Vec<u8> {

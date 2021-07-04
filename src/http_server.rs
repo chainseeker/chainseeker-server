@@ -10,7 +10,7 @@ use hyper::{Body, Request, Response, Server, StatusCode};
 use routerify::prelude::*;
 use routerify::{Middleware, Router, RouterService};
 use bitcoin_hashes::hex::{FromHex, ToHex};
-use bitcoin::{Script, TxIn, TxOut, Address, Network, AddressType};
+use bitcoin::{Script, TxIn, TxOut, Address, Network, AddressType, Transaction};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 
@@ -91,6 +91,26 @@ impl RestScriptPubKey {
                 None => "unknown",
             }.to_string(),
             address: address_str,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestUtxo {
+    txid: String,
+    vout: u32,
+    script_pub_key: RestScriptPubKey,
+    value: u64,
+}
+
+impl RestUtxo {
+    pub fn new(value: &UtxoServerValue, tx: &Transaction, config: &Config) -> Self {
+        Self {
+            txid: hex::encode(consensus_encode(&value.txid)),
+            vout: value.vout,
+            script_pub_key: RestScriptPubKey::new(&tx.output[value.vout as usize].script_pubkey, config),
+            value: value.value,
         }
     }
 }
@@ -573,8 +593,16 @@ impl HttpServer {
         if script.is_none() {
             return Ok(Self::not_found("Failed to decode input script or address."));
         }
+        let tx_db = server.tx_db.read().await;
         let values = server.utxo_server.read().await.get(&script.unwrap()).await;
-        Ok(Self::json(&values))
+        let mut utxos: Vec<RestUtxo> = Vec::new();
+        for utxo in values.iter() {
+            match tx_db.get(&utxo.txid) {
+                Some(tx_db_value) => utxos.push(RestUtxo::new(&utxo, &tx_db_value.tx, &server.config)),
+                None => return Ok(Self::internal_error(&format!("Failed to resolve previous txid: {}", utxo.txid))),
+            }
+        };
+        Ok(Self::json(&utxos))
     }
     /// `/rich_list_count` endpoint.
     async fn rich_list_count_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
