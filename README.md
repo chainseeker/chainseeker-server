@@ -97,8 +97,8 @@ Setup proxy
 
 Configure your web server (such as Nginx or Apache) to proxy HTTP requests to the correct port.
 
-1. Proxy `/` to the `http_port` (default port is 8000).
-1. Proxy `/ws` to the port of `ws_endpoint` (default port is 8001).
+1. Proxy `/` to the `http_port` (default: 8000).
+1. Proxy `/ws` to the port of `ws_endpoint` (default: 8001).
 
 And then, configure SSL/TLS certificate if required or use proxy services like [CloudFlare](https://www.cloudflare.com/).
 
