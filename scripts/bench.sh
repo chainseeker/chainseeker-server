@@ -9,7 +9,7 @@ if [ $# -lt 2 ]; then
 fi
 
 CONNECTIONS=$1
-ENDPOINT=$1
+ENDPOINT=$2
 
 # Usage: run ENDPOINT
 run() {
