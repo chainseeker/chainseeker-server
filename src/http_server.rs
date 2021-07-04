@@ -26,7 +26,7 @@ impl RestScriptSig {
     pub fn new(script: &Script) -> Self {
         Self {
             asm: script.asm(),
-            hex: script.to_string(),
+            hex: hex::encode(script.as_bytes()),
         }
     }
 }
