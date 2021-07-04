@@ -5,7 +5,7 @@
 		</div>
 		<div v-if="typeof active !== 'undefined'" style="margin: 10px 0px;">
 			<v-form v-on:submit="call">
-				<v-text-field :prefix="`${$config.coinConfig.apiEndpoint}/v1/`" label="API URL" :value="path" />
+				<v-text-field :prefix="`${$config.coinConfig.apiEndpoint}/v1/`" label="API URL" v-model="path" />
 				<div class="text-center">
 					<v-btn type="submit">Call API</v-btn>
 				</div>
