@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["MAX_INV_SIZE","The maximum number of [super::message_blockdata::Inventory] items in an `inv` message."]],"enum":[["NetworkMessage","A Network message payload. Proper documentation is available on at Bitcoin Wiki: Protocol Specification"]],"struct":[["CommandString","Serializer for command string"],["RawNetworkMessage","A Network message"]]});

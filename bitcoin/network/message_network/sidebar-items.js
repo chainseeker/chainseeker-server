@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["RejectReason","message rejection reason as a code"]],"struct":[["Reject","Reject message might be sent by peers rejecting one of our messages"],["VersionMessage","Some simple messages The `version` message"]]});

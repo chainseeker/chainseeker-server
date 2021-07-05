@@ -1,0 +1,123 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/home/runner/.cargo/registry/src/github.com-1ecc6299db9ec823/zmq-sys-0.11.0/src/errno.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>errno.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../zmq_sys/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<span id="2"> 2</span>
+<span id="3"> 3</span>
+<span id="4"> 4</span>
+<span id="5"> 5</span>
+<span id="6"> 6</span>
+<span id="7"> 7</span>
+<span id="8"> 8</span>
+<span id="9"> 9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unix</span>)]</span>
+<span class="kw">use</span> <span class="ident">libc</span> <span class="kw">as</span> <span class="ident">errno</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">windows</span>)]</span>
+<span class="kw">use</span> <span class="ident">windows::errno</span>;
+
+<span class="kw">const</span> <span class="ident">ZMQ_HAUSNUMERO</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="number">156_384_712</span>;
+
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EACCES</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EACCES</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EADDRINUSE</span>:       <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EADDRINUSE</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EAGAIN</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EAGAIN</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EBUSY</span>:            <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EBUSY</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ECONNREFUSED</span>:     <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ECONNREFUSED</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EFAULT</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EFAULT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EINTR</span>:            <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EINTR</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EHOSTUNREACH</span>:     <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EHOSTUNREACH</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EINPROGRESS</span>:      <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EINPROGRESS</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EINVAL</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EINVAL</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EMFILE</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EMFILE</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EMSGSIZE</span>:         <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EMSGSIZE</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENAMETOOLONG</span>:     <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENAMETOOLONG</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENODEV</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENODEV</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOENT</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENOENT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOMEM</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENOMEM</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOTCONN</span>:         <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENOTCONN</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOTSOCK</span>:         <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENOTSOCK</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EPROTO</span>:           <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EPROTO</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EPROTONOSUPPORT</span>:  <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EPROTONOSUPPORT</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOTSUP</span>:          <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENOTSUP</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOBUFS</span>:          <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENOBUFS</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENETDOWN</span>:         <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::ENETDOWN</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EADDRNOTAVAIL</span>:    <span class="ident">i32</span> <span class="op">=</span> <span class="ident">errno::EADDRNOTAVAIL</span>;
+
+<span class="comment">// native zmq error codes</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EFSM</span>:             <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">51</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOCOMPATPROTO</span>:   <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">52</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ETERM</span>:            <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">53</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EMTHREAD</span>:         <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">54</span>);
+
+<span class="comment">// These may be returned by libzmq if the target platform does not define these</span>
+<span class="comment">// errno codes.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOTSUP_ALT</span>:         <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">1</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EPROTONOSUPPORT_ALT</span>: <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">2</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOBUFS_ALT</span>:         <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">3</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENETDOWN_ALT</span>:        <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">4</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EADDRINUSE_ALT</span>:      <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">5</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EADDRNOTAVAIL_ALT</span>:   <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">6</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ECONNREFUSED_ALT</span>:    <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">7</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EINPROGRESS_ALT</span>:     <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">8</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOTSOCK_ALT</span>:        <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">9</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EMSGSIZE_ALT</span>:        <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">10</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EAFNOSUPPORT_ALT</span>:    <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">11</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENETUNREACH_ALT</span>:     <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">12</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ECONNABORTED_ALT</span>:    <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">13</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ECONNRESET_ALT</span>:      <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">14</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENOTCONN_ALT</span>:        <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">15</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ETIMEDOUT_ALT</span>:       <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">16</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EHOSTUNREACH_ALT</span>:    <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">17</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENETRESET_ALT</span>:       <span class="ident">i32</span> <span class="op">=</span> (<span class="ident">ZMQ_HAUSNUMERO</span> <span class="op">+</span> <span class="number">18</span>);
+</pre></div>
+</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="zmq_sys" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

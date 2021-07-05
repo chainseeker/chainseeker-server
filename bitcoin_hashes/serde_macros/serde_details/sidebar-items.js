@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["SerdeHash","Default serialization/deserialization methods"]]});

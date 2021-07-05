@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error","A library error"],["StandardError","Standard error responses, as described at at http://www.jsonrpc.org/specification#error_object"]],"fn":[["result_to_response","Converts a Rust `Result` to a JSONRPC response object"],["standard_error","Create a standard error responses"]],"struct":[["RpcError","A JSONRPC error object"]]});

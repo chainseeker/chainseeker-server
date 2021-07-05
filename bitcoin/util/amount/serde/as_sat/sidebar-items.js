@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["deserialize",""],["serialize",""]],"mod":[["opt","Serialize and deserialize [Optoin] as real numbers denominated in satoshi. Use with `#[serde(default, with = \"amount::serde::as_sat::opt\")]`."]]});

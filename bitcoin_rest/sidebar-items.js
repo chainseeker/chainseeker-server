@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["DEFAULT_ENDPOINT",""]],"enum":[["Error",""]],"fn":[["new","Create a new `bitcoin_rest` context."]],"struct":[["ChainInfo",""],["Context","`bitcoin_rest` context."],["ScriptPubKey",""],["Softfork",""],["Utxo",""],["UtxoData",""]]});
