@@ -16,6 +16,18 @@ async fn run_utxo_server(utxos: &Vec<UtxoEntry>) {
     }
 }
 
+fn bench_synced_height_db(c: &mut Criterion) {
+    let synced_height_db = SyncedHeightDB::new(COIN);
+    const HEIGHT: u32 = 123456;
+    synced_height_db.put(HEIGHT);
+    c.bench_function("SyncedHeightDB.put()", |b| b.iter(|| {
+        synced_height_db.put(HEIGHT);
+    }));
+    c.bench_function("SyncedHeightDB.get()", |b| b.iter(|| {
+        assert_eq!(synced_height_db.get(), Some(HEIGHT));
+    }));
+}
+
 fn bench_db(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let block = Block::consensus_decode(BLOCK).expect("Failed to decode block.");
@@ -53,5 +65,5 @@ fn bench_db(c: &mut Criterion) {
     }));
 }
 
-criterion_group!(benches, bench_db);
+criterion_group!(benches, bench_synced_height_db, bench_db);
 criterion_main!(benches);
