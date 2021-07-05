@@ -1,4 +1,4 @@
-use chainseeker_syncer::*;
+use chainseeker_server::*;
 
 #[tokio::main]
 async fn main() {

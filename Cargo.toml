@@ -1,5 +1,5 @@
 [package]
-name = "chainseeker-syncer"
+name = "chainseeker-server"
 version = "0.0.1"
 authors = ["Masahiko Hyuga <mail@mhyuga.jp>"]
 edition = "2018"
