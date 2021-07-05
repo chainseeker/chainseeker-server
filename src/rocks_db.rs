@@ -1,9 +1,7 @@
 /// An abstraction struct for key-value store.
 use std::fs::remove_dir_all;
 use std::marker::PhantomData;
-use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode, BoundColumnFamily};
-
-use crate::*;
+use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode, BoundColumnFamily, Options};
 
 pub trait ConstantSize {
     const LEN: usize;
@@ -249,7 +247,7 @@ impl<K, V> RocksDB<K, V>
         let mut opts = Options::default();
         opts.set_max_open_files(100);
         opts.create_if_missing(true);
-        let db = RocksDBBase::open(&opts, path).expect("Failed to open the database.");
+        let db = Rocks::open(&opts, path).expect("Failed to open the database.");
         Self {
             temporary,
             path: path.to_string(),

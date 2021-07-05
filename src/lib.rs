@@ -1,6 +1,5 @@
 use std::io::{Read, Write};
 use num_format::{Locale, ToFormattedStr, ToFormattedString};
-use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
 use bitcoin::hashes::hex::FromHex;
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{BlockHash, Block, BlockHeader, Address, Script, Network};
@@ -28,8 +27,6 @@ pub use web_socket_relay::*;
 pub mod fixtures;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
-
-type RocksDBBase = DBWithThreadMode<MultiThreaded>;
 
 pub fn flush_stdout() {
     std::io::stdout().flush().expect("Failed to flush.");
