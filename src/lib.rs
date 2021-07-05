@@ -18,6 +18,8 @@ pub mod db;
 pub use db::*;
 pub mod syncer;
 pub use syncer::*;
+pub mod rest;
+pub use rest::*;
 pub mod http_server;
 pub use http_server::*;
 pub mod web_socket_relay;
