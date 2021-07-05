@@ -2,12 +2,10 @@ use std::time::Instant;
 use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use tokio::sync::RwLock;
-//use bitcoin::{Address, Network};
 
 use super::*;
 
 pub struct Syncer {
-    coin: String,
     config: Config,
     utxo_db: UtxoDB,
     rest: bitcoin_rest::Context,
@@ -19,7 +17,6 @@ impl Syncer {
     pub async fn new(coin: &str, config: &Config) -> Self {
         let rest = get_rest(config);
         let syncer = Self {
-            coin: coin.to_string(),
             config: (*config).clone(),
             utxo_db: UtxoDB::new(coin, false),
             rest: rest,
@@ -69,7 +66,7 @@ impl Syncer {
         }
         // Put best block information.
         self.http_server.block_db.write().await.put(height, &block);
-        put_synced_height(&self.coin, height);
+        self.http_server.synced_height_db.write().await.put(height);
         println!(
             "Height={}, #tx={:4}, #vin={:5}, #vout={:5} (tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
             to_locale_string(height), block.txdata.len(), vins, vouts,
@@ -77,7 +74,7 @@ impl Syncer {
             addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
     }
     async fn process_reorgs(&mut self) {
-        let mut height = match get_synced_height(&self.coin) {
+        let mut height = match self.http_server.synced_height_db.read().await.get() {
             Some(h) => h,
             None => return (),
         };
@@ -110,12 +107,12 @@ impl Syncer {
             }
             self.utxo_db.reorg_block(&block, &prev_txs);
             height -= 1;
-            put_synced_height(&self.coin, height);
+            self.http_server.synced_height_db.write().await.put(height);
         }
     }
     async fn sync(&mut self, initial: bool) -> u32 {
         self.process_reorgs().await;
-        let mut start_height = match get_synced_height(&self.coin) {
+        let mut start_height = match self.http_server.synced_height_db.read().await.get() {
             Some(h) => h + 1,
             None => 0,
         };

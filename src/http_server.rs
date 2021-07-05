@@ -368,6 +368,7 @@ pub struct HttpServer {
     config: Config,
     // (height, RestBlockSummary)
     block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
+    pub synced_height_db: Arc<RwLock<SyncedHeightDB>>,
     pub block_db: Arc<RwLock<BlockDB>>,
     pub tx_db: Arc<RwLock<TxDB>>,
     pub addr_index_db: Arc<RwLock<AddressIndexDB>>,
@@ -381,6 +382,7 @@ impl HttpServer {
             coin: coin.to_string(),
             config: (*config).clone(),
             block_summary_cache: Arc::new(RwLock::new(HashMap::new())),
+            synced_height_db: Arc::new(RwLock::new(SyncedHeightDB::new(coin))),
             block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
             tx_db: Arc::new(RwLock::new(TxDB::new(coin, false))),
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin, false))),
@@ -423,7 +425,7 @@ impl HttpServer {
     /// `/status` endpoint.
     async fn status_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        Ok(Self::ok(format!("{{\"blocks\":{}}}", match get_synced_height(&server.coin) {
+        Ok(Self::ok(format!("{{\"blocks\":{}}}", match server.synced_height_db.read().await.get() {
             Some(synced_height) => synced_height as i32,
             None => -1,
         })))

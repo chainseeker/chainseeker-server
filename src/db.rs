@@ -1,3 +1,5 @@
+pub mod synced_height;
+pub use synced_height::*;
 pub mod block;
 pub use block::*;
 pub mod tx;

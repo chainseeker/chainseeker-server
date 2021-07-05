@@ -44,26 +44,11 @@ pub fn get_rest(config: &Config) -> bitcoin_rest::Context {
     bitcoin_rest::new(&config.rest_endpoint)
 }
 
-fn synced_height_path(coin: &str) -> String {
-    format!("{}/{}/synced_height.txt", data_dir(), coin)
-}
-
 pub async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
     let block_hash = rest.blockhashbyheight(height).await
         .expect(&format!("Failed to fetch block at height = {}.", height));
     let block = rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
     (block_hash, block)
-}
-
-pub fn get_synced_height(coin: &str) -> Option<u32> {
-    match std::fs::read_to_string(&synced_height_path(coin)) {
-        Ok(s) => Some(s.parse().unwrap()),
-        Err(_) => None,
-    }
-}
-
-pub fn put_synced_height(coin: &str, height: u32) {
-    std::fs::write(&synced_height_path(coin), height.to_string()).unwrap()
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -321,10 +306,5 @@ mod test {
     #[test]
     fn uint256_as_f64_12345() {
         assert_eq!(uint256_as_f64(&Uint256::from_u64(12345).unwrap()), 12345f64);
-    }
-    #[test]
-    fn synced_height() {
-        put_synced_height("test", 123456);
-        assert_eq!(get_synced_height("test"), Some(123456));
     }
 }
