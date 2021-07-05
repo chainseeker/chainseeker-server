@@ -61,7 +61,7 @@ pub struct BlockContentDBValue {
 }
 
 impl BlockContentDBValue {
-    fn new(height: u32, block: &Block) -> Self {
+    pub fn new(height: u32, block: &Block) -> Self {
         let size = block.get_size() as u32;
         let weight = block.get_weight() as u32;
         Self {

@@ -100,12 +100,7 @@ struct TomlConfig {
     coins             : std::collections::HashMap<String, TomlConfigEntry>,
 }
 
-pub fn load_config(coin: &str) -> Config {
-    let config_path = format!("{}/config.toml", data_dir());
-    let mut config_file = std::fs::File::open(&config_path)
-        .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
-    let mut config_str = String::new();
-    config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
+pub fn load_config_from_str(config_str: &str, coin: &str) -> Config {
     let mut config: TomlConfig = toml::from_str(&config_str).expect("Failed to parse config file.");
     let coin_config = config.coins.remove(coin);
     if coin_config.is_none() {
@@ -127,6 +122,20 @@ pub fn load_config(coin: &str) -> Config {
         http_port    : coin_config.http_port    .unwrap_or(config.http_port    .unwrap_or(8000)),
         ws_endpoint  : coin_config.ws_endpoint  .unwrap_or(config.ws_endpoint  .unwrap_or("127.0.0.1:8001".to_string())),
     }
+}
+
+pub fn load_config(coin: &str) -> Config {
+    let mut config_file = std::fs::File::open(&format!("{}/config.toml", data_dir()))
+        .expect("Failed to open config file.\nPlease copy \"config.example.toml\" to \"~/.chainseeker/config.toml\".");
+    let mut config_str = String::new();
+    config_file.read_to_string(&mut config_str).expect("Failed to read config file.");
+    load_config_from_str(&config_str, coin)
+}
+
+#[cfg(test)]
+pub fn config_example(coin: &str) -> Config {
+    let config_str = include_bytes!("../config.example.toml");
+    load_config_from_str(std::str::from_utf8(config_str).unwrap(), coin)
 }
 
 pub fn consensus_encode<E>(enc: &E) -> Vec<u8>

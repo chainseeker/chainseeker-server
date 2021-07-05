@@ -17,7 +17,7 @@ rest_endpoint = "http://localhost:18332/rest/"
 zmq_endpoint = "tcp://localhost:28333"
 
 [coins.rbtc]
-genesis_block_hash = ""
+genesis_block_hash = "0000000000000000000000000000000000000000000000000000000000000000"
 p2pkh_version = 111
 p2sh_version = 195
 segwit_hrp = "bcrt"

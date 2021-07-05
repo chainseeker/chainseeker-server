@@ -350,3 +350,24 @@ impl RestBlockSummary {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn rest() {
+        let tx_db = TxDB::new("test/rest", true);
+        let regtest_blocks = fixtures::regtest_blocks();
+        for height in 0..103 {
+            for tx in regtest_blocks[height].txdata.iter() {
+                tx_db.put_tx(tx, Some(height as u32)).unwrap();
+            }
+        }
+        let config = config_example("rbtc");
+        let block_rest = RestBlockWithTxs::from_block_content(&tx_db, &BlockContentDBValue::new(102, &regtest_blocks[102]), &config);
+        let block_rest_json = serde_json::to_string(&block_rest).unwrap();
+        //println!("{}", block_rest_json);
+        let block_json = r#"{"height":102,"header":"00000020df0fb031f6a92e8d1984f5371a6b6ff3b75258b88b8236c267eb5bd9eb1ac504fa67c6f3a210ff753118bc65a1c06ec9fde641d00fcee6cc441c2915694c81f2b226d960ffff7f2001000000","hash":"0df678a7cc20dc21d0859930daece5f2837798342d24c8f3dfdbaffe47012c31","version":536870912,"previousblockhash":"04c51aebd95beb67c236828bb85852b7f36f6b1a37f584198d2ea9f631b00fdf","merkleroot":"f2814c6915291c44cce6ce0fd041e6fdc96ec0a165bc183175ff10a2f3c667fa","time":1624843954,"bits":"207fffff","difficulty":4.6565423739069247e-10,"nonce":1,"size":472,"strippedsize":327,"weight":1453,"txs":[{"confirmedHeight":102,"hex":"020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff0401660101ffffffff028df2052a01000000160014683ca4604908ebda57dfd97ff94eb5553b4e5aee0000000000000000266a24aa21a9ed623e8562941c757c06c39e2b1c11bc9e92aa9e6254dbf8d968d43acaab0408d60120000000000000000000000000000000000000000000000000000000000000000000000000","txid":"518bcac0eff203a1cbdcd28a330760c6906eaa3f08885d5b396fdd606e9e6ea4","hash":"8f0303643150caf821e66da0c63865134b83abab8d6bfe12b1f6b0a1656a02f8","size":169,"vsize":142,"weight":568,"version":2,"locktime":0,"vin":[{"txid":"0000000000000000000000000000000000000000000000000000000000000000","vout":4294967295,"scriptSig":{"asm":"OP_PUSHBYTES_1 66 OP_PUSHBYTES_1 01","hex":"01660101"},"txinwitness":["200000000000000000000000000000000000000000000000000000000000000000"],"sequence":4294967295,"value":0,"address":null}],"vout":[{"value":5000000141,"n":0,"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 683ca4604908ebda57dfd97ff94eb5553b4e5aee","hex":"0014683ca4604908ebda57dfd97ff94eb5553b4e5aee","type":"witnesspubkeyhash","address":"bcrt1qdq72gczfpr4a547lm9lljn4425a5ukhwrfntw8"}},{"value":0,"n":1,"scriptPubKey":{"asm":"OP_RETURN OP_PUSHBYTES_36 aa21a9ed623e8562941c757c06c39e2b1c11bc9e92aa9e6254dbf8d968d43acaab0408d6","hex":"6a24aa21a9ed623e8562941c757c06c39e2b1c11bc9e92aa9e6254dbf8d968d43acaab0408d6","type":"unknown","address":null}}],"fee":-5000000141},{"confirmedHeight":102,"hex":"02000000000101f0081f8204df7696cc30cda9a8644fc6f6f30bb76a44f65691edcf821b7d100d0000000000fdffffff0273276bee000000001600143fb63f3b6d30f31ada79d7c14a995e52c4a6fdb300ca9a3b00000000160014ecac3ece9070b2b28ecfbc487b5ca575b1edb47a0247304402203a6c4b22bf0970bc4976f7dc51c20d55efe567c0b65d44011ca43e19dbbe6b25022001cf5af20bd916271120c957c8699c54f60711d44fcda81911718656318e47c7012102ae26b761393f8cebd89fbeeb783f190fc7b293a9c68060e10c076bc8df794d7f65000000","txid":"e5bdd0adc488e35e5441e7391d26808b40149031abe6d4014504b5f34a3e14e5","hash":"ccd68ec2c6b7f02fd29b5f88501761d11c2840b5accc07f269b867fdadb9f41e","size":222,"vsize":141,"weight":561,"version":2,"locktime":101,"vin":[{"txid":"0d107d1b82cfed9156f6446ab70bf3f6c64f64a8a9cd30cc9676df04821f08f0","vout":0,"scriptSig":{"asm":"","hex":""},"txinwitness":["47304402203a6c4b22bf0970bc4976f7dc51c20d55efe567c0b65d44011ca43e19dbbe6b25022001cf5af20bd916271120c957c8699c54f60711d44fcda81911718656318e47c701","2102ae26b761393f8cebd89fbeeb783f190fc7b293a9c68060e10c076bc8df794d7f"],"sequence":4294967293,"value":5000000000,"address":"bcrt1qdq72gczfpr4a547lm9lljn4425a5ukhwrfntw8"}],"vout":[{"value":3999999859,"n":0,"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 3fb63f3b6d30f31ada79d7c14a995e52c4a6fdb3","hex":"00143fb63f3b6d30f31ada79d7c14a995e52c4a6fdb3","type":"witnesspubkeyhash","address":"bcrt1q87mr7wmdxre34kne6lq54x272tz2dldnxnk9el"}},{"value":1000000000,"n":1,"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 ecac3ece9070b2b28ecfbc487b5ca575b1edb47a","hex":"0014ecac3ece9070b2b28ecfbc487b5ca575b1edb47a","type":"witnesspubkeyhash","address":"bcrt1qajkran5swzet9rk0h3y8kh99wkc7mdr6amyn3x"}}],"fee":141}]}"#;
+        assert_eq!(block_rest_json, block_json);
+    }
+}
