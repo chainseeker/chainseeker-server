@@ -286,6 +286,17 @@ pub struct RestBlockWithTxs {
 impl RestBlockWithTxs {
     pub fn from_block_content(tx_db: &TxDB, block_content: &BlockContentDBValue, config: &Config) -> Self {
         let rest_block_header = RestBlockHeader::from_block_content(block_content, config);
+        // TODO: waiting upstream fix: https://github.com/rust-rocksdb/rust-rocksdb/issues/536
+        /*
+        let begin_get = std::time::Instant::now();
+        let txs = tx_db.multi_get(block_content.txids.clone());
+        println!("RestBlockWithTxs: get transactions from DB in {}ms.", begin_get.elapsed().as_millis());
+        let begin_convert = std::time::Instant::now();
+        let txs = txs.into_iter().map(|tx| {
+            RestTx::from_tx_db_value(&tx.unwrap(), config)
+        }).collect();
+        println!("RestBlockWithTxs: convert transactions in {}ms.", begin_convert.elapsed().as_millis());
+        */
         let txs = block_content.txids.iter().map(|txid| {
             let tx = tx_db.get(txid).unwrap();
             RestTx::from_tx_db_value(&tx, config)

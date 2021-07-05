@@ -264,6 +264,16 @@ impl<K, V> RocksDB<K, V>
             None => None,
         }
     }
+    pub fn multi_get<I: IntoIterator<Item = K>>(&self, keys: I) -> Vec<Option<V>> {
+        let keys: Vec<Vec<u8>> = keys.into_iter().map(|key| key.serialize()).collect();
+        self.db.multi_get(keys).unwrap().iter().map(|value| {
+            if value.len() <= 0 {
+                None
+            } else {
+                Some(V::deserialize(value))
+            }
+        }).collect()
+    }
     pub fn put(&self, key: &K, value: &V) {
         self.db.put(key.serialize(), value.serialize()).unwrap();
     }
@@ -314,6 +324,7 @@ mod test {
             vec![(key1.clone(), value1.clone())]);
         db.delete(&key1);
         assert_eq!(db.get(&key1), None);
+        assert_eq!(db.multi_get(vec![key1, key2]), vec![None, Some(value2)]);
     }
     #[test]
     fn rocks_db_cf() {
