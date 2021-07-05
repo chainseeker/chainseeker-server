@@ -9,7 +9,6 @@ const COIN: &str = "bench";
 const BLOCK: &[u8] = include_bytes!("../fixtures/mainnet/block_500000.bin");
 
 async fn run_utxo_server(utxos: &Vec<UtxoEntry>) {
-    let _print_gag = gag::Gag::stdout().unwrap();
     let mut utxo_server = UtxoServer::new(COIN);
     for utxo in utxos {
         utxo_server.push(&utxo).await;
@@ -54,7 +53,6 @@ fn bench_db(c: &mut Criterion) {
         }
     }
     c.bench_function("RichList", |b| b.iter(|| {
-        let _print_gag = gag::Gag::stdout().unwrap();
         let mut rich_list = RichList::new();
         rich_list.process_block(&block, &previous_utxos);
         rich_list.finalize();

@@ -29,7 +29,6 @@ bitcoincore-rpc = "0.13"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = [] }
-gag = "1.0"
 
 [[bench]]
 name = "db"
