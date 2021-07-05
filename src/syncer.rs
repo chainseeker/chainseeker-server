@@ -16,6 +16,8 @@ pub struct Syncer {
 impl Syncer {
     pub async fn new(coin: &str, config: &Config) -> Self {
         let rest = get_rest(config);
+        // Checks if we can access to Bitcoin Core's REST endpoint.
+        rest.chaininfo().await.expect("Could not connect to Bitcoin Core's REST endpoint. Please check if the node is running, and listening on the correct IP address and port.");
         let syncer = Self {
             config: (*config).clone(),
             utxo_db: UtxoDB::new(coin, false),
