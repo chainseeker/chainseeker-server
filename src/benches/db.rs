@@ -8,13 +8,6 @@ use chainseeker_syncer::*;
 const COIN: &str = "bench";
 const BLOCK: &[u8] = include_bytes!("../fixtures/mainnet/block_500000.bin");
 
-async fn run_utxo_server(utxos: &Vec<UtxoEntry>) {
-    let mut utxo_server = UtxoServer::new(COIN);
-    for utxo in utxos {
-        utxo_server.push(&utxo).await;
-    }
-}
-
 fn bench_synced_height_db(c: &mut Criterion) {
     let mut synced_height_db = SyncedHeightDB::new(COIN);
     const HEIGHT: u32 = 123456;
@@ -37,7 +30,10 @@ fn bench_db(c: &mut Criterion) {
     let utxos = utxo_db.process_block(&block, true);
     c.bench_function("UtxoServer", |b| b.iter(|| {
         rt.block_on(async {
-            run_utxo_server(&utxos).await;
+            let mut utxo_server = UtxoServer::new(COIN);
+            for utxo in utxos.iter() {
+                utxo_server.push(&utxo).await;
+            }
         });
     }));
     // Construct dummy data.
