@@ -1,5 +1,5 @@
 use serde::Serialize;
-use bitcoin_hashes::hex::ToHex;
+use bitcoin::hashes::hex::ToHex;
 use bitcoin::{Script, TxIn, TxOut, Address, Network, AddressType, Transaction};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 

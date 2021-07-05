@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 use num_format::{Locale, ToFormattedStr, ToFormattedString};
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options};
-use bitcoin_hashes::hex::FromHex;
+use bitcoin::hashes::hex::FromHex;
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{BlockHash, Block, BlockHeader, Address, Script, Network};
 use bitcoin::util::uint::Uint256;

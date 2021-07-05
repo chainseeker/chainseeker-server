@@ -23,7 +23,6 @@ hyper = { version = "0.14", features = ["full"] }
 routerify = "2.1"
 rocksdb = "0.16"
 bitcoin = "0.26"
-bitcoin_hashes = "0.9"
 bitcoin-rest = { version = "0.0.10", default-features = false }
 bitcoincore-rpc = "0.13"
 

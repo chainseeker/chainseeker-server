@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use hyper::{Body, Request, Response, Server, StatusCode};
 use routerify::prelude::*;
 use routerify::{Middleware, Router, RouterService};
-use bitcoin_hashes::hex::{FromHex, ToHex};
+use bitcoin::hashes::hex::{FromHex, ToHex};
 use bitcoin::{Script, Address};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 
