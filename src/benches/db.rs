@@ -16,7 +16,7 @@ async fn run_utxo_server(utxos: &Vec<UtxoEntry>) {
 }
 
 fn bench_synced_height_db(c: &mut Criterion) {
-    let synced_height_db = SyncedHeightDB::new(COIN);
+    let mut synced_height_db = SyncedHeightDB::new(COIN);
     const HEIGHT: u32 = 123456;
     synced_height_db.put(HEIGHT);
     c.bench_function("SyncedHeightDB.put()", |b| b.iter(|| {
