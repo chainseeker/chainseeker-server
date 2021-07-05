@@ -45,6 +45,10 @@ impl RichList {
     pub fn remove(&mut self, script_pubkey: &Script, value: u64) {
         let v = self.map.get_mut(script_pubkey).unwrap();
         *v -= value;
+        // Remove the entry if the value is zero.
+        if *v <= 0 {
+            self.map.remove(script_pubkey);
+        }
     }
     pub fn get_index_of(&self, script_pubkey: &Script) -> Option<usize> {
         self.map.get_index_of(script_pubkey)
@@ -78,6 +82,10 @@ impl RichList {
             let txid = tx.txid();
             for vout in 0..tx.output.len() {
                 let output = &tx.output[vout];
+                // Ignore zero values.
+                if output.value <= 0 {
+                    continue;
+                }
                 let utxo = UtxoEntry {
                     script_pubkey: output.script_pubkey.clone(),
                     txid,
@@ -109,14 +117,12 @@ impl RichList {
 #[cfg(test)]
 mod test {
     use super::*;
-    fn entries() -> [RichListEntry; 6] {
+    fn entries() -> [RichListEntry; 4] {
         [
             RichListEntry { script_pubkey: consensus_decode(&hex::decode("160014683ca4604908ebda57dfd97ff94eb5553b4e5aee").unwrap()), value: 505000000141, },
             RichListEntry { script_pubkey: consensus_decode(&hex::decode("434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()), value: 5000000000, },
             RichListEntry { script_pubkey: consensus_decode(&hex::decode("1600143fb63f3b6d30f31ada79d7c14a995e52c4a6fdb3").unwrap()), value: 3999999859, },
             RichListEntry { script_pubkey: consensus_decode(&hex::decode("160014ecac3ece9070b2b28ecfbc487b5ca575b1edb47a").unwrap()), value: 1000000000, },
-            RichListEntry { script_pubkey: consensus_decode(&hex::decode("266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9").unwrap()), value: 0, },
-            RichListEntry { script_pubkey: consensus_decode(&hex::decode("266a24aa21a9ed623e8562941c757c06c39e2b1c11bc9e92aa9e6254dbf8d968d43acaab0408d6").unwrap()), value: 0, },
         ]
     }
     #[allow(dead_code)]
@@ -136,11 +142,17 @@ mod test {
             rich_list.process_block(&block, &prev_utxos);
         }
         rich_list.finalize();
+        rich_list.shrink_to_fit();
         //print_rich_list(&rich_list);
         let entries = entries();
+        assert_eq!(rich_list.len(), entries.len());
+        assert_eq!(rich_list.capacity(), entries.len());
+        assert_eq!(rich_list.size(), 165);
         for (i, (script_pubkey, value)) in rich_list.iter().enumerate() {
             assert_eq!(*script_pubkey, entries[i].script_pubkey);
             assert_eq!(*value, entries[i].value);
+            assert_eq!(rich_list.get_index_of(&entries[i].script_pubkey), Some(i));
         }
+        assert_eq!(rich_list.get_in_range(1..3), entries[1..3]);
     }
 }
