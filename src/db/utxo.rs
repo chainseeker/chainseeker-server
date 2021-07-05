@@ -235,7 +235,7 @@ mod test {
             utxo.value);
         }
     }
-    fn find_tx(blocks: &Vec<Block>, txid: &Txid) -> Transaction {
+    fn find_tx(blocks: &[Block], txid: &Txid) -> Transaction {
         for block in blocks.iter() {
             for tx in block.txdata.iter() {
                 if tx.txid() == *txid {
@@ -247,10 +247,10 @@ mod test {
     }
     #[test]
     fn utxo_db() {
-        let blocks = fixtures::regtest_blocks().to_vec();
+        let blocks = fixtures::regtest_blocks();
         let mut utxo_db = UtxoDB::new("test/utxo", true);
-        for h in 0..(blocks.len()-1) {
-            utxo_db.process_block(&blocks[h], false);
+        for block in blocks.iter() {
+            utxo_db.process_block(&block, false);
         }
         // Test UTXO database BEFORE reorg.
         let mut utxos_test = utxo_db.iter().filter(|utxo| utxo.value != 0).collect::<Vec<UtxoEntry>>();
@@ -259,9 +259,10 @@ mod test {
         utxos.sort();
         assert_eq!(utxos_test, utxos);
         // Test UTXO database AFTER reorg.
+        let reorged_block = fixtures::regtest_reorged_block();
         // Find previous transactions.
         let mut prev_txs = Vec::new();
-        for tx in blocks[blocks.len()-2].txdata.iter() {
+        for tx in blocks.last().unwrap().txdata.iter() {
             for vin in tx.input.iter() {
                 if vin.previous_output.is_null() {
                     continue;
@@ -271,8 +272,8 @@ mod test {
                 prev_txs.push(prev_tx);
             }
         }
-        utxo_db.reorg_block(&blocks[blocks.len()-2], &prev_txs);
-        utxo_db.process_block(&blocks[blocks.len()-1], false);
+        utxo_db.reorg_block(&blocks.last().unwrap(), &prev_txs);
+        utxo_db.process_block(&reorged_block, false);
         let mut utxos_test = utxo_db.iter().filter(|utxo| utxo.value != 0).collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
         let mut utxos = fixtures::utxos_after_reorg();

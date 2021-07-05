@@ -128,11 +128,9 @@ mod test {
     }
     #[test]
     fn addr_index_db() {
-        let blocks = fixtures::regtest_blocks().to_vec();
         let addr_index_db = AddressIndexDB::new("test/address_index", true);
         let mut utxo_db = UtxoDB::new("test/address_index", true);
-        for h in 0..(blocks.len()-1) {
-            let block = &blocks[h];
+        for block in fixtures::regtest_blocks().iter() {
             let prev_utxos = utxo_db.process_block(&block, false);
             addr_index_db.process_block(&block, &prev_utxos);
         }

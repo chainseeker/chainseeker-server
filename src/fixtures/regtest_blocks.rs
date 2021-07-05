@@ -1,5 +1,5 @@
 use crate::*;
-pub fn regtest_blocks() -> [Block; 104] {
+pub fn regtest_blocks() -> [Block; 103] {
     [
         consensus_decode(include_bytes!("./regtest/block_0.bin")),
         consensus_decode(include_bytes!("./regtest/block_1.bin")),
@@ -104,6 +104,9 @@ pub fn regtest_blocks() -> [Block; 104] {
         consensus_decode(include_bytes!("./regtest/block_100.bin")),
         consensus_decode(include_bytes!("./regtest/block_101.bin")),
         consensus_decode(include_bytes!("./regtest/block_102.bin")),
-        consensus_decode(include_bytes!("./regtest/block_102_new.bin")),
     ]
+}
+
+pub fn regtest_reorged_block() -> Block {
+    consensus_decode(include_bytes!("./regtest/block_102_new.bin"))
 }

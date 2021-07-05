@@ -151,18 +151,18 @@ mod tests {
     use super::*;
     #[test]
     fn put_and_get_transactions() {
-        let blocks = fixtures::regtest_blocks().to_vec();
+        let blocks = fixtures::regtest_blocks();
         let mut utxo_db = UtxoDB::new("test/tx", true);
         let tx_db = TxDB::new("test/tx", true);
         let mut previous_utxos_vec = Vec::new();
-        for height in 0..blocks.len()-1 {
-            let previous_utxos = utxo_db.process_block(&blocks[height], true);
-            tx_db.process_block(height as u32, &blocks[height], &previous_utxos);
+        for (height, block) in blocks.iter().enumerate() {
+            let previous_utxos = utxo_db.process_block(&block, true);
+            tx_db.process_block(height as u32, &block, &previous_utxos);
             previous_utxos_vec.push(previous_utxos);
         }
-        for height in 0..blocks.len()-1 {
+        for (height, block) in blocks.iter().enumerate() {
             let mut previous_utxo_index = 0;
-            for tx in blocks[height].txdata.iter() {
+            for tx in block.txdata.iter() {
                 let value = tx_db.get(&tx.txid()).unwrap();
                 assert_eq!(value.confirmed_height, Some(height as u32));
                 assert_eq!(value.tx, *tx);

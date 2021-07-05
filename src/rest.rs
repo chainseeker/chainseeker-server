@@ -358,8 +358,8 @@ mod test {
     fn rest() {
         let tx_db = TxDB::new("test/rest", true);
         let regtest_blocks = fixtures::regtest_blocks();
-        for height in 0..103 {
-            for tx in regtest_blocks[height].txdata.iter() {
+        for (height, block) in regtest_blocks.iter().enumerate() {
+            for tx in block.txdata.iter() {
                 tx_db.put_tx(tx, Some(height as u32)).unwrap();
             }
         }
