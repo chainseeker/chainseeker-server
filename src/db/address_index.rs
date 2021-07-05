@@ -122,8 +122,8 @@ mod test {
         entries.sort();
         for entry in entries.iter() {
             println!("        AddressIndexDBKey {{ script_pubkey: consensus_decode(&hex::decode(\"{}\").unwrap()), txid: consensus_decode(&hex::decode(\"{}\").unwrap()), }},",
-            hex::encode(consensus_encode(&entry.script_pubkey)),
-            hex::encode(consensus_encode(&entry.txid)));
+                hex::encode(consensus_encode(&entry.script_pubkey)),
+                hex::encode(consensus_encode(&entry.txid)));
         }
     }
     #[test]

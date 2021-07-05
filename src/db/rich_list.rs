@@ -35,6 +35,9 @@ impl RichList {
     pub fn shrink_to_fit(&mut self) {
         self.map.shrink_to_fit();
     }
+    pub fn iter(&self) -> indexmap::map::Iter<'_, Script, u64> {
+        self.map.iter()
+    }
     pub fn push(&mut self, utxo: &UtxoEntry) {
         let value = self.map.get(&utxo.script_pubkey).unwrap_or(&0u64) + utxo.value;
         self.map.insert(utxo.script_pubkey.clone(), value);
@@ -100,5 +103,44 @@ impl RichList {
     }
     pub fn finalize(&mut self) {
         self.map.par_sort_by(|_k1, v1, _k2, v2| v2.cmp(v1));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    fn entries() -> [RichListEntry; 6] {
+        [
+            RichListEntry { script_pubkey: consensus_decode(&hex::decode("160014683ca4604908ebda57dfd97ff94eb5553b4e5aee").unwrap()), value: 505000000141, },
+            RichListEntry { script_pubkey: consensus_decode(&hex::decode("434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()), value: 5000000000, },
+            RichListEntry { script_pubkey: consensus_decode(&hex::decode("1600143fb63f3b6d30f31ada79d7c14a995e52c4a6fdb3").unwrap()), value: 3999999859, },
+            RichListEntry { script_pubkey: consensus_decode(&hex::decode("160014ecac3ece9070b2b28ecfbc487b5ca575b1edb47a").unwrap()), value: 1000000000, },
+            RichListEntry { script_pubkey: consensus_decode(&hex::decode("266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf9").unwrap()), value: 0, },
+            RichListEntry { script_pubkey: consensus_decode(&hex::decode("266a24aa21a9ed623e8562941c757c06c39e2b1c11bc9e92aa9e6254dbf8d968d43acaab0408d6").unwrap()), value: 0, },
+        ]
+    }
+    #[allow(dead_code)]
+    fn print_rich_list(rich_list: &RichList) {
+        for (script_pubkey, value) in rich_list.iter() {
+            println!("            RichListEntry {{ script_pubkey: consensus_decode(&hex::decode(\"{}\").unwrap()), value: {}, }},",
+                hex::encode(consensus_encode(&script_pubkey)),
+                value);
+        }
+    }
+    #[test]
+    fn rich_list() {
+        let mut rich_list = RichList::new();
+        let mut utxo_db = UtxoDB::new("test/rich_list", true);
+        for block in fixtures::regtest_blocks().iter() {
+            let prev_utxos = utxo_db.process_block(&block, false);
+            rich_list.process_block(&block, &prev_utxos);
+        }
+        rich_list.finalize();
+        //print_rich_list(&rich_list);
+        let entries = entries();
+        for (i, (script_pubkey, value)) in rich_list.iter().enumerate() {
+            assert_eq!(*script_pubkey, entries[i].script_pubkey);
+            assert_eq!(*value, entries[i].value);
+        }
     }
 }
