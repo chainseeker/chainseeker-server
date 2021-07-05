@@ -8,25 +8,9 @@ use chainseeker_syncer::*;
 const COIN: &str = "bench";
 const BLOCK: &[u8] = include_bytes!("../fixtures/mainnet/block_500000.bin");
 
-async fn run_utxo_server_in_memory(utxos: &Vec<UtxoEntry>) {
+async fn run_utxo_server(utxos: &Vec<UtxoEntry>) {
     let _print_gag = gag::Gag::stdout().unwrap();
-    let mut utxo_server = UtxoServerInMemory::new(COIN);
-    for utxo in utxos {
-        utxo_server.push(&utxo).await;
-    }
-}
-
-async fn run_utxo_server_in_storage(utxos: &Vec<UtxoEntry>) {
-    let _print_gag = gag::Gag::stdout().unwrap();
-    let mut utxo_server = UtxoServerInStorage::new(COIN);
-    for utxo in utxos {
-        utxo_server.push(&utxo).await;
-    }
-}
-
-async fn run_utxo_server_in_storage_lazy(utxos: &Vec<UtxoEntry>) {
-    let _print_gag = gag::Gag::stdout().unwrap();
-    let mut utxo_server = UtxoServerInStorageLazy::new(COIN);
+    let mut utxo_server = UtxoServer::new(COIN);
     for utxo in utxos {
         utxo_server.push(&utxo).await;
     }
@@ -40,19 +24,9 @@ fn bench_db(c: &mut Criterion) {
         utxo_db.process_block(&block, true);
     }));
     let utxos = utxo_db.process_block(&block, true);
-    c.bench_function("UtxoServerInMemory", |b| b.iter(|| {
+    c.bench_function("UtxoServer", |b| b.iter(|| {
         rt.block_on(async {
-            run_utxo_server_in_memory(&utxos).await;
-        });
-    }));
-    c.bench_function("UtxoServerInStorage", |b| b.iter(|| {
-        rt.block_on(async {
-            run_utxo_server_in_storage(&utxos).await;
-        });
-    }));
-    c.bench_function("UtxoServerInStorageLazy", |b| b.iter(|| {
-        rt.block_on(async {
-            run_utxo_server_in_storage_lazy(&utxos).await;
+            run_utxo_server(&utxos).await;
         });
     }));
     // Construct dummy data.
