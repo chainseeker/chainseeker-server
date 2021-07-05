@@ -14,8 +14,6 @@ pub mod rocks_db;
 pub use rocks_db::*;
 pub mod rocks_db_multi;
 pub use rocks_db_multi::*;
-pub mod rocks_db_lazy;
-pub use rocks_db_lazy::*;
 pub mod db;
 pub use db::*;
 pub mod syncer;

@@ -3,9 +3,6 @@ use bitcoin::{Txid, Script, Block, WScriptHash};
 
 use crate::*;
 
-pub type UtxoServer = UtxoServerInMemory;
-//pub type UtxoServer = UtxoServerInStorageLazy;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct UtxoServerValue {
     pub txid: Txid,  // +32 = 32
@@ -50,11 +47,11 @@ impl Deserialize for UtxoServerValue {
 }
 
 #[derive(Debug, Clone)]
-pub struct UtxoServerInMemory {
+pub struct UtxoServer {
     db: IndexMap<WScriptHash, Vec<UtxoServerValue>>,
 }
 
-impl UtxoServerInMemory {
+impl UtxoServer {
     pub fn new(_coin: &str) -> Self {
         Self {
             db: IndexMap::new(),
@@ -128,170 +125,3 @@ impl UtxoServerInMemory {
         }
     }
 }
-
-/*
-#[derive(Debug, Clone, PartialEq, Eq, std::hash::Hash)]
-struct UtxoServerInStorageKey {
-    script_pubkey: Script,
-}
-
-impl From<&Script> for UtxoServerInStorageKey {
-    fn from(script_pubkey: &Script) -> Self {
-        Self {
-            script_pubkey: (*script_pubkey).clone(),
-        }
-    }
-}
-
-impl Serialize for UtxoServerInStorageKey {
-    fn serialize(&self) -> Vec<u8> {
-        consensus_encode(&self.script_pubkey)
-    }
-}
-
-impl Deserialize for UtxoServerInStorageKey {
-    fn deserialize(buf: &[u8]) -> Self {
-        Self {
-            script_pubkey: consensus_decode(buf),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct UtxoServerInStorage {
-    db: RocksDBMulti<UtxoServerInStorageKey, UtxoServerValue>,
-}
-
-impl UtxoServerInStorage {
-    fn path(coin: &str) -> String {
-        format!("/tmp/chainseeker/{}/utxo", coin)
-    }
-    pub fn new(coin: &str) -> Self {
-        let db = RocksDBMulti::new(&Self::path(coin), true);
-        Self {
-            db,
-        }
-    }
-    pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
-        self.db.get(&script_pubkey.into())
-    }
-    pub async fn push(&mut self, utxo: &UtxoEntry) {
-        let value = UtxoServerValue {
-            txid: utxo.txid,
-            vout: utxo.vout,
-            value: utxo.value,
-        };
-        self.db.push(&(&utxo.script_pubkey).into(), value);
-    }
-    pub async fn remove(&mut self, utxo: &UtxoEntry) {
-        let key = UtxoServerInStorageKey {
-            script_pubkey: utxo.script_pubkey.clone()
-        };
-        let value = UtxoServerValue {
-            txid: utxo.txid,
-            vout: utxo.vout,
-            value: utxo.value,
-        };
-        self.db.pop(&key, &value);
-    }
-    pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
-        // Process vouts.
-        for tx in block.txdata.iter() {
-            let txid = tx.txid();
-            for vout in 0..tx.output.len() {
-                let output = &tx.output[vout];
-                let utxo = UtxoEntry {
-                    script_pubkey: output.script_pubkey.clone(),
-                    txid,
-                    vout: vout as u32,
-                    value: output.value,
-                };
-                self.push(&utxo).await;
-            }
-        }
-        // Process vins.
-        let mut previous_utxo_index = 0;
-        for tx in block.txdata.iter() {
-            for vin in tx.input.iter() {
-                if vin.previous_output.is_null() {
-                    continue;
-                }
-                let utxo = &previous_utxos[previous_utxo_index];
-                self.remove(utxo).await;
-                previous_utxo_index += 1;
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct UtxoServerInStorageLazy {
-    db: RocksDBLazy<UtxoServerInStorageKey, UtxoServerValue>,
-}
-
-impl UtxoServerInStorageLazy {
-    fn path(coin: &str) -> String {
-        format!("/tmp/chainseeker/{}/utxo", coin)
-    }
-    pub fn new(coin: &str) -> Self {
-        let db = RocksDBLazy::new(&Self::path(coin), true);
-        let server = Self {
-            db,
-        };
-        server
-    }
-    pub async fn flush(&mut self) {
-        self.db.flush().await;
-    }
-    pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
-        self.db.get(&script_pubkey.into()).await
-    }
-    pub async fn push(&mut self, utxo: &UtxoEntry) {
-        let value = UtxoServerValue {
-            txid: utxo.txid,
-            vout: utxo.vout,
-            value: utxo.value,
-        };
-        self.db.push(&(&utxo.script_pubkey).into(), &value).await;
-    }
-    pub async fn remove(&mut self, utxo: &UtxoEntry) {
-        let key = UtxoServerInStorageKey {
-            script_pubkey: utxo.script_pubkey.clone()
-        };
-        let value = UtxoServerValue {
-            txid: utxo.txid,
-            vout: utxo.vout,
-            value: utxo.value,
-        };
-        self.db.remove(&key, &value).await;
-    }
-    pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
-        // Process vouts.
-        for tx in block.txdata.iter() {
-            let txid = tx.txid();
-            for vout in 0..tx.output.len() {
-                let output = &tx.output[vout];
-                let utxo = UtxoEntry {
-                    script_pubkey: output.script_pubkey.clone(),
-                    txid,
-                    vout: vout as u32,
-                    value: output.value,
-                };
-                self.push(&utxo).await;
-            }
-        }
-        // Process vins.
-        let mut previous_utxo_index = 0;
-        for tx in block.txdata.iter() {
-            for vin in tx.input.iter() {
-                if vin.previous_output.is_null() {
-                    continue;
-                }
-                let utxo = &previous_utxos[previous_utxo_index];
-                self.remove(utxo).await;
-                previous_utxo_index += 1;
-            }
-        }
-    }
-}
-*/
