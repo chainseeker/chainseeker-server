@@ -205,7 +205,7 @@ impl<'a, K, V> RocksDBColumnFamily<'a, K, V>
         self.name.as_str()
     }
     pub fn get(&self, key: &K) -> Option<V> {
-        match self.base.db.get_cf(self.cf, key.serialize()).unwrap() {
+        match self.base.db.get_pinned_cf(self.cf, key.serialize()).unwrap() {
             Some(value) => Some(V::deserialize(&value)),
             None => None,
         }
@@ -259,7 +259,7 @@ impl<K, V> RocksDB<K, V>
         }
     }
     pub fn get(&self, key: &K) -> Option<V> {
-        match self.db.get(key.serialize()).unwrap() {
+        match self.db.get_pinned(key.serialize()).unwrap() {
             Some(value) => Some(V::deserialize(&value)),
             None => None,
         }
