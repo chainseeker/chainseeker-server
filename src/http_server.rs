@@ -263,7 +263,7 @@ impl HttpServer {
             return Ok(Self::not_found("Failed to decode input script or address."));
         }
         let tx_db = server.tx_db.read().await;
-        let values = server.utxo_server.read().await.get(&script.unwrap()).await;
+        let values = server.utxo_server.read().await.get(&script.unwrap());
         let mut utxos: Vec<RestUtxo> = Vec::new();
         for utxo in values.iter() {
             match tx_db.get(&utxo.txid) {

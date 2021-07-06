@@ -56,7 +56,7 @@ impl Syncer {
         let addr_index_elapsed = begin_addr_index.elapsed();
         // Process if non initial-sync.
         if !initial {
-            self.http_server.utxo_server.write().await.process_block(block, &previous_utxos).await;
+            self.http_server.utxo_server.write().await.process_block(block, &previous_utxos);
             self.http_server.rich_list.write().await.process_block(block, &previous_utxos);
         }
         // Count vins/vouts.
@@ -211,7 +211,7 @@ impl Syncer {
         let utxo_server_join = tokio::spawn(async move {
             let mut utxo_server = utxo_server.write().await;
             while let Some(utxo) = utxo_server_rx.recv().await {
-                utxo_server.push(&utxo).await;
+                utxo_server.push(&utxo);
             }
         });
         let rich_list = self.http_server.rich_list.clone();

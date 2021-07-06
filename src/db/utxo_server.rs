@@ -9,43 +9,6 @@ pub struct UtxoServerValue {
     pub vout: u32,   // + 4 = 36
 }
 
-impl ConstantSize for UtxoServerValue {
-    const LEN: usize = 36;
-}
-
-impl From<&UtxoServerValue> for Vec<u8> {
-    fn from(value: &UtxoServerValue) -> Self {
-        let mut buf: [u8; 36] = [0; 36];
-        value.txid.consensus_encode(&mut buf[0..32]).expect("Failed to encode txid.");
-        buf[32..36].copy_from_slice(&value.vout.to_le_bytes());
-        buf.to_vec()
-    }
-}
-
-impl Serialize for UtxoServerValue {
-    fn serialize(&self) -> Vec<u8> {
-        self.into()
-    }
-}
-
-impl From<&[u8]> for UtxoServerValue {
-    fn from(buf: &[u8]) -> UtxoServerValue {
-        assert_eq!(buf.len(), 36);
-        let txid = consensus_decode(&buf[0..32]);
-        let vout = bytes_to_u32(&buf[32..36]);
-        UtxoServerValue {
-            txid,
-            vout,
-        }
-    }
-}
-
-impl Deserialize for UtxoServerValue {
-    fn deserialize(buf: &[u8]) -> Self {
-        buf.into()
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct UtxoServer {
     db: IndexMap<WScriptHash, Vec<UtxoServerValue>>,
@@ -72,13 +35,13 @@ impl UtxoServer {
     pub fn iter(&self) -> indexmap::map::Iter<WScriptHash, Vec<UtxoServerValue>> {
         self.db.iter()
     }
-    pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
+    pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         match self.db.get(&script_pubkey.wscript_hash()) {
             Some(values) => (*values).clone(),
             None => Vec::new(),
         }
     }
-    pub async fn push(&mut self, utxo: &UtxoEntry) {
+    pub fn push(&mut self, utxo: &UtxoEntry) {
         let wscript_hash = utxo.script_pubkey.wscript_hash();
         let values = match self.db.get_mut(&wscript_hash) {
             Some(values) => values,
@@ -99,7 +62,7 @@ impl UtxoServer {
             !(utxo_value.txid == *txid && utxo_value.vout == vout)
         }).cloned().collect();
     }
-    pub async fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+    pub fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
         // Process vouts.
         for tx in block.txdata.iter() {
             let txid = tx.txid();
@@ -111,7 +74,7 @@ impl UtxoServer {
                     vout: vout as u32,
                     value: output.value,
                 };
-                self.push(&utxo).await;
+                self.push(&utxo);
             }
         }
         // Process vins.
@@ -150,7 +113,7 @@ mod test {
         let mut utxo_db = UtxoDB::new("test/utxo_server", true);
         for block in fixtures::regtest_blocks().iter() {
             let prev_utxos = utxo_db.process_block(&block, false);
-            utxo_server.process_block(&block, &prev_utxos).await;
+            utxo_server.process_block(&block, &prev_utxos);
         }
         utxo_server.shrink_to_fit();
         //print_utxo_server(&utxo_server);
