@@ -46,10 +46,12 @@ impl HttpServer {
         let builder = Response::builder();
         let builder = if cacheable {
             builder
-                .header("Cache-Control", "public")
-                .header("Cache-Control", "max-age=86400")
+                .header("Cache-Control", "public, max-age=60, s-maxage=86400")
+                .header("CDN-Cache-Control", "max-age=86400")
         } else {
             builder
+                .header("Cache-Control", "no-store")
+                .header("CDN-Cache-Control", "no-store")
         };
         builder
             .header("Content-Type", "application/json")
