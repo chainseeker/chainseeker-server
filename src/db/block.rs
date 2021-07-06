@@ -177,14 +177,16 @@ impl BlockDB {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const HEIGHT: u32 = 500000;
-    const BLOCK: &[u8] = include_bytes!("../fixtures/mainnet/block_500000.bin");
     #[test]
     fn put_and_get_block() {
-        let block = consensus_decode(BLOCK);
         let block_db = BlockDB::new("test/block", true);
-        block_db.put(HEIGHT, &block);
-        let value_test = block_db.get(HEIGHT);
-        assert_eq!(value_test, Some(BlockContentDBValue::new(HEIGHT, &block)));
+        let blocks = fixtures::regtest_blocks();
+        for (height, block) in blocks.iter().enumerate() {
+            block_db.put(height as u32, &block);
+        }
+        for height in 0..blocks.len() {
+            assert_eq!(block_db.get(height as u32), Some(BlockContentDBValue::new(height as u32, &blocks[height])));
+        }
+        assert_eq!(block_db.get(blocks.len() as u32), None);
     }
 }
