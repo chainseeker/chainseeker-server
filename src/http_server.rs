@@ -42,8 +42,14 @@ impl HttpServer {
             rich_list: Arc::new(RwLock::new(RichList::new())),
         }
     }
-    fn response(status: &StatusCode, body: String) -> Response<Body> {
-        Response::builder()
+    fn response(status: &StatusCode, body: String, cacheable: bool) -> Response<Body> {
+        let builder = Response::builder();
+        let builder = if cacheable {
+            builder.header("Cache-Control", "public")
+        } else {
+            builder
+        };
+        builder
             .header("Content-Type", "application/json")
             .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
             .status(status)
@@ -51,7 +57,7 @@ impl HttpServer {
             .unwrap()
     }
     fn error(status: &StatusCode, msg: &str) -> Response<Body> {
-        Self::response(status, format!("{{\"error\":\"{}\"}}", msg))
+        Self::response(status, format!("{{\"error\":\"{}\"}}", msg), false)
     }
     fn not_found(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::NOT_FOUND, msg)
@@ -62,15 +68,15 @@ impl HttpServer {
     fn internal_error(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::INTERNAL_SERVER_ERROR, msg)
     }
-    fn ok(json: String) -> Response<Body> {
-        Self::response(&StatusCode::OK, json)
+    fn ok(json: String, cacheable: bool) -> Response<Body> {
+        Self::response(&StatusCode::OK, json, cacheable)
     }
-    fn json<S>(object: S) -> Response<Body>
+    fn json<S>(object: S, cacheable: bool) -> Response<Body>
         where S: serde::ser::Serialize,
     {
         let json = serde_json::to_string(&object);
         match json {
-            Ok(json) => Self::ok(json),
+            Ok(json) => Self::ok(json, cacheable),
             Err(_) => Self::internal_error("Failed to encode to JSON."),
         }
     }
@@ -80,7 +86,7 @@ impl HttpServer {
         Ok(Self::ok(format!("{{\"blocks\":{}}}", match server.synced_height_db.read().await.get() {
             Some(synced_height) => synced_height as i32,
             None => -1,
-        })))
+        }), false))
     }
     /// `/tx/:txid` endpoint.
     async fn tx_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -90,7 +96,10 @@ impl HttpServer {
             Err(_) => return Ok(Self::not_found("Failed to decode txid.")),
         };
         match server.tx_db.read().await.get_as_rest(&txid, &server.config) {
-            Some(tx) => Ok(Self::json(tx)),
+            Some(tx) => {
+                let cacheable = tx.confirmed_height.is_some();
+                Ok(Self::json(tx, cacheable))
+            },
             None => Ok(Self::not_found("Transaction not found.")),
         }
     }
@@ -105,7 +114,7 @@ impl HttpServer {
             return Ok(Self::bad_request("Failed to parse input."));
         }
         match rpc.send_raw_transaction(hex.unwrap()) {
-            Ok(txid) => Ok(Self::ok(format!("{{\"txid\":\"{}\"}}", txid))),
+            Ok(txid) => Ok(Self::ok(format!("{{\"txid\":\"{}\"}}", txid), false)),
             Err(_) => Ok(Self::bad_request(&format!("Failed to broadcast transaction."))),
         }
     }
@@ -138,7 +147,7 @@ impl HttpServer {
             server.block_summary_cache.write().await.insert(height, summary.clone());
             ret.push(summary);
         }
-        Ok(Self::json(&ret))
+        Ok(Self::json(&ret, true))
     }
     /// Helper function for `/block*` APIs.
     async fn block_content(req: &Request<Body>) -> Result<BlockContentDBValue, Response<Body>> {
@@ -172,7 +181,7 @@ impl HttpServer {
     async fn block_with_txids_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockWithTxids::from_block_content(&block_content, &server.config))),
+            Ok(block_content) => Ok(Self::json(RestBlockWithTxids::from_block_content(&block_content, &server.config), true)),
             Err(res) => Ok(res),
         }
     }
@@ -181,7 +190,7 @@ impl HttpServer {
         let server = req.data::<HttpServer>().unwrap();
         let tx_db = server.tx_db.read().await;
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockWithTxs::from_block_content(&tx_db, &block_content, &server.config))),
+            Ok(block_content) => Ok(Self::json(RestBlockWithTxs::from_block_content(&tx_db, &block_content, &server.config), true)),
             Err(res) => Ok(res),
         }
     }
@@ -189,7 +198,7 @@ impl HttpServer {
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockHeader::from_block_content(&block_content, &server.config))),
+            Ok(block_content) => Ok(Self::json(RestBlockHeader::from_block_content(&block_content, &server.config), true)),
             Err(res) => Ok(res),
         }
     }
@@ -215,7 +224,7 @@ impl HttpServer {
         }
         let txids = server.addr_index_db.read().await.get(&script.unwrap());
         let txids = txids.iter().map(|txid| txid.to_hex()).collect::<Vec<String>>();
-        Ok(Self::json(&txids))
+        Ok(Self::json(&txids, false))
     }
     /// `/txs/:script_or_address` endpoint.
     async fn txs_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -240,7 +249,7 @@ impl HttpServer {
             return Ok(Self::internal_error(&format!("Failed to resolve transactions (one of these is {}).", txids_not_found[0])));
         }
         let txs: Vec<RestTx> = txs.into_iter().map(|x| x.unwrap()).collect();
-        Ok(Self::json(&txs))
+        Ok(Self::json(&txs, false))
     }
     /// `/utxos/:script_or_address` endpoint.
     async fn utxos_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -258,13 +267,13 @@ impl HttpServer {
                 None => return Ok(Self::internal_error(&format!("Failed to resolve previous txid: {}", utxo.txid))),
             }
         };
-        Ok(Self::json(&utxos))
+        Ok(Self::json(&utxos, false))
     }
     /// `/rich_list_count` endpoint.
     async fn rich_list_count_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         let json = format!("{{\"count\":{}}}", server.rich_list.read().await.len());
-        Ok(Self::ok(json))
+        Ok(Self::ok(json, false))
     }
     /// `/rich_list_addr_rank/:script_or_address` endpoint.
     async fn rich_list_addr_rank_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -274,8 +283,8 @@ impl HttpServer {
             return Ok(Self::not_found("Failed to decode input script or address."));
         }
         match server.rich_list.read().await.get_index_of(&script.unwrap()) {
-            Some(rank) => Ok(Self::ok(format!("{{\"rank\":{}}}", rank + 1))),
-            None => Ok(Self::ok("{\"rank\":null}".to_string())),
+            Some(rank) => Ok(Self::ok(format!("{{\"rank\":{}}}", rank + 1), false)),
+            None => Ok(Self::ok("{\"rank\":null}".to_string(), false)),
         }
     }
     /// `/rich_list/:offset/:limit` endpoint.
@@ -293,7 +302,7 @@ impl HttpServer {
         let addresses = rich_list.get_in_range(offset..offset+limit).iter()
             .map(|entry| RestRichListEntry::from_rich_list_entry(entry, &server.config))
             .collect::<Vec<RestRichListEntry>>();
-        Ok(Self::json(&addresses))
+        Ok(Self::json(&addresses, false))
     }
     pub async fn run(&self, ip: &str, port: u16) {
         let addr = SocketAddr::from((
