@@ -120,6 +120,12 @@ impl TxDB {
     pub fn get(&self, txid: &Txid) -> Option<TxDBValue> {
         self.db.get(&TxDBKey { txid: (*txid).clone() })
     }
+    pub fn get_as_rest(&self, txid: &Txid, config: &Config) -> Option<RestTx> {
+        match self.get(txid) {
+            Some(value) => Some(RestTx::from_tx_db_value(&value, config)),
+            None => None,
+        }
+    }
     pub fn multi_get<I: IntoIterator<Item = Txid>>(&self, txids: I) -> Vec<Option<TxDBValue>> {
         let txids: Vec<TxDBKey> = txids.into_iter().map(|txid| TxDBKey { txid }).collect();
         self.db.multi_get(txids)

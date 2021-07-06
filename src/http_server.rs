@@ -89,8 +89,8 @@ impl HttpServer {
             Ok(txid) => txid,
             Err(_) => return Ok(Self::not_found("Failed to decode txid.")),
         };
-        match server.tx_db.read().await.get(&txid) {
-            Some(value) => Ok(Self::json(RestTx::from_tx_db_value(&value, &server.config))),
+        match server.tx_db.read().await.get_as_rest(&txid, &server.config) {
+            Some(tx) => Ok(Self::json(tx)),
             None => Ok(Self::not_found("Transaction not found.")),
         }
     }

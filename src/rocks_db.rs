@@ -1,7 +1,7 @@
 /// An abstraction struct for key-value store.
 use std::fs::remove_dir_all;
 use std::marker::PhantomData;
-use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode, BoundColumnFamily, Options};
+use rocksdb::{DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode, BoundColumnFamily, Options, DBPinnableSlice};
 
 pub trait ConstantSize {
     const LEN: usize;
@@ -261,6 +261,9 @@ impl<K, V> RocksDB<K, V>
             Some(value) => Some(V::deserialize(&value)),
             None => None,
         }
+    }
+    pub fn get_raw(&self, key: &K) -> Option<DBPinnableSlice<'_>> {
+        self.db.get_pinned(key.serialize()).unwrap()
     }
     pub fn multi_get<I: IntoIterator<Item = K>>(&self, keys: I) -> Vec<Option<V>> {
         let keys: Vec<Vec<u8>> = keys.into_iter().map(|key| key.serialize()).collect();
