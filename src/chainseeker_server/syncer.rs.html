@@ -488,7 +488,7 @@
                     <span class="kw">let</span> <span class="ident">block_queue_len</span> <span class="op">=</span> <span class="ident">block_queue</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">len</span>();
                     <span class="kw">if</span> <span class="ident">block_queue_len</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">BLOCK_QUEUE_SIZE</span> {
                         <span class="comment">//println!(&quot;Block queue is full. Waiting for 100ms...&quot;);</span>
-                        <span class="ident">std::thread::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">10</span>));
+                        <span class="ident">tokio::time::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">10</span>)).<span class="kw">await</span>;
                         <span class="kw">continue</span>;
                     }
                     <span class="kw">let</span> <span class="ident">count</span> <span class="op">=</span> (<span class="ident">BLOCK_QUEUE_SIZE</span> <span class="op">-</span> <span class="ident">block_queue_len</span> <span class="op">+</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">u32</span>;
@@ -522,7 +522,7 @@
                         },
                         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
                             <span class="macro">println!</span>(<span class="string">&quot;Block queue is empty. Waiting for blocks...&quot;</span>);
-                            <span class="ident">std::thread::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">100</span>));
+                            <span class="ident">tokio::time::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
                         }
                     }
                 }
@@ -650,7 +650,7 @@
             }
             <span class="kw">let</span> <span class="ident">multipart</span> <span class="op">=</span> <span class="ident">socket</span>.<span class="ident">recv_multipart</span>(<span class="number">1</span>);
             <span class="kw">if</span> <span class="ident">multipart</span>.<span class="ident">is_err</span>() {
-                <span class="ident">std::thread::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">100</span>));
+                <span class="ident">tokio::time::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
                 <span class="kw">continue</span>;
             }
             <span class="kw">let</span> <span class="ident">multipart</span> <span class="op">=</span> <span class="ident">multipart</span>.<span class="ident">unwrap</span>();

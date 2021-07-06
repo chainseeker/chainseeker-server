@@ -235,7 +235,7 @@
                     <span class="macro">assert_eq!</span>(<span class="ident">multipart</span>.<span class="ident">len</span>(), <span class="number">3</span>);
                     <span class="kw">let</span> <span class="ident">topic</span> <span class="op">=</span> <span class="ident">std::str::from_utf8</span>(<span class="kw-2">&amp;</span><span class="ident">multipart</span>[<span class="number">0</span>]).<span class="ident">expect</span>(<span class="string">&quot;Failed to decode ZeroMQ topic.&quot;</span>).<span class="ident">to_string</span>();
                     <span class="kw">let</span> <span class="ident">hash</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">multipart</span>[<span class="number">1</span>];
-                    <span class="macro">println!</span>(<span class="string">&quot;WebSocketRelay: {} {} {}&quot;</span>, <span class="ident">topic</span>, <span class="ident">hex::encode</span>(<span class="ident">hash</span>), <span class="ident">hex::encode</span>(<span class="kw-2">&amp;</span><span class="ident">multipart</span>[<span class="number">2</span>]));
+                    <span class="comment">//println!(&quot;WebSocketRelay: {} {} {}&quot;, topic, hex::encode(hash), hex::encode(&amp;multipart[2]));</span>
                     <span class="kw">let</span> <span class="ident">json</span> <span class="op">=</span> <span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="macro">vec!</span>[<span class="ident">topic</span>, <span class="ident">hex::encode</span>(<span class="ident">hash</span>)]).<span class="ident">unwrap</span>();
                     <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">json</span>).<span class="ident">unwrap</span>();
                 },
@@ -253,7 +253,7 @@
     }
     <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">wait_for_ready</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">while</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">ready</span>().<span class="kw">await</span> {
-            <span class="ident">std::thread::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">1</span>));
+            <span class="ident">tokio::time::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">1</span>)).<span class="kw">await</span>;
         }
     }
     <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
