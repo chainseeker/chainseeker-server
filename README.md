@@ -107,7 +107,7 @@ Performance
 
 ### Server specs
 
-- Bitcoin Core: DigitalOcean, Basic, 4 GB, 2vCPUs ($24/mo)
+- Bitcoin Core: DigitalOcean, Basic, 4 GB, 2 vCPUs ($24/mo)
 - chainseeker-syncer: DigitalOcean, Memory-Optimized, 16 GB, 2 vCPUs ($80/mo)
 - client: DigitalOcean, CPU-Optimized, 4 GB, 2 vCPUs ($40/mo)
 
