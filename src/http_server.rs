@@ -38,7 +38,7 @@ impl HttpServer {
             block_db: Arc::new(RwLock::new(BlockDB::new(coin, false))),
             tx_db: Arc::new(RwLock::new(TxDB::new(coin, false))),
             addr_index_db: Arc::new(RwLock::new(AddressIndexDB::new(coin, false))),
-            utxo_server: Arc::new(RwLock::new(UtxoServer::new(coin))),
+            utxo_server: Arc::new(RwLock::new(UtxoServer::new())),
             rich_list: Arc::new(RwLock::new(RichList::new())),
         }
     }

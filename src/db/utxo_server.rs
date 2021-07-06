@@ -52,7 +52,7 @@ pub struct UtxoServer {
 }
 
 impl UtxoServer {
-    pub fn new(_coin: &str) -> Self {
+    pub fn new() -> Self {
         Self {
             db: IndexMap::new(),
         }
@@ -68,6 +68,9 @@ impl UtxoServer {
     }
     pub fn shrink_to_fit(&mut self) {
         self.db.shrink_to_fit();
+    }
+    pub fn iter(&self) -> indexmap::map::Iter<WScriptHash, Vec<UtxoServerValue>> {
+        self.db.iter()
     }
     pub async fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
         match self.db.get(&script_pubkey.wscript_hash()) {
@@ -122,6 +125,42 @@ impl UtxoServer {
                 self.remove(&utxo.script_pubkey, &utxo.txid, utxo.vout);
                 previous_utxo_index += 1;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[allow(dead_code)]
+    fn print_utxo_server(utxo_server: &UtxoServer) {
+        for (wscript_hash, values) in utxo_server.iter() {
+            println!("        (WScriptHash::from_hex(\"{}\").unwrap(), vec![", hex::encode(wscript_hash));
+            for value in values.iter() {
+                println!("            UtxoServerValue {{ txid: consensus_decode(&hex::decode(\"{}\").unwrap()), vout: {}, }},",
+                    hex::encode(consensus_encode(&value.txid)),
+                    value.vout);
+            }
+            println!("        ]),");
+        }
+    }
+    #[tokio::test]
+    async fn utxo_server() {
+        let mut utxo_server = UtxoServer::new();
+        let mut utxo_db = UtxoDB::new("test/utxo_server", true);
+        for block in fixtures::regtest_blocks().iter() {
+            let prev_utxos = utxo_db.process_block(&block, false);
+            utxo_server.process_block(&block, &prev_utxos).await;
+        }
+        utxo_server.shrink_to_fit();
+        //print_utxo_server(&utxo_server);
+        let entries = fixtures::utxo_server_entries();
+        assert_eq!(utxo_server.len(), entries.len());
+        assert_eq!(utxo_server.capacity(), entries.len());
+        assert_eq!(utxo_server.size(), 7608);
+        for (i, (wscript_hash, value)) in utxo_server.iter().enumerate() {
+            assert_eq!(*wscript_hash, entries[i].0);
+            assert_eq!(*value, entries[i].1);
         }
     }
 }

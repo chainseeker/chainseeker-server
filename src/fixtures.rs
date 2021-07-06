@@ -6,3 +6,5 @@ pub mod utxos_after_reorg;
 pub use utxos_after_reorg::*;
 pub mod addr_index_db;
 pub use addr_index_db::*;
+pub mod utxo_server;
+pub use utxo_server::*;
