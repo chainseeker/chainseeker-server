@@ -45,7 +45,9 @@ impl HttpServer {
     fn response(status: &StatusCode, body: String, cacheable: bool) -> Response<Body> {
         let builder = Response::builder();
         let builder = if cacheable {
-            builder.header("Cache-Control", "public")
+            builder
+                .header("Cache-Control", "public")
+                .header("Cache-Control", "max-age=86400")
         } else {
             builder
         };
