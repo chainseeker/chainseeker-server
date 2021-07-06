@@ -146,7 +146,7 @@ impl Syncer {
                     let block_queue_len = block_queue.read().await.len();
                     if block_queue_len >= BLOCK_QUEUE_SIZE {
                         //println!("Block queue is full. Waiting for 100ms...");
-                        std::thread::sleep(std::time::Duration::from_millis(10));
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                         continue;
                     }
                     let count = (BLOCK_QUEUE_SIZE - block_queue_len + 1) as u32;
@@ -180,7 +180,7 @@ impl Syncer {
                         },
                         None => {
                             println!("Block queue is empty. Waiting for blocks...");
-                            std::thread::sleep(std::time::Duration::from_millis(100));
+                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                         }
                     }
                 }
@@ -308,7 +308,7 @@ impl Syncer {
             }
             let multipart = socket.recv_multipart(1);
             if multipart.is_err() {
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 continue;
             }
             let multipart = multipart.unwrap();

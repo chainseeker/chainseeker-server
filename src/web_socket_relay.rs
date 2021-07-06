@@ -93,7 +93,7 @@ impl WebSocketRelay {
     }
     pub async fn wait_for_ready(&self) {
         while !self.ready().await {
-            std::thread::sleep(std::time::Duration::from_millis(1));
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         }
     }
     pub async fn stop(&self) {
