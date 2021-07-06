@@ -69,7 +69,8 @@ impl WebSocketRelay {
             if *self.stop.read().await {
                 break;
             }
-            match socket.recv_multipart(zmq::DONTWAIT) {
+            let multipart = socket.recv_multipart(zmq::DONTWAIT);
+            match multipart {
                 Ok(multipart) => {
                     assert_eq!(multipart.len(), 3);
                     let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.").to_string();
@@ -80,7 +81,7 @@ impl WebSocketRelay {
                 },
                 Err(_) => {
                     //println!("WebSockerRelay: failed to receive a message from ZeroMq.");
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     continue;
                 },
             }
