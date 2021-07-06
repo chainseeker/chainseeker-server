@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
 use num_format::{Locale, ToFormattedStr, ToFormattedString};
+pub use bitcoin_rest::bitcoin;
 use bitcoin::hashes::hex::FromHex;
 use bitcoin::consensus::{Encodable, Decodable};
 use bitcoin::{BlockHash, Block, BlockHeader, Address, Script, Network};
