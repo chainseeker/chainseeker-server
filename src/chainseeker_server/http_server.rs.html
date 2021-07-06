@@ -415,7 +415,7 @@
             <span class="ident">block_db</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">BlockDB::new</span>(<span class="ident">coin</span>, <span class="bool-val">false</span>))),
             <span class="ident">tx_db</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">TxDB::new</span>(<span class="ident">coin</span>, <span class="bool-val">false</span>))),
             <span class="ident">addr_index_db</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">AddressIndexDB::new</span>(<span class="ident">coin</span>, <span class="bool-val">false</span>))),
-            <span class="ident">utxo_server</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">UtxoServer::new</span>(<span class="ident">coin</span>))),
+            <span class="ident">utxo_server</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">UtxoServer::new</span>())),
             <span class="ident">rich_list</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">RichList::new</span>())),
         }
     }
