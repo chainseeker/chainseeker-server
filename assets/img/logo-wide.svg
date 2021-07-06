@@ -47,7 +47,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -80,14 +80,14 @@
     <text
        xml:space="preserve"
        style="font-style:normal;font-weight:normal;font-size:42.0693px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#999999;fill-opacity:1;stroke:none;stroke-width:0.14023"
-       x="78.941132"
-       y="52.236908"
+       x="72.549492"
+       y="56.353306"
        id="text20"><tspan
          sodipodi:role="line"
          id="tspan18"
-         x="78.941132"
-         y="52.236908"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:42.0693px;font-family:Scriptina;-inkscape-font-specification:Scriptina;fill:#999999;fill-opacity:1;stroke-width:0.14023">ain</tspan></text>
+         x="72.549492"
+         y="56.353306"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:42.0693px;font-family:Scriptina;-inkscape-font-specification:Scriptina;fill:#999999;fill-opacity:1;stroke-width:0.14023">hain</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-weight:normal;font-size:42.0693px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#999999;fill-opacity:1;stroke:none;stroke-width:0.14023"
@@ -104,56 +104,56 @@
        id="rect838"
        width="9.5747223"
        height="9.5747223"
-       x="86.692154"
-       y="8.4181957" />
+       x="85.63382"
+       y="4.1848621" />
     <rect
        style="fill:#999999;fill-opacity:1;stroke-width:0.264583"
        id="rect838-3"
        width="9.5747223"
        height="9.5747223"
-       x="97.503998"
-       y="8.4181957" />
+       x="96.445663"
+       y="4.1848621" />
     <rect
        style="fill:#666666;fill-opacity:1;stroke-width:0.264583"
        id="rect838-6"
        width="9.5747223"
        height="9.5747223"
-       x="108.31586"
-       y="8.4181957" />
+       x="107.25752"
+       y="4.1848621" />
     <rect
        style="fill:#333333;fill-opacity:1;stroke-width:0.264583"
        id="rect838-7"
        width="9.5747223"
        height="9.5747223"
-       x="119.15782"
-       y="19.530691" />
+       x="118.09948"
+       y="15.297356" />
     <rect
        style="fill:#333333;fill-opacity:1;stroke-width:0.264583"
        id="rect838-7-5"
        width="9.5747223"
        height="9.5747223"
-       x="119.1277"
-       y="8.4181957" />
+       x="118.06937"
+       y="4.1848621" />
     <rect
        style="fill:#666666;fill-opacity:1;stroke-width:0.264583"
        id="rect838-6-3"
        width="9.5747223"
        height="9.5747223"
-       x="129.96974"
-       y="19.530691" />
+       x="128.91142"
+       y="15.297356" />
     <rect
        style="fill:#999999;fill-opacity:1;stroke-width:0.264583"
        id="rect838-3-5"
        width="9.5747223"
        height="9.5747223"
-       x="140.78159"
-       y="19.530691" />
+       x="139.72327"
+       y="15.297356" />
     <rect
        style="fill:#cccccc;fill-opacity:1;stroke-width:0.264583"
        id="rect838-62"
        width="9.5747223"
        height="9.5747223"
-       x="151.59344"
-       y="19.530691" />
+       x="150.53513"
+       y="15.297356" />
   </g>
 </svg>

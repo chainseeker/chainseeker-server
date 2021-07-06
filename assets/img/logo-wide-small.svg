@@ -28,7 +28,7 @@
      inkscape:pageshadow="2"
      inkscape:zoom="5.6"
      inkscape:cx="109.8216"
-     inkscape:cy="39.856944"
+     inkscape:cy="28.785515"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      inkscape:document-rotation="0"
@@ -47,7 +47,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -79,15 +79,15 @@
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:17.3649px;font-family:Scriptina;-inkscape-font-specification:Scriptina;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.26458333;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">S</tspan></text>
     <text
        xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.4189px;line-height:1.25;font-family:Scriptina;-inkscape-font-specification:Scriptina;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.26458333;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-       x="19.291143"
-       y="13.044734"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.4189px;line-height:1.25;font-family:Scriptina;-inkscape-font-specification:Scriptina;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.264583;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       x="18.207785"
+       y="13.885619"
        id="text20"><tspan
          sodipodi:role="line"
          id="tspan18"
-         x="19.291143"
-         y="13.044734"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.4189px;font-family:Scriptina;-inkscape-font-specification:Scriptina;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.26458333;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">ain</tspan></text>
+         x="18.207785"
+         y="13.885619"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.4189px;font-family:Scriptina;-inkscape-font-specification:Scriptina;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.264583;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">hain</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.4189px;line-height:1.25;font-family:Scriptina;-inkscape-font-specification:Scriptina;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.26458333;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
@@ -105,55 +105,55 @@
        width="2.3712773"
        height="2.3712773"
        x="21.210764"
-       y="2.1925833" />
+       y="1.1342499" />
     <rect
        style="fill:#999999;fill-opacity:1;stroke-width:0.0655267"
        id="rect838-3"
        width="2.3712773"
        height="2.3712773"
        x="23.888426"
-       y="2.1925833" />
+       y="1.1342499" />
     <rect
        style="fill:#666666;fill-opacity:1;stroke-width:0.0655267"
        id="rect838-6"
        width="2.3712773"
        height="2.3712773"
        x="26.566095"
-       y="2.1925833" />
+       y="1.1342499" />
     <rect
        style="fill:#333333;fill-opacity:1;stroke-width:0.0655267"
        id="rect838-7"
        width="2.3712773"
        height="2.3712773"
        x="29.251217"
-       y="4.944706" />
+       y="3.8863726" />
     <rect
        style="fill:#333333;fill-opacity:1;stroke-width:0.0655267"
        id="rect838-7-5"
        width="2.3712773"
        height="2.3712773"
        x="29.243755"
-       y="2.1925833" />
+       y="1.1342499" />
     <rect
        style="fill:#666666;fill-opacity:1;stroke-width:0.0655267"
        id="rect838-6-3"
        width="2.3712773"
        height="2.3712773"
        x="31.928898"
-       y="4.944706" />
+       y="3.8863726" />
     <rect
        style="fill:#999999;fill-opacity:1;stroke-width:0.0655267"
        id="rect838-3-5"
        width="2.3712773"
        height="2.3712773"
        x="34.60656"
-       y="4.944706" />
+       y="3.8863726" />
     <rect
        style="fill:#cccccc;fill-opacity:1;stroke-width:0.0655267"
        id="rect838-62"
        width="2.3712773"
        height="2.3712773"
        x="37.284229"
-       y="4.944706" />
+       y="3.8863726" />
   </g>
 </svg>
