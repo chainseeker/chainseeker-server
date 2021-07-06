@@ -17,15 +17,12 @@ impl WebSocketRelay {
             ready: Arc::new(RwLock::new(false)),
         }
     }
-    pub async fn run(&self, zmq_endpoint: &str, ws_endpoint: &str, install_ctrl_c: bool) {
-        // Install Ctrl-C watch.
-        if install_ctrl_c {
-            let stop = self.stop.clone();
-            tokio::spawn(async move {
-                tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
-                *stop.write().await = true;
-            });
-        }
+    pub async fn run(&self, zmq_endpoint: &str, ws_endpoint: &str) {
+        let stop = self.stop.clone();
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
+            *stop.write().await = true;
+        });
         //println!("WebSocketRelay: waiting for a ZeroMQ message...");
         // Create a WebSocket server.
         let ws_endpoint_string = ws_endpoint.to_string();
@@ -119,12 +116,12 @@ mod test {
         println!("ZeroMQ server created.");
         // Run relay.
         let relay = WebSocketRelay::new();
-        {
+        let handle = {
             let relay = relay.clone();
             tokio::spawn(async move {
-                relay.run(&format!("tcp://localhost:{}", ZMQ_PORT), &format!("localhost:{}", WS_PORT), false).await;
-            });
-        }
+                relay.run(&format!("tcp://localhost:{}", ZMQ_PORT), &format!("localhost:{}", WS_PORT)).await;
+            })
+        };
         // Wait before WebSocketRelay is ready.
         relay.wait_for_ready().await;
         // Create WebSocket client.
@@ -152,5 +149,6 @@ mod test {
         let msg = read.next().await.unwrap().unwrap().into_data();
         assert_eq!(String::from_utf8(msg).unwrap(), format!("[\"hashtx\",\"{}\"]", TXID));
         relay.stop().await;
+        handle.await.unwrap();
     }
 }

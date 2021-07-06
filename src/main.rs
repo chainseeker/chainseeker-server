@@ -29,7 +29,7 @@ async fn main() {
         let zmq_endpoint = config.zmq_endpoint.clone();
         let ws_endpoint = config.ws_endpoint.clone();
         handles.push(tokio::spawn(async move {
-            ws.run(&zmq_endpoint, &ws_endpoint, true).await;
+            ws.run(&zmq_endpoint, &ws_endpoint).await;
         }));
     }
     // Do initial sync.
