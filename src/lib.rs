@@ -41,13 +41,6 @@ pub fn get_rest(config: &Config) -> bitcoin_rest::Context {
     bitcoin_rest::new(&config.rest_endpoint)
 }
 
-pub async fn fetch_block(rest: &bitcoin_rest::Context, height: u32) -> (BlockHash, Block) {
-    let block_hash = rest.blockhashbyheight(height).await
-        .expect(&format!("Failed to fetch block at height = {}.", height));
-    let block = rest.block(&block_hash).await.expect(&format!("Failed to fetch a block with blockid = {}", block_hash));
-    (block_hash, block)
-}
-
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
     pub genesis_block_hash: BlockHash,

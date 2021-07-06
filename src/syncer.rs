@@ -185,7 +185,11 @@ impl Syncer {
                     }
                 }
             } else {
-                let (_block_hash, block) = fetch_block(&self.rest, height).await;
+                let block_db_value = self.http_server.block_db.read().await.get(height - 1).unwrap();
+                let block_hash = block_db_value.block_header.block_hash();
+                let block_headers = self.rest.headers(2, &block_hash).await.unwrap();
+                let block_hash = block_headers[1].block_hash();
+                let block = self.rest.block(&block_hash).await.unwrap();
                 self.process_block(initial, height, &block).await;
             }
         }
