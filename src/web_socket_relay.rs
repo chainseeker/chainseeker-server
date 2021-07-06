@@ -75,7 +75,7 @@ impl WebSocketRelay {
                     assert_eq!(multipart.len(), 3);
                     let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.").to_string();
                     let hash = &multipart[1];
-                    println!("WebSocketRelay: {} {} {}", topic, hex::encode(hash), hex::encode(&multipart[2]));
+                    //println!("WebSocketRelay: {} {} {}", topic, hex::encode(hash), hex::encode(&multipart[2]));
                     let json = serde_json::to_string(&vec![topic, hex::encode(hash)]).unwrap();
                     tx.send(json).unwrap();
                 },
