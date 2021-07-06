@@ -191,6 +191,8 @@
 <span id="188">188</span>
 <span id="189">189</span>
 <span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Txid</span>, <span class="ident">Block</span>, <span class="ident">BlockHeader</span>, <span class="ident">BlockHash</span>};
 <span class="kw">use</span> <span class="ident">bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR</span>;
@@ -371,15 +373,17 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">const</span> <span class="ident">HEIGHT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">500000</span>;
-    <span class="kw">const</span> <span class="ident">BLOCK</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="macro">include_bytes!</span>(<span class="string">&quot;../fixtures/mainnet/block_500000.bin&quot;</span>);
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">put_and_get_block</span>() {
-        <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">consensus_decode</span>(<span class="ident">BLOCK</span>);
         <span class="kw">let</span> <span class="ident">block_db</span> <span class="op">=</span> <span class="ident">BlockDB::new</span>(<span class="string">&quot;test/block&quot;</span>, <span class="bool-val">true</span>);
-        <span class="ident">block_db</span>.<span class="ident">put</span>(<span class="ident">HEIGHT</span>, <span class="kw-2">&amp;</span><span class="ident">block</span>);
-        <span class="kw">let</span> <span class="ident">value_test</span> <span class="op">=</span> <span class="ident">block_db</span>.<span class="ident">get</span>(<span class="ident">HEIGHT</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">value_test</span>, <span class="prelude-val">Some</span>(<span class="ident">BlockContentDBValue::new</span>(<span class="ident">HEIGHT</span>, <span class="kw-2">&amp;</span><span class="ident">block</span>)));
+        <span class="kw">let</span> <span class="ident">blocks</span> <span class="op">=</span> <span class="ident">fixtures::regtest_blocks</span>();
+        <span class="kw">for</span> (<span class="ident">height</span>, <span class="ident">block</span>) <span class="kw">in</span> <span class="ident">blocks</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
+            <span class="ident">block_db</span>.<span class="ident">put</span>(<span class="ident">height</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="kw-2">&amp;</span><span class="ident">block</span>);
+        }
+        <span class="kw">for</span> <span class="ident">height</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">blocks</span>.<span class="ident">len</span>() {
+            <span class="macro">assert_eq!</span>(<span class="ident">block_db</span>.<span class="ident">get</span>(<span class="ident">height</span> <span class="kw">as</span> <span class="ident">u32</span>), <span class="prelude-val">Some</span>(<span class="ident">BlockContentDBValue::new</span>(<span class="ident">height</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="kw-2">&amp;</span><span class="ident">blocks</span>[<span class="ident">height</span>])));
+        }
+        <span class="macro">assert_eq!</span>(<span class="ident">block_db</span>.<span class="ident">get</span>(<span class="ident">blocks</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u32</span>), <span class="prelude-val">None</span>);
     }
 }
 </pre></div>
