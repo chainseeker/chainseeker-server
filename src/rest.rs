@@ -280,16 +280,6 @@ pub struct RestRichListEntry {
     pub value: u64,
 }
 
-impl RestRichListEntry {
-    pub fn from_rich_list_entry(entry: &RichListEntry, config: &Config) -> Self {
-        let script_pub_key = RestScriptPubKey::new(&entry.script_pubkey, config);
-        Self {
-            script_pub_key,
-            value: entry.value,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct RestBlockSummary {
     hash        : String,

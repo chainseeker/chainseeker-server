@@ -1,5 +1,4 @@
 use std::mem::size_of;
-use std::cmp::min;
 use core::ops::Range;
 use indexmap::IndexMap;
 use bitcoin::{Block, Script};
@@ -53,25 +52,28 @@ impl RichList {
     pub fn get_index_of(&self, script_pubkey: &Script) -> Option<usize> {
         self.map.get_index_of(script_pubkey)
     }
-    pub fn get_in_range(&self, range: Range<usize>) -> Vec<RichListEntry> {
-        if self.map.len() < 1 {
-            return Vec::new();
+    pub fn get_in_range(&self, range: Range<usize>) -> Vec<Option<RichListEntry>> {
+        let mut ret = Vec::with_capacity(range.end - range.start);
+        for i in range {
+            ret.push(match self.map.get_index(i) {
+                Some((script_pubkey, value)) => Some(RichListEntry {
+                    script_pubkey: (*script_pubkey).clone(),
+                    value: *value,
+                }),
+                None => None,
+            });
         }
-        if range.start >= self.map.len() {
-            return Vec::new();
-        }
-        let start = range.start;
-        let end = min(range.end, self.map.len());
-        let mut ret = Vec::with_capacity(end - start);
-        for i in start..end {
-            let data = self.map.get_index(i);
-            if data.is_none() {
-                break;
-            }
-            let (script_pubkey, value) = data.unwrap();
-            ret.push(RichListEntry {
-                script_pubkey: (*script_pubkey).clone(),
-                value: *value,
+        ret
+    }
+    pub fn get_in_range_as_rest(&self, range: Range<usize>, config: &Config) -> Vec<Option<RestRichListEntry>> {
+        let mut ret = Vec::with_capacity(range.end - range.start);
+        for i in range {
+            ret.push(match self.map.get_index(i) {
+                Some((script_pubkey, value)) => Some(RestRichListEntry {
+                    script_pub_key: RestScriptPubKey::new(script_pubkey, config),
+                    value: *value,
+                }),
+                None => None,
             });
         }
         ret
@@ -117,18 +119,18 @@ impl RichList {
 #[cfg(test)]
 mod test {
     use super::*;
-    fn entries() -> [RichListEntry; 4] {
+    fn entries() -> [Option<RichListEntry>; 4] {
         [
-            RichListEntry { script_pubkey: consensus_decode(&hex::decode("160014683ca4604908ebda57dfd97ff94eb5553b4e5aee").unwrap()), value: 505000000141, },
-            RichListEntry { script_pubkey: consensus_decode(&hex::decode("434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()), value: 5000000000, },
-            RichListEntry { script_pubkey: consensus_decode(&hex::decode("1600143fb63f3b6d30f31ada79d7c14a995e52c4a6fdb3").unwrap()), value: 3999999859, },
-            RichListEntry { script_pubkey: consensus_decode(&hex::decode("160014ecac3ece9070b2b28ecfbc487b5ca575b1edb47a").unwrap()), value: 1000000000, },
+            Some(RichListEntry { script_pubkey: consensus_decode(&hex::decode("160014683ca4604908ebda57dfd97ff94eb5553b4e5aee").unwrap()), value: 505000000141, }),
+            Some(RichListEntry { script_pubkey: consensus_decode(&hex::decode("434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()), value: 5000000000, }),
+            Some(RichListEntry { script_pubkey: consensus_decode(&hex::decode("1600143fb63f3b6d30f31ada79d7c14a995e52c4a6fdb3").unwrap()), value: 3999999859, }),
+            Some(RichListEntry { script_pubkey: consensus_decode(&hex::decode("160014ecac3ece9070b2b28ecfbc487b5ca575b1edb47a").unwrap()), value: 1000000000, }),
         ]
     }
     #[allow(dead_code)]
     fn print_rich_list(rich_list: &RichList) {
         for (script_pubkey, value) in rich_list.iter() {
-            println!("            RichListEntry {{ script_pubkey: consensus_decode(&hex::decode(\"{}\").unwrap()), value: {}, }},",
+            println!("            Some(RichListEntry {{ script_pubkey: consensus_decode(&hex::decode(\"{}\").unwrap()), value: {}, }}),",
                 hex::encode(consensus_encode(&script_pubkey)),
                 value);
         }
@@ -136,6 +138,7 @@ mod test {
     #[test]
     fn rich_list() {
         let mut rich_list = RichList::new();
+        assert_eq!(rich_list.get_in_range(0..1), vec![None]);
         let mut utxo_db = UtxoDB::new("test/rich_list", true);
         for block in fixtures::regtest_blocks().iter() {
             let prev_utxos = utxo_db.process_block(&block, false);
@@ -143,16 +146,16 @@ mod test {
         }
         rich_list.finalize();
         rich_list.shrink_to_fit();
-        //print_rich_list(&rich_list);
+        print_rich_list(&rich_list);
         let entries = entries();
         assert_eq!(rich_list.len(), entries.len());
         assert_eq!(rich_list.capacity(), entries.len());
         assert_eq!(rich_list.size(), 165);
-        for (i, (script_pubkey, value)) in rich_list.iter().enumerate() {
-            assert_eq!(*script_pubkey, entries[i].script_pubkey);
-            assert_eq!(*value, entries[i].value);
-            assert_eq!(rich_list.get_index_of(&entries[i].script_pubkey), Some(i));
+        assert_eq!(rich_list.get_in_range(0..entries.len()), entries);
+        for (i, entry) in entries.iter().enumerate() {
+            assert_eq!(rich_list.get_index_of(&entry.as_ref().unwrap().script_pubkey), Some(i));
         }
-        assert_eq!(rich_list.get_in_range(1..3), entries[1..3]);
+        assert_eq!(rich_list.get_in_range(0..0), Vec::new());
+        assert_eq!(rich_list.get_in_range(entries.len()..entries.len()+1), vec![None]);
     }
 }

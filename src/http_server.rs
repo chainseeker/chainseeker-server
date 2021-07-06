@@ -303,10 +303,7 @@ impl HttpServer {
         };
         let server = req.data::<HttpServer>().unwrap();
         let rich_list = server.rich_list.read().await;
-        let addresses = rich_list.get_in_range(offset..offset+limit).iter()
-            .map(|entry| RestRichListEntry::from_rich_list_entry(entry, &server.config))
-            .collect::<Vec<RestRichListEntry>>();
-        Ok(Self::json(&addresses, false))
+        Ok(Self::json(&rich_list.get_in_range_as_rest(offset..offset+limit, &server.config), false))
     }
     pub async fn run(&self, ip: &str, port: u16) {
         let addr = SocketAddr::from((
