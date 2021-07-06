@@ -3,7 +3,7 @@ use tokio::runtime::Runtime;
 use bitcoin::consensus::Decodable;
 use bitcoin::Block;
 
-use chainseeker_syncer::*;
+use chainseeker_server::*;
 
 const COIN: &str = "bench";
 const BLOCK: &[u8] = include_bytes!("../fixtures/mainnet/block_500000.bin");
