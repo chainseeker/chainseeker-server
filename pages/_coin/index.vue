@@ -18,7 +18,7 @@
 						<td><ElapsedTime :time="1000 * block.time" /> ago</td>
 						<td>{{ block.ntxs }}</td>
 						<td>{{ block.size.toLocaleString() }} bytes</td>
-						<td>{{ block.hash }} bytes</td>
+						<td>{{ block.hash }}</td>
 					</tr>
 				</tbody>
 			</template>
