@@ -6,6 +6,10 @@
 				<v-row>
 					<v-col md=2>Final Balance</v-col>
 					<v-col md=4><Amount :value="utxos.reduce((acc, utxo) => acc + utxo.value, 0)" /></v-col>
+					<v-col md=2>Rank</v-col>
+					<v-col md=4>#{{ rank.toLocaleString() }}</v-col>
+				</v-row>
+				<v-row>
 					<v-col md=2>#transactions</v-col>
 					<v-col md=4>{{ txids.length.toLocaleString() }}</v-col>
 				</v-row>
@@ -87,6 +91,7 @@ export default class Home extends Vue {
 	TXS_PER_PAGE: number = TXS_PER_PAGE;
 	address: string | null = null;
 	status: cs.Status | null = null;
+	rank: number | null = null;
 	txids: { txid: string }[] | null = null;
 	txsPage: number = 0;
 	txsBuffer: cs.Transaction[] = [];
@@ -113,9 +118,11 @@ export default class Home extends Vue {
 		const cs = new Chainseeker($config.coinConfig.apiEndpoint);
 		const status = await cs.getStatus();
 		try {
+			const rank = await cs.getRichListRank(address);
 			const txids = (await cs.getTxids(address)).map(txid => ({ txid: txid }));
 			const utxos = await cs.getUtxos(address);
 			return {
+				rank,
 				address,
 				status,
 				txids,
