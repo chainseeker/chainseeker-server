@@ -228,9 +228,8 @@ impl HttpServer {
         let tx_db = server.tx_db.read().await;
         let mut txids_not_found = Vec::new();
         let txs = txids.iter().map(|txid| {
-            let tx_db_value = tx_db.get(txid);
-            match tx_db_value {
-                Some(v) => Some(RestTx::from_tx_db_value(&v, &server.config)),
+            match tx_db.get_as_rest(txid, &server.config) {
+                Some(tx) => Some(tx),
                 None => {
                     txids_not_found.push(txid);
                     None

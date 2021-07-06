@@ -1,4 +1,5 @@
 use bitcoin::{Transaction, Txid, TxOut, Block};
+use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 
 use crate::*;
 
@@ -28,6 +29,29 @@ pub struct TxDBValue {
     pub previous_txouts: Vec<TxOut>,
 }
 
+impl TxDBValue {
+    pub fn deserialize_as_rawtx(buf: &[u8]) -> (Option<u32>, Vec<u8>, Vec<TxOut>) {
+        let confirmed_height = bytes_to_i32(&buf[0..4]);
+        let confirmed_height = if confirmed_height >= 0 {
+            Some(confirmed_height as u32)
+        } else {
+            None
+        };
+        let tx_len = bytes_to_u32(&buf[4..8]) as usize;
+        let tx = buf[8..tx_len+8].to_vec();
+        let mut offset: usize = tx_len + 8;
+        let mut previous_txouts = Vec::new();
+        while offset < buf.len() {
+            let txout_len = bytes_to_u32(&buf[offset..offset+4]) as usize;
+            offset += 4;
+            let txout = consensus_decode(&buf[offset..txout_len+offset]);
+            offset += txout_len;
+            previous_txouts.push(txout);
+        }
+        (confirmed_height, tx, previous_txouts)
+    }
+}
+
 impl Serialize for TxDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut ret = Vec::new();
@@ -52,26 +76,10 @@ impl Serialize for TxDBValue {
 
 impl Deserialize for TxDBValue {
     fn deserialize(buf: &[u8]) -> Self {
-        let confirmed_height = bytes_to_i32(&buf[0..4]);
-        let confirmed_height = if confirmed_height >= 0 {
-            Some(confirmed_height as u32)
-        } else {
-            None
-        };
-        let tx_len = bytes_to_u32(&buf[4..8]) as usize;
-        let tx = consensus_decode(&buf[8..tx_len+8]);
-        let mut offset: usize = tx_len + 8;
-        let mut previous_txouts = Vec::new();
-        while offset < buf.len() {
-            let txout_len = bytes_to_u32(&buf[offset..offset+4]) as usize;
-            offset += 4;
-            let txout = consensus_decode(&buf[offset..txout_len+offset]);
-            offset += txout_len;
-            previous_txouts.push(txout);
-        }
+        let (confirmed_height, tx, previous_txouts) = Self::deserialize_as_rawtx(buf);
         Self {
             confirmed_height,
-            tx,
+            tx: consensus_decode(&tx),
             previous_txouts,
         }
     }
@@ -121,8 +129,47 @@ impl TxDB {
         self.db.get(&TxDBKey { txid: (*txid).clone() })
     }
     pub fn get_as_rest(&self, txid: &Txid, config: &Config) -> Option<RestTx> {
-        match self.get(txid) {
-            Some(value) => Some(RestTx::from_tx_db_value(&value, config)),
+        //let begin_get = std::time::Instant::now();
+        let buf = self.db.get_raw(&TxDBKey { txid: (*txid).clone() });
+        //println!("Transaction got in {}us.", begin_get.elapsed().as_micros());
+        match buf {
+            Some(buf) => {
+                //let begin_convert = std::time::Instant::now();
+                let (confirmed_height, rawtx, previous_txouts) = TxDBValue::deserialize_as_rawtx(&buf);
+                let tx: Transaction = consensus_decode(&rawtx);
+                let mut input_value = 0;
+                let mut vin = Vec::new();
+                let mut previous_txout_index = 0;
+                for input in tx.input.iter() {
+                    if input.previous_output.is_null() {
+                        vin.push(RestVin::new(input, &None, config));
+                    } else {
+                        input_value += previous_txouts[previous_txout_index].value;
+                        vin.push(RestVin::new(input, &Some(previous_txouts[previous_txout_index].clone()), config));
+                        previous_txout_index += 1;
+                    }
+                }
+                let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
+                let tx = RestTx {
+                    confirmed_height,
+                    hex: hex::encode(&rawtx),
+                    txid: tx.txid().to_string(),
+                    hash: tx.wtxid().to_string(),
+                    size: tx.get_size(),
+                    // TODO: waiting for upstream merge.
+                    //vsize: tx.get_vsize(),
+                    vsize: (tx.get_weight() + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR,
+                    weight: tx.get_weight(),
+                    version: tx.version,
+                    locktime: tx.lock_time,
+                    vin,
+                    vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, config)).collect(),
+                    // TODO: compute for coinbase transactions!
+                    fee: (input_value as i64) - (output_value as i64),
+                };
+                //println!("Transaction converted in {}us.", begin_convert.elapsed().as_micros());
+                Some(tx)
+            },
             None => None,
         }
     }

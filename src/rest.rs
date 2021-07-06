@@ -1,7 +1,6 @@
 use serde::Serialize;
 use bitcoin::hashes::hex::ToHex;
 use bitcoin::{Script, TxIn, TxOut, Address, Network, AddressType, Transaction};
-use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 
 use super::*;
 
@@ -128,55 +127,19 @@ impl RestVout {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestTx {
-    confirmed_height: Option<u32>,
-    hex: String,
-    txid: String,
-    hash: String,
-    size: usize,
-    vsize: usize,
-    weight: usize,
-    version: i32,
-    locktime: u32,
-    vin: Vec<RestVin>,
-    vout: Vec<RestVout>,
-    fee: i64,
+    pub confirmed_height: Option<u32>,
+    pub hex: String,
+    pub txid: String,
+    pub hash: String,
+    pub size: usize,
+    pub vsize: usize,
+    pub weight: usize,
+    pub version: i32,
+    pub locktime: u32,
+    pub vin: Vec<RestVin>,
+    pub vout: Vec<RestVout>,
+    pub fee: i64,
     //counterparty: ,
-}
-
-impl RestTx {
-    pub fn from_tx_db_value(value: &TxDBValue, config: &Config) -> Self {
-        let tx = &value.tx;
-        let mut input_value = 0;
-        let mut vin = Vec::new();
-        let mut previous_txout_index = 0;
-        for input in tx.input.iter() {
-            if input.previous_output.is_null() {
-                vin.push(RestVin::new(input, &None, config));
-            } else {
-                input_value += value.previous_txouts[previous_txout_index].value;
-                vin.push(RestVin::new(input, &Some(value.previous_txouts[previous_txout_index].clone()), config));
-                previous_txout_index += 1;
-            }
-        }
-        let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
-        Self {
-            confirmed_height: value.confirmed_height,
-            hex: hex::encode(&consensus_encode(tx)),
-            txid: tx.txid().to_string(),
-            hash: tx.wtxid().to_string(),
-            size: tx.get_size(),
-            // TODO: waiting for upstream merge.
-            //vsize: tx.get_vsize(),
-            vsize: (tx.get_weight() + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR,
-            weight: tx.get_weight(),
-            version: tx.version,
-            locktime: tx.lock_time,
-            vin,
-            vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, config)).collect(),
-            // TODO: compute for coinbase transactions!
-            fee: (input_value as i64) - (output_value as i64),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -287,19 +250,9 @@ impl RestBlockWithTxs {
     pub fn from_block_content(tx_db: &TxDB, block_content: &BlockContentDBValue, config: &Config) -> Self {
         let rest_block_header = RestBlockHeader::from_block_content(block_content, config);
         // TODO: waiting upstream fix: https://github.com/rust-rocksdb/rust-rocksdb/issues/536
-        /*
-        let begin_get = std::time::Instant::now();
-        let txs = tx_db.multi_get(block_content.txids.clone());
-        println!("RestBlockWithTxs: get transactions from DB in {}ms.", begin_get.elapsed().as_millis());
-        let begin_convert = std::time::Instant::now();
-        let txs = txs.into_iter().map(|tx| {
-            RestTx::from_tx_db_value(&tx.unwrap(), config)
-        }).collect();
-        println!("RestBlockWithTxs: convert transactions in {}ms.", begin_convert.elapsed().as_millis());
-        */
+        //let txs = tx_db.multi_get_as_rest(block_content.txids.clone());
         let txs = block_content.txids.iter().map(|txid| {
-            let tx = tx_db.get(txid).unwrap();
-            RestTx::from_tx_db_value(&tx, config)
+            tx_db.get_as_rest(txid, config).unwrap()
         }).collect::<Vec<RestTx>>();
         Self {
             height           : rest_block_header.height,
