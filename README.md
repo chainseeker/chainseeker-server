@@ -7,8 +7,31 @@ chainseeker-server
 
 **chainseeker.info**: fast and reliable open-source cryptocurrency block explorer.
 
-This is a server-side implementation of chainseeker.info.
+This is the server-side implementation of chainseeker.info.
 If you are looking for a client-side library, check [here](https://github.com/chainseeker/chainseeker-client).
+
+Features
+--------
+
+- 100% open source.
+	- Licensed with MIT.
+	- No fee, no backdoors and no access limitations (if you serve your server your own).
+- Server-side code is fully written in Rust and thus fast.
+	- For benchmark results, see [Performance](#performance) section.
+	- Can sync to the Bitcoin mainnet in a day (may vary with the machine spec).
+- Web front-end is written in Nuxt.js (Vue.js) and statically generated.
+	- Can serve with AWS S3 or any other object storage services. No need for web servers.
+	- Modern UI interface with [Vuetify](https://vuetifyjs.com/).
+- Can serve Bitcoin mainnet with machines with less than 16GB of memory.
+	- [chainseeker.info](https://chainseeker.info/) is served on the DigitalOcean's 16GB Memory-Optimized instance.
+	- Start from $160 / mo ($80 / mo for instance and $80 / mo for block storage).
+- Neet REST API (JSON) interface which can easily interact with your app.
+	- JavaScript (TypeScript) client is available [here](https://github.com/chainseeker/chainseeker-client).
+	- See [types.ts](https://github.com/chainseeker/chainseeker-client/blob/master/src/types.ts) for JSON interface.
+- Other features:
+	- Serve the list of transactions related to a given address (so-called "address index").
+	- Serve the ranking of addresses (so-called "rich list").
+	- Altcoin support (tested with Monacoin).
 
 Cloning the repo
 ----------------
