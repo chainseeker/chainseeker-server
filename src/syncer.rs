@@ -21,7 +21,7 @@ impl Syncer {
         let syncer = Self {
             config: (*config).clone(),
             utxo_db: UtxoDB::new(coin, false),
-            rest: rest,
+            rest,
             stop: Arc::new(RwLock::new(false)),
             http_server: HttpServer::new(coin, config),
         };
@@ -78,7 +78,7 @@ impl Syncer {
     async fn process_reorgs(&mut self) {
         let mut height = match self.http_server.synced_height_db.read().await.get() {
             Some(h) => h,
-            None => return (),
+            None => return,
         };
         loop {
             //let block_hash_rest = self.rest.blockhashbyheight(height).await
@@ -248,7 +248,7 @@ impl Syncer {
             rich_list_tx.send(utxo).await.unwrap();
         }
         print_stat(i, true);
-        println!("");
+        println!();
         println!("Loaded all UTXOs in {}ms.", to_locale_string(begin.elapsed().as_millis()));
         // Wait async tasks to finish.
         drop(utxo_server_tx);

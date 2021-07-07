@@ -112,12 +112,7 @@ impl<'a, K, V> Iterator for RocksDBIterator<'a, K, V>
 {
     type Item = (K, V);
     fn next(&mut self) -> Option<Self::Item> {
-        match self.base.next() {
-            Some((key, value)) => {
-                Some((K::deserialize(&key), V::deserialize(&value)))
-            },
-            None => None,
-        }
+        self.base.next().map(|(key, value)| (K::deserialize(&key), V::deserialize(&value)))
     }
 }
 
@@ -139,7 +134,7 @@ impl<'a, K, V> RocksDBPrefixIterator<'a, K, V>
     {
         Self {
             base,
-            prefix: prefix,
+            prefix,
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -203,10 +198,7 @@ impl<'a, K, V> RocksDBColumnFamily<'a, K, V>
         self.name.as_str()
     }
     pub fn get(&self, key: &K) -> Option<V> {
-        match self.base.db.get_pinned_cf(self.cf, key.serialize()).unwrap() {
-            Some(value) => Some(V::deserialize(&value)),
-            None => None,
-        }
+        self.base.db.get_pinned_cf(self.cf, key.serialize()).unwrap().map(|value| V::deserialize(&value))
     }
     pub fn put(&self, key: &K, value: &V) {
         self.base.db.put_cf(self.cf, key.serialize(), value.serialize()).unwrap();
@@ -239,10 +231,8 @@ impl<K, V> RocksDB<K, V>
           V: Serialize + Deserialize + 'static,
 {
     pub fn new(path: &str, temporary: bool) -> Self {
-        if temporary {
-            if std::path::Path::new(path).exists() {
-                remove_dir_all(path).unwrap();
-            }
+        if temporary && std::path::Path::new(path).exists() {
+            remove_dir_all(path).unwrap();
         }
         let mut opts = Options::default();
         opts.set_max_open_files(100);
@@ -251,16 +241,13 @@ impl<K, V> RocksDB<K, V>
         Self {
             temporary,
             path: path.to_string(),
-            db: db,
+            db,
             _k: PhantomData,
             _v: PhantomData,
         }
     }
     pub fn get(&self, key: &K) -> Option<V> {
-        match self.db.get_pinned(key.serialize()).unwrap() {
-            Some(value) => Some(V::deserialize(&value)),
-            None => None,
-        }
+        self.db.get_pinned(key.serialize()).unwrap().map(|value| V::deserialize(&value))
     }
     pub fn get_raw(&self, key: &K) -> Option<DBPinnableSlice<'_>> {
         self.db.get_pinned(key.serialize()).unwrap()

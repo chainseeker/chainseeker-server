@@ -74,20 +74,69 @@ struct TomlConfigEntry {
     ws_endpoint       : Option<String>,
 }
 
+pub fn default_genesis_block_hash() -> String {
+    "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f".to_string()
+}
+pub fn default_p2pkh_version() -> u8 {
+    0
+}
+pub fn default_p2sh_version() -> u8 {
+    5
+}
+pub fn default_segwit_hrp() -> String {
+    "bc".to_string()
+}
+pub fn default_rpc_endpoint() -> String {
+    "http://localhost:8332".to_string()
+}
+pub fn default_rpc_user() -> String {
+    "bitcoin".to_string()
+}
+pub fn default_rpc_pass() -> String {
+    "bitcoinrpc".to_string()
+}
+pub fn default_rest_endpoint() -> String {
+    bitcoin_rest::DEFAULT_ENDPOINT.to_string()
+}
+pub fn default_zmq_endpoint() -> String {
+    "tcp://localhost:28332".to_string()
+}
+pub fn default_http_ip() -> String {
+    "127.0.0.1".to_string()
+}
+pub fn default_http_port() -> u16 {
+    8000
+}
+pub fn default_ws_endpoint() -> String {
+    "127.0.0.1:8001".to_string()
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 struct TomlConfig {
-    genesis_block_hash: Option<String>,
-    p2pkh_version     : Option<u8>,
-    p2sh_version      : Option<u8>,
-    segwit_hrp        : Option<String>,
-    rpc_endpoint      : Option<String>,
-    rpc_user          : Option<String>,
-    rpc_pass          : Option<String>,
-    rest_endpoint     : Option<String>,
-    zmq_endpoint      : Option<String>,
-    http_ip           : Option<String>,
-    http_port         : Option<u16>,
-    ws_endpoint       : Option<String>,
+    #[serde(default = "default_genesis_block_hash")]
+    genesis_block_hash: String,
+    #[serde(default = "default_p2pkh_version")]
+    p2pkh_version     : u8,
+    #[serde(default = "default_p2sh_version")]
+    p2sh_version      : u8,
+    #[serde(default = "default_segwit_hrp")]
+    segwit_hrp        : String,
+    #[serde(default = "default_rpc_endpoint")]
+    rpc_endpoint      : String,
+    #[serde(default = "default_rpc_user")]
+    rpc_user          : String,
+    #[serde(default = "default_rpc_pass")]
+    rpc_pass          : String,
+    #[serde(default = "default_rest_endpoint")]
+    rest_endpoint     : String,
+    #[serde(default = "default_zmq_endpoint")]
+    zmq_endpoint      : String,
+    #[serde(default = "default_http_ip")]
+    http_ip           : String,
+    #[serde(default = "default_http_port")]
+    http_port         : u16,
+    #[serde(default = "default_ws_endpoint")]
+    ws_endpoint       : String,
     coins             : std::collections::HashMap<String, TomlConfigEntry>,
 }
 
@@ -98,20 +147,20 @@ pub fn load_config_from_str(config_str: &str, coin: &str) -> Config {
         panic!("Cannot find the specified coin in your config.");
     }
     let coin_config = coin_config.unwrap();
-    let genesis_block_hash = BlockHash::from_hex(&coin_config.genesis_block_hash.unwrap_or(config.genesis_block_hash.unwrap_or("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f".to_string()))).unwrap();
+    let genesis_block_hash = BlockHash::from_hex(&coin_config.genesis_block_hash.unwrap_or(config.genesis_block_hash)).unwrap();
     Config {
         genesis_block_hash,
-        p2pkh_version: coin_config.p2pkh_version.unwrap_or(config.p2pkh_version.unwrap_or(0)),
-        p2sh_version : coin_config.p2sh_version .unwrap_or(config.p2sh_version .unwrap_or(5)),
-        segwit_hrp   : coin_config.segwit_hrp   .unwrap_or(config.segwit_hrp   .unwrap_or("bc".to_string())),
-        rpc_endpoint : coin_config.rpc_endpoint .unwrap_or(config.rpc_endpoint .unwrap_or("http://localhost:8332".to_string())),
-        rpc_user     : coin_config.rpc_user     .unwrap_or(config.rpc_user     .unwrap_or("bitcoin".to_string())),
-        rpc_pass     : coin_config.rpc_pass     .unwrap_or(config.rpc_pass     .unwrap_or("bitcoinrpc".to_string())),
-        rest_endpoint: coin_config.rest_endpoint.unwrap_or(config.rest_endpoint.unwrap_or("http://localhost:8332/rest/".to_string())),
-        zmq_endpoint : coin_config.zmq_endpoint .unwrap_or(config.zmq_endpoint .unwrap_or("tcp://localhost:28332".to_string())),
-        http_ip      : coin_config.http_ip      .unwrap_or(config.http_ip      .unwrap_or("127.0.0.1".to_string())),
-        http_port    : coin_config.http_port    .unwrap_or(config.http_port    .unwrap_or(8000)),
-        ws_endpoint  : coin_config.ws_endpoint  .unwrap_or(config.ws_endpoint  .unwrap_or("127.0.0.1:8001".to_string())),
+        p2pkh_version: coin_config.p2pkh_version.unwrap_or(config.p2pkh_version),
+        p2sh_version : coin_config.p2sh_version .unwrap_or(config.p2sh_version ),
+        segwit_hrp   : coin_config.segwit_hrp   .unwrap_or(config.segwit_hrp   ),
+        rpc_endpoint : coin_config.rpc_endpoint .unwrap_or(config.rpc_endpoint ),
+        rpc_user     : coin_config.rpc_user     .unwrap_or(config.rpc_user     ),
+        rpc_pass     : coin_config.rpc_pass     .unwrap_or(config.rpc_pass     ),
+        rest_endpoint: coin_config.rest_endpoint.unwrap_or(config.rest_endpoint),
+        zmq_endpoint : coin_config.zmq_endpoint .unwrap_or(config.zmq_endpoint ),
+        http_ip      : coin_config.http_ip      .unwrap_or(config.http_ip      ),
+        http_port    : coin_config.http_port    .unwrap_or(config.http_port    ),
+        ws_endpoint  : coin_config.ws_endpoint  .unwrap_or(config.ws_endpoint  ),
     }
 }
 
@@ -173,10 +222,7 @@ pub fn address_to_string(addr: &Address, config: &Config) -> String {
 
 fn script_to_address_string_internal(script: &Script, p2pkh_version: u8, p2sh_version: u8, segwit_hrp: &str) -> Option<String> {
     let addr = Address::from_script(script, Network::Bitcoin /* any */);
-    match addr {
-        Some(addr) => Some(address_to_string_internal(&addr, p2pkh_version, p2sh_version, segwit_hrp)),
-        None => None,
-    }
+    addr.map(|addr| address_to_string_internal(&addr, p2pkh_version, p2sh_version, segwit_hrp))
 }
 
 pub fn script_to_address_string(script: &Script, config: &Config) -> Option<String> {
@@ -277,8 +323,7 @@ pub fn write_arr<W>(w: &mut W, arr: &[u8])
 pub fn read_vec<R>(r: &mut R, len: usize) -> Vec<u8>
     where R: Read
 {
-    let mut vec = Vec::with_capacity(len);
-    vec.resize(len, 0);
+    let mut vec = vec![0; len];
     r.read_exact(&mut vec).expect("Failed to read vec.");
     vec
 }
