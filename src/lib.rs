@@ -335,7 +335,7 @@ pub fn to_locale_string<T>(num: T) -> String
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::str::FromStr;
     use super::*;
     #[test]

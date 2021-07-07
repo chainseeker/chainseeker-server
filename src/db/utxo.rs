@@ -199,7 +199,7 @@ impl UtxoDB {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     #[allow(dead_code)]
     fn print_utxo_db(utxo_db: &UtxoDB) {

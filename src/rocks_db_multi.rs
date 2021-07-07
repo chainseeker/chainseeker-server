@@ -37,7 +37,7 @@ impl<K, V> RocksDBMulti<K, V>
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     #[test]
     fn rocks_db_multi() {

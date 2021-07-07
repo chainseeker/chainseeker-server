@@ -32,7 +32,7 @@ impl SyncedHeightDB {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     #[test]
     fn synced_height() {

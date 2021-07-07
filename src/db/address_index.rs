@@ -75,7 +75,7 @@ impl AddressIndexDB {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     #[allow(dead_code)]
     fn print_addr_index_db(addr_index_db: &AddressIndexDB) {

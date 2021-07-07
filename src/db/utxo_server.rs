@@ -92,7 +92,7 @@ impl UtxoServer {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     #[allow(dead_code)]
     fn print_utxo_server(utxo_server: &UtxoServer) {

@@ -103,7 +103,7 @@ impl WebSocketRelay {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     #[tokio::test(flavor = "multi_thread")]
     async fn web_socket_relay() {

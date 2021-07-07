@@ -292,7 +292,7 @@ impl<K, V> Drop for RocksDB<K, V>
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     #[test]
     fn rocks_db() {
