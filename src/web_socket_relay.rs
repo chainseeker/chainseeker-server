@@ -6,18 +6,22 @@ use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Debug, Clone)]
 pub struct WebSocketRelay {
+    zmq_endpoint: String,
+    ws_endpoint: String,
     stop: Arc<RwLock<bool>>,
     ready: Arc<RwLock<bool>>,
 }
 
 impl WebSocketRelay {
-    pub fn new() -> Self {
+    pub fn new(zmq_endpoint: &str, ws_endpoint: &str) -> Self {
         Self {
+            zmq_endpoint: zmq_endpoint.to_string(),
+            ws_endpoint: ws_endpoint.to_string(),
             stop: Arc::new(RwLock::new(false)),
             ready: Arc::new(RwLock::new(false)),
         }
     }
-    pub async fn run(&self, zmq_endpoint: &str, ws_endpoint: &str) {
+    pub async fn run(&self) {
         let stop = self.stop.clone();
         tokio::spawn(async move {
             tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
@@ -25,12 +29,12 @@ impl WebSocketRelay {
         });
         //println!("WebSocketRelay: waiting for a ZeroMQ message...");
         // Create a WebSocket server.
-        let ws_endpoint_string = ws_endpoint.to_string();
+        let ws_endpoint = self.ws_endpoint.clone();
         let (tx, rx) = tokio::sync::watch::channel("".to_string());
         let ready = self.ready.clone();
         tokio::spawn(async move {
-            let listener = TcpListener::bind(&ws_endpoint_string).await.unwrap();
-            println!("WebSocketRelay: listening on {}", ws_endpoint_string);
+            let listener = TcpListener::bind(&ws_endpoint).await.unwrap();
+            println!("WebSocketRelay: listening on {}", ws_endpoint);
             *ready.write().await = true;
             loop {
                 if let Ok((stream, _)) = listener.accept().await {
@@ -59,7 +63,7 @@ impl WebSocketRelay {
         // Connect to ZMQ.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
-        socket.connect(zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
+        socket.connect(&self.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         socket.set_subscribe(b"hashtx").expect("Failed to subscribe to a ZeroMQ topic.");
         loop {
@@ -115,11 +119,11 @@ mod test {
         socket.bind("tcp://lo:5555").unwrap();
         println!("ZeroMQ server created.");
         // Run relay.
-        let relay = WebSocketRelay::new();
+        let relay = WebSocketRelay::new(&format!("tcp://localhost:{}", ZMQ_PORT), &format!("localhost:{}", WS_PORT));
         let handle = {
             let relay = relay.clone();
             tokio::spawn(async move {
-                relay.run(&format!("tcp://localhost:{}", ZMQ_PORT), &format!("localhost:{}", WS_PORT)).await;
+                relay.run().await;
             })
         };
         // Wait before WebSocketRelay is ready.

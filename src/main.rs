@@ -25,11 +25,9 @@ async fn main() {
     }
     // Run WebSocketRelay.
     {
-        let ws = WebSocketRelay::new();
-        let zmq_endpoint = config.zmq_endpoint.clone();
-        let ws_endpoint = config.ws_endpoint.clone();
+        let ws = WebSocketRelay::new(&config.zmq_endpoint, &config.ws_endpoint);
         handles.push(tokio::spawn(async move {
-            ws.run(&zmq_endpoint, &ws_endpoint).await;
+            ws.run().await;
         }));
     }
     // Do initial sync.
