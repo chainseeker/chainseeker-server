@@ -55,10 +55,7 @@ impl TxDBValue {
 impl Serialize for TxDBValue {
     fn serialize(&self) -> Vec<u8> {
         let mut ret = Vec::new();
-        let confirmed_height = match self.confirmed_height {
-            Some(confirmed_height) => confirmed_height as i32,
-            None => -1i32,
-        };
+        let confirmed_height = self.confirmed_height.map_or_else(|| -1i32, |confirmed_height| confirmed_height as i32);
         ret.push(confirmed_height.to_le_bytes().to_vec());
         let tx = consensus_encode(&self.tx);
         let tx_len = tx.len() as u32;
@@ -106,16 +103,13 @@ impl TxDB {
     pub fn put_tx(&self, tx: &Transaction, confirmed_height: Option<u32>) -> Result<TxDBValue, Txid> {
         let mut previous_txouts = Vec::new();
         for vin in tx.input.iter() {
-            if vin.previous_output.is_null() {
-                continue;
+            if !vin.previous_output.is_null() {
+                let previous_txid = &vin.previous_output.txid;
+                match self.get(previous_txid) {
+                    Some(previous_tx) => previous_txouts.push(previous_tx.tx.output[vin.previous_output.vout as usize].clone()),
+                    None => return Err((*previous_txid).clone()),
+                }
             }
-            let previous_txid = &vin.previous_output.txid;
-            let previous_tx = self.get(previous_txid);
-            if previous_tx.is_none() {
-                return Err((*previous_txid).clone());
-            }
-            let previous_tx = previous_tx.unwrap();
-            previous_txouts.push(previous_tx.tx.output[vin.previous_output.vout as usize].clone());
         }
         let value = TxDBValue {
             confirmed_height,
@@ -132,46 +126,43 @@ impl TxDB {
         //let begin_get = std::time::Instant::now();
         let buf = self.db.get_raw(&TxDBKey { txid: (*txid).clone() });
         //println!("Transaction got in {}us.", begin_get.elapsed().as_micros());
-        match buf {
-            Some(buf) => {
-                //let begin_convert = std::time::Instant::now();
-                let (confirmed_height, rawtx, previous_txouts) = TxDBValue::deserialize_as_rawtx(&buf);
-                let tx: Transaction = consensus_decode(&rawtx);
-                let mut input_value = 0;
-                let mut vin = Vec::new();
-                let mut previous_txout_index = 0;
-                for input in tx.input.iter() {
-                    if input.previous_output.is_null() {
-                        vin.push(RestVin::new(input, &None, config));
-                    } else {
-                        input_value += previous_txouts[previous_txout_index].value;
-                        vin.push(RestVin::new(input, &Some(previous_txouts[previous_txout_index].clone()), config));
-                        previous_txout_index += 1;
-                    }
+        buf.map_or_else(|| None, |buf| {
+            //let begin_convert = std::time::Instant::now();
+            let (confirmed_height, rawtx, previous_txouts) = TxDBValue::deserialize_as_rawtx(&buf);
+            let tx: Transaction = consensus_decode(&rawtx);
+            let mut input_value = 0;
+            let mut vin = Vec::new();
+            let mut previous_txout_index = 0;
+            for input in tx.input.iter() {
+                if input.previous_output.is_null() {
+                    vin.push(RestVin::new(input, &None, config));
+                } else {
+                    input_value += previous_txouts[previous_txout_index].value;
+                    vin.push(RestVin::new(input, &Some(previous_txouts[previous_txout_index].clone()), config));
+                    previous_txout_index += 1;
                 }
-                let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
-                let tx = RestTx {
-                    confirmed_height,
-                    hex: hex::encode(&rawtx),
-                    txid: tx.txid().to_string(),
-                    hash: tx.wtxid().to_string(),
-                    size: tx.get_size(),
-                    // TODO: waiting for upstream merge.
-                    //vsize: tx.get_vsize(),
-                    vsize: (tx.get_weight() + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR,
-                    weight: tx.get_weight(),
-                    version: tx.version,
-                    locktime: tx.lock_time,
-                    vin,
-                    vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, config)).collect(),
-                    // TODO: compute for coinbase transactions!
-                    fee: (input_value as i64) - (output_value as i64),
-                };
-                //println!("Transaction converted in {}us.", begin_convert.elapsed().as_micros());
-                Some(tx)
-            },
-            None => None,
-        }
+            }
+            let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
+            let tx = RestTx {
+                confirmed_height,
+                hex: hex::encode(&rawtx),
+                txid: tx.txid().to_string(),
+                hash: tx.wtxid().to_string(),
+                size: tx.get_size(),
+                // TODO: waiting for upstream merge.
+                //vsize: tx.get_vsize(),
+                vsize: (tx.get_weight() + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR,
+                weight: tx.get_weight(),
+                version: tx.version,
+                locktime: tx.lock_time,
+                vin,
+                vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, config)).collect(),
+                // TODO: compute for coinbase transactions!
+                fee: (input_value as i64) - (output_value as i64),
+            };
+            //println!("Transaction converted in {}us.", begin_convert.elapsed().as_micros());
+            Some(tx)
+        })
     }
     pub fn multi_get<I: IntoIterator<Item = Txid>>(&self, txids: I) -> Vec<Option<TxDBValue>> {
         let txids: Vec<TxDBKey> = txids.into_iter().map(|txid| TxDBKey { txid }).collect();
@@ -183,15 +174,14 @@ impl TxDB {
             // Process vins.
             let mut previous_txouts = Vec::new();
             for vin in tx.input.iter() {
-                if vin.previous_output.is_null() {
-                    continue;
+                if !vin.previous_output.is_null() {
+                    let txout = TxOut {
+                        value: previous_utxos[previous_utxo_index].value,
+                        script_pubkey: previous_utxos[previous_utxo_index].script_pubkey.clone(),
+                    };
+                    previous_txouts.push(txout);
+                    previous_utxo_index += 1;
                 }
-                let txout = TxOut {
-                    value: previous_utxos[previous_utxo_index].value,
-                    script_pubkey: previous_utxos[previous_utxo_index].script_pubkey.clone(),
-                };
-                previous_txouts.push(txout);
-                previous_utxo_index += 1;
             }
             let value = TxDBValue {
                 confirmed_height: Some(confirmed_height),
