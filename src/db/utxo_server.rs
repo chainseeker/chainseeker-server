@@ -45,25 +45,18 @@ impl UtxoServer {
         self.db.iter()
     }
     pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
-        match self.db.get(&script_pubkey.wscript_hash()) {
-            Some(values) => (*values).clone(),
-            None => Vec::new(),
-        }
+        self.db.get(&script_pubkey.wscript_hash()).map_or_else(|| Vec::new(), |values| (*values).clone())
     }
     pub fn push(&mut self, utxo: &UtxoEntry) {
-        let wscript_hash = utxo.script_pubkey.wscript_hash();
-        let values = match self.db.get_mut(&wscript_hash) {
-            Some(values) => values,
-            None => {
-                self.db.insert(wscript_hash, Vec::with_capacity(1));
-                self.db.get_mut(&wscript_hash).unwrap()
-            },
-        };
         let v = UtxoServerValue {
             txid: utxo.txid,
             vout: utxo.vout,
         };
-        values.push(v);
+        let wscript_hash = utxo.script_pubkey.wscript_hash();
+        match self.db.get_mut(&wscript_hash) {
+            Some(values) => values.push(v),
+            None => assert!(self.db.insert(wscript_hash, vec![v]).is_none()),
+        }
     }
     fn remove(&mut self, script_pubkey: &Script, txid: &Txid, vout: u32) {
         let values = self.db.get_mut(&script_pubkey.wscript_hash()).unwrap();
@@ -75,27 +68,24 @@ impl UtxoServer {
         // Process vouts.
         for tx in block.txdata.iter() {
             let txid = tx.txid();
-            for vout in 0..tx.output.len() {
-                let output = &tx.output[vout];
-                let utxo = UtxoEntry {
+            for (vout, output) in tx.output.iter().enumerate() {
+                self.push(&UtxoEntry {
                     script_pubkey: output.script_pubkey.clone(),
                     txid,
                     vout: vout as u32,
                     value: output.value,
-                };
-                self.push(&utxo);
+                });
             }
         }
         // Process vins.
         let mut previous_utxo_index = 0;
         for tx in block.txdata.iter() {
             for vin in tx.input.iter() {
-                if vin.previous_output.is_null() {
-                    continue;
+                if !vin.previous_output.is_null() {
+                    let utxo = &previous_utxos[previous_utxo_index];
+                    self.remove(&utxo.script_pubkey, &utxo.txid, utxo.vout);
+                    previous_utxo_index += 1;
                 }
-                let utxo = &previous_utxos[previous_utxo_index];
-                self.remove(&utxo.script_pubkey, &utxo.txid, utxo.vout);
-                previous_utxo_index += 1;
             }
         }
     }
@@ -118,14 +108,17 @@ mod test {
     }
     #[tokio::test]
     async fn utxo_server() {
-        let mut utxo_server = UtxoServer::new();
+        let mut utxo_server: UtxoServer = Default::default();
+        assert!(utxo_server.is_empty());
         let mut utxo_db = UtxoDB::new("test/utxo_server", true);
-        for block in fixtures::regtest_blocks().iter() {
+        let blocks = fixtures::regtest_blocks();
+        for block in blocks.iter() {
             let prev_utxos = utxo_db.process_block(&block, false);
             utxo_server.process_block(&block, &prev_utxos);
         }
         utxo_server.shrink_to_fit();
         print_utxo_server(&utxo_server);
+        assert!(!utxo_server.is_empty());
         let entries = fixtures::utxo_server_entries();
         assert_eq!(utxo_server.len(), entries.len());
         assert_eq!(utxo_server.capacity(), entries.len());
@@ -134,5 +127,6 @@ mod test {
             assert_eq!(*wscript_hash, entries[i].0);
             assert_eq!(*value, entries[i].1);
         }
+        assert_eq!(utxo_server.get(&blocks[0].txdata[0].output[0].script_pubkey).len(), 1);
     }
 }
