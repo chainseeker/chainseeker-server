@@ -29,6 +29,49 @@ pub mod fixtures;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
+pub fn parse_arguments() -> Result<(String, Config), String> {
+    // Read arguments.
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        println!("usage: {} COIN", args[0]);
+        return Err("Insufficient arguments.".to_string());
+    }
+    let coin = &args[1];
+    // Load config.
+    let config = load_config(coin);
+    Ok((coin.to_string(), config))
+}
+
+pub async fn main(coin: &str, config: &Config) {
+    // Create Syncer instance.
+    let mut syncer = Syncer::new(&coin, &config).await;
+    let mut handles = Vec::new();
+    // Run HTTP server.
+    {
+        let server = syncer.http_server.clone();
+        let http_ip = config.http_ip.clone();
+        let http_port = config.http_port;
+        handles.push(tokio::spawn(async move {
+            server.run(&http_ip, http_port).await;
+        }));
+    }
+    // Run WebSocketRelay.
+    {
+        let ws = WebSocketRelay::new(&config.zmq_endpoint, &config.ws_endpoint);
+        handles.push(tokio::spawn(async move {
+            ws.run().await;
+        }));
+    }
+    // Do initial sync.
+    syncer.initial_sync().await;
+    // Run syncer.
+    syncer.run().await;
+    // Join for the threads.
+    for handle in handles.iter_mut() {
+        handle.await.expect("Failed to await a tokio JoinHandle.");
+    }
+}
+
 pub fn flush_stdout() {
     std::io::stdout().flush().expect("Failed to flush.");
 }
@@ -172,7 +215,6 @@ pub fn load_config(coin: &str) -> Config {
     load_config_from_str(&config_str, coin)
 }
 
-#[cfg(test)]
 pub fn config_example(coin: &str) -> Config {
     let config_str = include_bytes!("../config.example.toml");
     load_config_from_str(std::str::from_utf8(config_str).unwrap(), coin)

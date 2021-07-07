@@ -63,19 +63,19 @@ impl HttpServer {
     fn error(status: &StatusCode, msg: &str) -> Response<Body> {
         Self::response(status, format!("{{\"error\":\"{}\"}}", msg), false)
     }
-    fn not_found(msg: &str) -> Response<Body> {
+    pub fn not_found(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::NOT_FOUND, msg)
     }
-    fn bad_request(msg: &str) -> Response<Body> {
+    pub fn bad_request(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::BAD_REQUEST, msg)
     }
-    fn internal_error(msg: &str) -> Response<Body> {
+    pub fn internal_error(msg: &str) -> Response<Body> {
         Self::error(&StatusCode::INTERNAL_SERVER_ERROR, msg)
     }
-    fn ok(json: String, cacheable: bool) -> Response<Body> {
+    pub fn ok(json: String, cacheable: bool) -> Response<Body> {
         Self::response(&StatusCode::OK, json, cacheable)
     }
-    fn json<S>(object: S, cacheable: bool) -> Response<Body>
+    pub fn json<S>(object: S, cacheable: bool) -> Response<Body>
         where S: serde::ser::Serialize,
     {
         let json = serde_json::to_string(&object);
@@ -87,10 +87,7 @@ impl HttpServer {
     /// `/status` endpoint.
     async fn status_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        Ok(Self::ok(format!("{{\"blocks\":{}}}", match server.synced_height_db.read().await.get() {
-            Some(synced_height) => synced_height as i32,
-            None => -1,
-        }), false))
+        Ok(Self::json(RestStatus { blocks: server.synced_height_db.read().await.get().map_or(-1, |h| h as i32) }, false))
     }
     /// `/tx/:txid` endpoint.
     async fn tx_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {

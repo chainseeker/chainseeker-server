@@ -45,7 +45,7 @@ impl UtxoServer {
         self.db.iter()
     }
     pub fn get(&self, script_pubkey: &Script) -> Vec<UtxoServerValue> {
-        self.db.get(&script_pubkey.wscript_hash()).map_or_else(|| Vec::new(), |values| (*values).clone())
+        self.db.get(&script_pubkey.wscript_hash()).map_or_else(Vec::new, |values| (*values).clone())
     }
     pub fn push(&mut self, utxo: &UtxoEntry) {
         let v = UtxoServerValue {

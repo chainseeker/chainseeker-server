@@ -5,6 +5,11 @@ use bitcoin::{Script, TxIn, TxOut, Address, Network, AddressType, Transaction};
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RestStatus {
+    pub blocks: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RestScriptSig {
     pub asm: String,
     pub hex: String,
