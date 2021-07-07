@@ -48,6 +48,9 @@ impl RichList {
         self.map.insert(utxo.script_pubkey.clone(), value);
     }
     pub fn remove(&mut self, script_pubkey: &Script, value: u64) {
+        if value == 0 {
+            return;
+        }
         let v = self.map.get_mut(script_pubkey).unwrap();
         *v -= value;
         // Remove the entry if the value is zero.
