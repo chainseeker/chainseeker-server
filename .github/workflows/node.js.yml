@@ -41,14 +41,18 @@ jobs:
           ${{ runner.os }}-
 
     - name: Install npm dependencies
+      working-directory: ${{github.workspace}}/web
       run: npm ci
 
     - name: Build
+      working-directory: ${{github.workspace}}/web
       run: npm run build --if-present
 
     - name: Test
+      working-directory: ${{github.workspace}}/web
       run: npm test --if-present
 
     - name: Build Nuxt
+      working-directory: ${{github.workspace}}/web
       run: npm run nuxt:generate
 
