@@ -116,7 +116,8 @@ mod test {
     }
     #[test]
     fn rich_list() {
-        let mut rich_list = RichList::new();
+        let mut rich_list: RichList = Default::default();
+        assert_eq!(rich_list.is_empty(), true);
         let mut utxo_db = UtxoDB::new("test/rich_list", true);
         for block in fixtures::regtest_blocks().iter() {
             let prev_utxos = utxo_db.process_block(&block, false);
@@ -126,6 +127,7 @@ mod test {
         rich_list.shrink_to_fit();
         print_rich_list(&rich_list);
         let entries: Vec<Option<RestRichListEntry>> = serde_json::from_str(JSON).unwrap();
+        assert_eq!(rich_list.is_empty(), false);
         assert_eq!(rich_list.len(), entries.len());
         assert_eq!(rich_list.capacity(), entries.len());
         assert_eq!(rich_list.size(), 165);

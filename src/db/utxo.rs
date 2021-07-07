@@ -1,4 +1,3 @@
-use rayon::prelude::*;
 use bitcoin::{Block, Txid, Script, Transaction};
 
 use crate::*;
@@ -111,62 +110,50 @@ impl UtxoDB {
     }
     pub fn process_block(&mut self, block: &Block, no_panic: bool) -> Vec<UtxoEntry> {
         // Process vouts.
-        let inserts = block.txdata.par_iter().map(|tx| {
-            let mut inserts = Vec::new();
+        for tx in block.txdata.iter() {
             let txid = tx.txid();
-            for vout in 0..tx.output.len() {
-                let output = &tx.output[vout];
-                let key = UtxoDBKey {
-                    txid,
-                    vout: vout as u32,
-                };
-                let value = UtxoDBValue {
-                    script_pubkey: output.script_pubkey.clone(),
-                    value: output.value,
-                };
-                inserts.push((key ,value));
+            for (vout, output) in tx.output.iter().enumerate() {
+                self.db.put(
+                    &UtxoDBKey {
+                        txid,
+                        vout: vout as u32,
+                    },
+                    &UtxoDBValue {
+                        script_pubkey: output.script_pubkey.clone(),
+                        value: output.value,
+                    },
+                );
             }
-            inserts
-        }).collect::<Vec<Vec<(UtxoDBKey, UtxoDBValue)>>>().concat();
-        for insert in inserts.iter() {
-            self.db.put(&insert.0, &insert.1);
         }
         // Process vins.
-        let keys = block.txdata.par_iter().map(|tx| {
-            let mut keys = Vec::new();
-            for vin in tx.input.iter() {
-                if vin.previous_output.is_null() {
-                    continue;
-                }
-                let txid = vin.previous_output.txid;
-                let vout = vin.previous_output.vout;
-                let key = UtxoDBKey {
-                    txid,
-                    vout,
-                };
-                keys.push(key);
-            }
-            keys
-        }).collect::<Vec<Vec<UtxoDBKey>>>().concat();
         let mut previous_utxos = Vec::new();
-        for key in keys.iter() {
-            let value = self.db.get(&key);
-            match value {
-                Some(value) => {
-                    self.db.delete(&key);
-                    let utxo = UtxoEntry {
-                        script_pubkey: value.script_pubkey,
-                        txid: key.txid,
-                        vout: key.vout,
-                        value: value.value,
+        for tx in block.txdata.iter() {
+            for vin in tx.input.iter() {
+                if !vin.previous_output.is_null() {
+                    let txid = vin.previous_output.txid;
+                    let vout = vin.previous_output.vout;
+                    let key = UtxoDBKey {
+                        txid,
+                        vout,
                     };
-                    previous_utxos.push(utxo);
-                },
-                None => {
-                    if !no_panic {
-                        panic!("Failed to find UTXO entry.");
+                    match self.db.get(&key) {
+                        Some(value) => {
+                            self.db.delete(&key);
+                            let utxo = UtxoEntry {
+                                script_pubkey: value.script_pubkey,
+                                txid: key.txid,
+                                vout: key.vout,
+                                value: value.value,
+                            };
+                            previous_utxos.push(utxo);
+                        },
+                        None => {
+                            if !no_panic {
+                                panic!("Failed to find UTXO entry.");
+                            }
+                        },
                     }
-                },
+                }
             }
         }
         previous_utxos

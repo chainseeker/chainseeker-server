@@ -3,7 +3,7 @@ use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
 
 use crate::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TxDBKey {
     txid: Txid,
 }
@@ -195,18 +195,50 @@ impl TxDB {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
     use super::*;
+    const TXID: &str = "503e4e9824282eb06f1a328484e2b367b5f4f93a405d6e7b97261bafabfb53d5";
     #[test]
-    fn tx_db() {
+    fn key_deserialize() {
+        let mut txid = hex::decode(TXID).unwrap();
+        txid.reverse();
+        assert_eq!(
+            TxDBKey {
+                txid: Txid::from_str(TXID).unwrap(),
+            },
+            TxDBKey::deserialize(&txid),
+        );
+    }
+    #[test]
+    fn put_unconfirmed() {
+        let tx = &fixtures::regtest_blocks()[0].txdata[0];
+        let tx_db = TxDB::new("test/tx/unconfirmed", true);
+        tx_db.put_tx(&tx, None).unwrap();
+        assert_eq!(
+            tx_db.get(&tx.txid()).unwrap(),
+            TxDBValue {
+                confirmed_height: None,
+                tx: (*tx).clone(),
+                previous_txouts: Vec::new(),
+            },
+        );
+    }
+    #[test]
+    fn put_confirmed() {
         let blocks = fixtures::regtest_blocks();
-        let mut utxo_db = UtxoDB::new("test/tx", true);
-        let tx_db = TxDB::new("test/tx", true);
+        let mut utxo_db = UtxoDB::new("test/tx/confirmed", true);
+        let tx_db = TxDB::new("test/tx/confirmed", true);
         let mut previous_utxos_vec = Vec::new();
         for (height, block) in blocks.iter().enumerate() {
             let previous_utxos = utxo_db.process_block(&block, true);
             tx_db.process_block(height as u32, &block, &previous_utxos);
             previous_utxos_vec.push(previous_utxos);
         }
+        // txid = fe6c48bbfdc025670f4db0340650ba5a50f9307b091d9aaa19aa44291961c69f.
+        assert_eq!(
+            tx_db.put_tx(&consensus_decode(&hex::decode("01000000000101d553fbabaf1b26977b6e5d403af9f4b567b3e28484321a6fb02e2824984e3e5000000000171600142b2296c588ec413cebd19c3cbc04ea830ead6e78ffffffff01be1611020000000017a91487e4e5a7ff7bf78b8a8972a49381c8a673917f3e870247304402205f39ccbab38b644acea0776d18cb63ce3e37428cbac06dc23b59c61607aef69102206b8610827e9cb853ea0ba38983662034bd3575cc1ab118fb66d6a98066fa0bed01210304c01563d46e38264283b99bb352b46e69bf132431f102d4bd9a9d8dab075e7f00000000").unwrap()), Some(500_000)),
+            Result::<TxDBValue, Txid>::Err(Txid::from_str(TXID).unwrap()),
+        );
         for (height, block) in blocks.iter().enumerate() {
             let mut previous_utxo_index = 0;
             for tx in block.txdata.iter() {
