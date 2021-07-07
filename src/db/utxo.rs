@@ -219,9 +219,6 @@ mod test {
         let mut utxos = utxo_db.iter().collect::<Vec<UtxoEntry>>();
         utxos.sort();
         for utxo in utxos.iter() {
-            if utxo.value == 0 {
-                continue;
-            }
             println!("        UtxoEntry {{ script_pubkey: consensus_decode(&Vec::from_hex(\"{}\").unwrap()), txid: consensus_decode(&Vec::from_hex(\"{}\").unwrap()), vout: {}, value: {}u64, }},",
             hex::encode(consensus_encode(&utxo.script_pubkey)),
             hex::encode(consensus_encode(&utxo.txid)),
@@ -246,11 +243,12 @@ mod test {
         for block in blocks.iter() {
             utxo_db.process_block(&block, false);
         }
+        println!("BEFORE");
+        print_utxo_db(&utxo_db);
         // Test UTXO database BEFORE reorg.
-        let mut utxos_test = utxo_db.iter().filter(|utxo| utxo.value != 0).collect::<Vec<UtxoEntry>>();
+        let mut utxos_test = utxo_db.iter().collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
-        let mut utxos = fixtures::utxos_before_reorg();
-        utxos.sort();
+        let utxos = fixtures::utxos_before_reorg();
         assert_eq!(utxos_test, utxos);
         // Test UTXO database AFTER reorg.
         let reorged_block = fixtures::regtest_reorged_block();
@@ -268,10 +266,11 @@ mod test {
         }
         utxo_db.reorg_block(&blocks.last().unwrap(), &prev_txs);
         utxo_db.process_block(&reorged_block, false);
-        let mut utxos_test = utxo_db.iter().filter(|utxo| utxo.value != 0).collect::<Vec<UtxoEntry>>();
+        println!("AFTER");
+        print_utxo_db(&utxo_db);
+        let mut utxos_test = utxo_db.iter().collect::<Vec<UtxoEntry>>();
         utxos_test.sort();
-        let mut utxos = fixtures::utxos_after_reorg();
-        utxos.sort();
+        let utxos = fixtures::utxos_after_reorg();
         assert_eq!(utxos_test, utxos);
     }
 }

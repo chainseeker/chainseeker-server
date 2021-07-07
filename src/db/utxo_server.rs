@@ -125,11 +125,11 @@ mod test {
             utxo_server.process_block(&block, &prev_utxos);
         }
         utxo_server.shrink_to_fit();
-        //print_utxo_server(&utxo_server);
+        print_utxo_server(&utxo_server);
         let entries = fixtures::utxo_server_entries();
         assert_eq!(utxo_server.len(), entries.len());
         assert_eq!(utxo_server.capacity(), entries.len());
-        assert_eq!(utxo_server.size(), 7608);
+        assert_eq!(utxo_server.size(), 7672);
         for (i, (wscript_hash, value)) in utxo_server.iter().enumerate() {
             assert_eq!(*wscript_hash, entries[i].0);
             assert_eq!(*value, entries[i].1);

@@ -197,7 +197,7 @@ impl TxDB {
 mod tests {
     use super::*;
     #[test]
-    fn put_and_get_transactions() {
+    fn tx_db() {
         let blocks = fixtures::regtest_blocks();
         let mut utxo_db = UtxoDB::new("test/tx", true);
         let tx_db = TxDB::new("test/tx", true);
@@ -210,19 +210,20 @@ mod tests {
         for (height, block) in blocks.iter().enumerate() {
             let mut previous_utxo_index = 0;
             for tx in block.txdata.iter() {
+                let mut previous_txout_index = 0;
                 let value = tx_db.get(&tx.txid()).unwrap();
                 assert_eq!(value.confirmed_height, Some(height as u32));
                 assert_eq!(value.tx, *tx);
                 for vin in tx.input.iter() {
-                    if vin.previous_output.is_null() {
-                        continue;
+                    if !vin.previous_output.is_null() {
+                        let txout = TxOut {
+                            value: previous_utxos_vec[height][previous_utxo_index].value,
+                            script_pubkey: previous_utxos_vec[height][previous_utxo_index].script_pubkey.clone(),
+                        };
+                        assert_eq!(value.previous_txouts[previous_txout_index], txout);
+                        previous_utxo_index += 1;
+                        previous_txout_index += 1;
                     }
-                    let txout = TxOut {
-                        value: previous_utxos_vec[height][previous_utxo_index].value,
-                        script_pubkey: previous_utxos_vec[height][previous_utxo_index].script_pubkey.clone(),
-                    };
-                    assert_eq!(value.previous_txouts[previous_utxo_index], txout);
-                    previous_utxo_index += 1;
                 }
             }
         }

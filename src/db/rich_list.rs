@@ -108,10 +108,10 @@ impl RichList {
 #[cfg(test)]
 mod test {
     use super::*;
-    const JSON: &str = r#"[{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 683ca4604908ebda57dfd97ff94eb5553b4e5aee","hex":"0014683ca4604908ebda57dfd97ff94eb5553b4e5aee","type":"witnesspubkeyhash","address":"bc1qdq72gczfpr4a547lm9lljn4425a5ukhwtx34za"},"value":505000000141},{"scriptPubKey":{"asm":"OP_PUSHBYTES_65 04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f OP_CHECKSIG","hex":"4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac","type":"unknown","address":null},"value":5000000000},{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 3fb63f3b6d30f31ada79d7c14a995e52c4a6fdb3","hex":"00143fb63f3b6d30f31ada79d7c14a995e52c4a6fdb3","type":"witnesspubkeyhash","address":"bc1q87mr7wmdxre34kne6lq54x272tz2dldnwu5m49"},"value":3999999859},{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 ecac3ece9070b2b28ecfbc487b5ca575b1edb47a","hex":"0014ecac3ece9070b2b28ecfbc487b5ca575b1edb47a","type":"witnesspubkeyhash","address":"bc1qajkran5swzet9rk0h3y8kh99wkc7mdr645xdau"},"value":1000000000}]"#;
+    const JSON: &str = r#"[{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 97033ca70d45fe6d49310859e132a9df98f97625","hex":"001497033ca70d45fe6d49310859e132a9df98f97625","type":"witnesspubkeyhash","address":"bcrt1qjupnefcdghlx6jf3ppv7zv4fm7v0ja39dzzwvd"},"value":505000034900},{"scriptPubKey":{"asm":"OP_PUSHBYTES_65 04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f OP_CHECKSIG","hex":"4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac","type":"unknown","address":null},"value":5000000000},{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 13bb0bcb776f3e15fa8800877552044d4db27b96","hex":"001413bb0bcb776f3e15fa8800877552044d4db27b96","type":"witnesspubkeyhash","address":"bcrt1qzwashjmhdulpt75gqzrh25syf4xmy7uk6clm0p"},"value":4900000000},{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 261b6555a3cb5d3593c0275ff46f31c36e42a4c7","hex":"0014261b6555a3cb5d3593c0275ff46f31c36e42a4c7","type":"witnesspubkeyhash","address":"bcrt1qycdk24dredwnty7qya0lgme3cdhy9fx83qc9wd"},"value":99965100}]"#;
     #[allow(dead_code)]
     fn print_rich_list(rich_list: &RichList) {
-        let entries = rich_list.get_in_range_as_rest(0..rich_list.len(), &config_example("btc"));
+        let entries = rich_list.get_in_range_as_rest(0..rich_list.len(), &config_example("rbtc"));
         println!("{}", serde_json::to_string(&entries).unwrap());
     }
     #[test]
@@ -129,7 +129,7 @@ mod test {
         assert_eq!(rich_list.len(), entries.len());
         assert_eq!(rich_list.capacity(), entries.len());
         assert_eq!(rich_list.size(), 165);
-        assert_eq!(rich_list.get_in_range_as_rest(0..entries.len(), &config_example("btc")), entries);
+        assert_eq!(rich_list.get_in_range_as_rest(0..entries.len(), &config_example("rbtc")), entries);
         for (i, entry) in entries.iter().enumerate() {
             let script_pubkey = Script::from_hex(&entry.as_ref().unwrap().script_pub_key.hex).unwrap();
             assert_eq!(rich_list.get_index_of(&script_pubkey), Some(i));
