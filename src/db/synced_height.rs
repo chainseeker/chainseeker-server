@@ -36,7 +36,10 @@ mod test {
     use super::*;
     #[test]
     fn synced_height() {
-        std::fs::remove_file(SyncedHeightDB::path("test/synced_height"));
+        let path = SyncedHeightDB::path("test/synced_height");
+        if std::path::Path::new(&path).exists() {
+            std::fs::remove_file(&path).unwrap();
+        }
         let mut synced_height_db = SyncedHeightDB::new("test/synced_height");
         assert_eq!(synced_height_db.get(), None);
         synced_height_db.put(123456);

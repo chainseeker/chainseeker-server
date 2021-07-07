@@ -13,7 +13,7 @@ p2pkh_version = 111
 p2sh_version = 195
 segwit_hrp = "tb"
 rpc_endpoint = "http://localhost:18332"
-rest_endpoint = "http://localhost:18332/rest/"
+rest_endpoint = "http://localhost:18332/rest"
 zmq_endpoint = "tcp://localhost:28333"
 
 [coins.rbtc]
@@ -22,7 +22,7 @@ p2pkh_version = 111
 p2sh_version = 195
 segwit_hrp = "bcrt"
 rpc_endpoint = "http://localhost:18443"
-rest_endpoint = "http://localhost:18443/rest/"
+rest_endpoint = "http://localhost:18443/rest"
 zmq_endpoint = "tcp://localhost:28334"
 
 [coins.sbtc]
@@ -31,7 +31,7 @@ p2pkh_version = 111
 p2sh_version = 195
 segwit_hrp = "tb"
 rpc_endpoint = "http://localhost:38332"
-rest_endpoint = "http://localhost:38332/rest/"
+rest_endpoint = "http://localhost:38332/rest"
 zmq_endpoint = "tcp://localhost:28335"
 
 [coins.mona]
@@ -40,5 +40,5 @@ p2pkh_version = 50
 p2sh_version = 55
 segwit_hrp = "mona"
 rpc_endpoint = "http://localhost:9402"
-rest_endpoint = "http://localhost:9402/rest/"
+rest_endpoint = "http://localhost:9402/rest"
 zmq_endpoint = "tcp://localhost:29401"
