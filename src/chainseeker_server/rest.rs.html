@@ -324,10 +324,6 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>};
 <span class="kw">use</span> <span class="ident">bitcoin::hashes::hex::ToHex</span>;
@@ -397,18 +393,14 @@
         <span class="self">Self</span> {
             <span class="ident">asm</span>: <span class="ident">script_pubkey</span>.<span class="ident">asm</span>(),
             <span class="ident">hex</span>: <span class="ident">hex::encode</span>(<span class="ident">script_pubkey</span>.<span class="ident">as_bytes</span>()),
-            <span class="ident">r#type</span>: <span class="kw">match</span> <span class="ident">address</span>.<span class="ident">clone</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">address</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">address</span>.<span class="ident">address_type</span>() {
-                    <span class="prelude-val">Some</span>(<span class="ident">address_type</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">address_type</span> {
-                        <span class="ident">AddressType::P2pkh</span>  <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;pubkeyhash&quot;</span>,
-                        <span class="ident">AddressType::P2sh</span>   <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;scripthash&quot;</span>,
-                        <span class="ident">AddressType::P2wpkh</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;witnesspubkeyhash&quot;</span>,
-                        <span class="ident">AddressType::P2wsh</span>  <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;witnessscripthash&quot;</span>,
-                    },
-                    <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;unknown&quot;</span>,
+            <span class="ident">r#type</span>: <span class="ident">address</span>.<span class="ident">map_or</span>(<span class="string">&quot;unknown&quot;</span>, <span class="op">|</span><span class="ident">address</span><span class="op">|</span> <span class="ident">address</span>.<span class="ident">address_type</span>().<span class="ident">map_or</span>(<span class="string">&quot;unknown&quot;</span>, <span class="op">|</span><span class="ident">address_type</span><span class="op">|</span> {
+                <span class="kw">match</span> <span class="ident">address_type</span> {
+                    <span class="ident">AddressType::P2pkh</span>  <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;pubkeyhash&quot;</span>,
+                    <span class="ident">AddressType::P2sh</span>   <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;scripthash&quot;</span>,
+                    <span class="ident">AddressType::P2wpkh</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;witnesspubkeyhash&quot;</span>,
+                    <span class="ident">AddressType::P2wsh</span>  <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;witnessscripthash&quot;</span>,
                 }
-                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;unknown&quot;</span>,
-            }.<span class="ident">to_string</span>(),
+            })).<span class="ident">to_string</span>(),
             <span class="ident">address</span>: <span class="ident">address_str</span>,
         }
     }
