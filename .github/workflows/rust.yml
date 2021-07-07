@@ -8,14 +8,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  SCCACHE_CACHE_SIZE: 512M
+  CC: /tmp/sccache/sccache cc
+  CXX: /tmp/sccache/sccache c++
 
 jobs:
   test:
-
-    env:
-      SCCACHE_CACHE_SIZE: 512M
-      CC: /tmp/sccache/sccache cc
-      CXX: /tmp/sccache/sccache c++
 
     runs-on: ubuntu-latest
 
@@ -28,6 +26,8 @@ jobs:
 
     - name: Configure sccache
       uses: visvirial/sccache-action@v1
+      with:
+        cache-key: sccache-ubuntu-latest-test
 
     - name: Install stable toolchain
       uses: actions-rs/toolchain@v1
@@ -51,6 +51,11 @@ jobs:
 
     - name: Install dependencies
       run: sudo apt install -y libzmq3-dev
+
+    - name: Configure sccache
+      uses: visvirial/sccache-action@v1
+      with:
+        cache-key: sccache-ubuntu-latest-doc
 
     - name: Generate document
       run: cargo doc --verbose
