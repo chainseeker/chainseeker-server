@@ -47,6 +47,9 @@ jobs:
 
     - uses: actions/checkout@v2
 
+    - name: Install dependencies
+      run: sudo apt install -y libzmq3-dev
+
     - name: Generate document
       run: cargo doc --verbose
 
