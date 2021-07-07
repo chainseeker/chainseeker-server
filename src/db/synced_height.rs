@@ -15,10 +15,7 @@ impl SyncedHeightDB {
         format!("{}/synced_height.txt", Self::dir(coin))
     }
     pub fn new(coin: &str) -> Self {
-        let synced_height = match std::fs::read_to_string(&Self::path(coin)) {
-            Ok(s) => Some(s.parse().unwrap()),
-            Err(_) => None,
-        };
+        let synced_height = std::fs::read_to_string(&Self::path(coin)).map_or_else(|_| None, |s| Some(s.parse().unwrap()));
         Self {
             coin: coin.to_string(),
             synced_height,
@@ -39,7 +36,9 @@ mod test {
     use super::*;
     #[test]
     fn synced_height() {
+        std::fs::remove_file(SyncedHeightDB::path("test/synced_height"));
         let mut synced_height_db = SyncedHeightDB::new("test/synced_height");
+        assert_eq!(synced_height_db.get(), None);
         synced_height_db.put(123456);
         assert_eq!(synced_height_db.get(), Some(123456));
     }
