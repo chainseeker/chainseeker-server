@@ -324,12 +324,22 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>};
 <span class="kw">use</span> <span class="ident">bitcoin::hashes::hex::ToHex</span>;
 <span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Script</span>, <span class="ident">TxIn</span>, <span class="ident">TxOut</span>, <span class="ident">Address</span>, <span class="ident">Network</span>, <span class="ident">AddressType</span>, <span class="ident">Transaction</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RestStatus</span> {
+    <span class="kw">pub</span> <span class="ident">blocks</span>: <span class="ident">i32</span>,
+}
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RestScriptSig</span> {

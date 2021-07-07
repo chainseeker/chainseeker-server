@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["RestBlockHeader",""],["RestBlockSummary",""],["RestBlockWithTxids",""],["RestBlockWithTxs",""],["RestRichListEntry",""],["RestScriptPubKey",""],["RestScriptSig",""],["RestTx",""],["RestUtxo",""],["RestVin",""],["RestVout",""]]});
+initSidebarItems({"struct":[["RestBlockHeader",""],["RestBlockSummary",""],["RestBlockWithTxids",""],["RestBlockWithTxs",""],["RestRichListEntry",""],["RestScriptPubKey",""],["RestScriptSig",""],["RestStatus",""],["RestTx",""],["RestUtxo",""],["RestVin",""],["RestVout",""]]});
