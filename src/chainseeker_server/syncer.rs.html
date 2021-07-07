@@ -367,7 +367,7 @@
         <span class="kw">let</span> <span class="ident">syncer</span> <span class="op">=</span> <span class="self">Self</span> {
             <span class="ident">config</span>: (<span class="kw-2">*</span><span class="ident">config</span>).<span class="ident">clone</span>(),
             <span class="ident">utxo_db</span>: <span class="ident">UtxoDB::new</span>(<span class="ident">coin</span>, <span class="bool-val">false</span>),
-            <span class="ident">rest</span>: <span class="ident">rest</span>,
+            <span class="ident">rest</span>,
             <span class="ident">stop</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="bool-val">false</span>)),
             <span class="ident">http_server</span>: <span class="ident">HttpServer::new</span>(<span class="ident">coin</span>, <span class="ident">config</span>),
         };
@@ -424,7 +424,7 @@
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">process_reorgs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">height</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>() {
             <span class="prelude-val">Some</span>(<span class="ident">h</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">h</span>,
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> (),
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span>,
         };
         <span class="kw">loop</span> {
             <span class="comment">//let block_hash_rest = self.rest.blockhashbyheight(height).await</span>
@@ -594,7 +594,7 @@
             <span class="ident">rich_list_tx</span>.<span class="ident">send</span>(<span class="ident">utxo</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
         }
         <span class="ident">print_stat</span>(<span class="ident">i</span>, <span class="bool-val">true</span>);
-        <span class="macro">println!</span>(<span class="string">&quot;&quot;</span>);
+        <span class="macro">println!</span>();
         <span class="macro">println!</span>(<span class="string">&quot;Loaded all UTXOs in {}ms.&quot;</span>, <span class="ident">to_locale_string</span>(<span class="ident">begin</span>.<span class="ident">elapsed</span>().<span class="ident">as_millis</span>()));
         <span class="comment">// Wait async tasks to finish.</span>
         <span class="ident">drop</span>(<span class="ident">utxo_server_tx</span>);
