@@ -1,13 +1,13 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use bitcoin::hashes::hex::ToHex;
 use bitcoin::{Script, TxIn, TxOut, Address, Network, AddressType, Transaction};
 
 use super::*;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RestScriptSig {
-    asm: String,
-    hex: String,
+    pub asm: String,
+    pub hex: String,
 }
 
 impl RestScriptSig {
@@ -19,16 +19,16 @@ impl RestScriptSig {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestVin {
-    txid: String,
-    vout: u32,
-    script_sig: RestScriptSig,
-    txinwitness: Vec<String>,
-    sequence: u32,
-    value: u64,
-    address: Option<String>,
+    pub txid: String,
+    pub vout: u32,
+    pub script_sig: RestScriptSig,
+    pub txinwitness: Vec<String>,
+    pub sequence: u32,
+    pub value: u64,
+    pub address: Option<String>,
 }
 
 impl RestVin {
@@ -51,12 +51,12 @@ impl RestVin {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RestScriptPubKey {
-    asm: String,
-    hex: String,
-    r#type: String,
-    address: Option<String>,
+    pub asm: String,
+    pub hex: String,
+    pub r#type: String,
+    pub address: Option<String>,
 }
 
 impl RestScriptPubKey {
@@ -83,13 +83,13 @@ impl RestScriptPubKey {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestUtxo {
-    txid: String,
-    vout: u32,
-    script_pub_key: RestScriptPubKey,
-    value: u64,
+    pub txid: String,
+    pub vout: u32,
+    pub script_pub_key: RestScriptPubKey,
+    pub value: u64,
 }
 
 impl RestUtxo {
@@ -106,12 +106,12 @@ impl RestUtxo {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestVout {
-    value: u64,
-    n: usize,
-    script_pub_key: RestScriptPubKey,
+    pub value: u64,
+    pub n: usize,
+    pub script_pub_key: RestScriptPubKey,
 }
 
 impl RestVout {
@@ -124,7 +124,7 @@ impl RestVout {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestTx {
     pub confirmed_height: Option<u32>,
@@ -142,7 +142,7 @@ pub struct RestTx {
     //counterparty: ,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RestBlockHeader {
     pub height: u32,
     pub header: String,
@@ -188,7 +188,7 @@ impl RestBlockHeader {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RestBlockWithTxids {
     pub height: u32,
     pub header: String,
@@ -228,7 +228,7 @@ impl RestBlockWithTxids {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RestBlockWithTxs {
     pub height: u32,
     pub header: String,
@@ -273,22 +273,22 @@ impl RestBlockWithTxs {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestRichListEntry {
     pub script_pub_key: RestScriptPubKey,
     pub value: u64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RestBlockSummary {
-    hash        : String,
-    time        : u32,
-    nonce       : u32,
-    size        : u32,
-    strippedsize: u32,
-    weight      : u32,
-    txcount     : usize,
+    pub hash        : String,
+    pub time        : u32,
+    pub nonce       : u32,
+    pub size        : u32,
+    pub strippedsize: u32,
+    pub weight      : u32,
+    pub txcount     : usize,
 }
 
 impl RestBlockSummary {
