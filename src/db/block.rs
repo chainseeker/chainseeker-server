@@ -43,10 +43,7 @@ impl BlockHashDB {
         self.db.put(&height, &BlockHashDBValue { block_hash: block.block_hash() });
     }
     pub fn get(&self, height: u32) -> Option<BlockHash> {
-        match self.db.get(&height) {
-            Some(value) => Some(value.block_hash),
-            None => None,
-        }
+        self.db.get(&height).map(|value| value.block_hash)
     }
 }
 
@@ -81,12 +78,13 @@ const BLOCK_HEADER_LEN: usize = 80;
 
 impl Serialize for BlockContentDBValue {
     fn serialize(&self) -> Vec<u8> {
-        let mut ret = Vec::new();
-        ret.push(self.height.to_le_bytes().to_vec());
-        ret.push(consensus_encode(&self.block_header));
-        ret.push(self.size.to_le_bytes().to_vec());
-        ret.push(self.strippedsize.to_le_bytes().to_vec());
-        ret.push(self.weight.to_le_bytes().to_vec());
+        let mut ret = vec![
+            self.height.to_le_bytes().to_vec(),
+            consensus_encode(&self.block_header),
+            self.size.to_le_bytes().to_vec(),
+            self.strippedsize.to_le_bytes().to_vec(),
+            self.weight.to_le_bytes().to_vec(),
+        ];
         for txid in self.txids.iter() {
             ret.push(consensus_encode(txid));
         }
@@ -141,7 +139,7 @@ impl BlockContentDB {
         self.db.put(&BlockHashDBValue { block_hash: block.block_hash() }, &BlockContentDBValue::new(height, &block));
     }
     pub fn get(&self, block_hash: &BlockHash) -> Option<BlockContentDBValue> {
-        self.db.get(&BlockHashDBValue { block_hash: (*block_hash).clone() })
+        self.db.get(&BlockHashDBValue { block_hash: *block_hash })
     }
 }
 

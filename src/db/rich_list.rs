@@ -16,11 +16,20 @@ pub struct RichList {
     map: IndexMap<Script, u64>,
 }
 
+impl Default for RichList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RichList {
     pub fn new() -> Self {
         Self {
             map: IndexMap::new(),
         }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
     pub fn len(&self) -> usize {
         self.map.len()
@@ -42,7 +51,7 @@ impl RichList {
         let v = self.map.get_mut(script_pubkey).unwrap();
         *v -= value;
         // Remove the entry if the value is zero.
-        if *v <= 0 {
+        if *v == 0 {
             self.map.remove(script_pubkey);
         }
     }
@@ -59,7 +68,7 @@ impl RichList {
             })
         }).collect()
     }
-    pub fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+    pub fn process_block(&mut self, block: &Block, previous_utxos: &[UtxoEntry]) {
         // Process vouts.
         for tx in block.txdata.iter() {
             let txid = tx.txid();

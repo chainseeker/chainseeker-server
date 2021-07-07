@@ -98,7 +98,7 @@ impl TxDB {
         }
     }
     pub fn put(&self, txid: &Txid, value: &TxDBValue) {
-        self.db.put(&TxDBKey { txid: (*txid).clone() }, value);
+        self.db.put(&TxDBKey { txid: *txid }, value);
     }
     pub fn put_tx(&self, tx: &Transaction, confirmed_height: Option<u32>) -> Result<TxDBValue, Txid> {
         let mut previous_txouts = Vec::new();
@@ -107,7 +107,7 @@ impl TxDB {
                 let previous_txid = &vin.previous_output.txid;
                 match self.get(previous_txid) {
                     Some(previous_tx) => previous_txouts.push(previous_tx.tx.output[vin.previous_output.vout as usize].clone()),
-                    None => return Err((*previous_txid).clone()),
+                    None => return Err(*previous_txid),
                 }
             }
         }
@@ -120,11 +120,11 @@ impl TxDB {
         Ok(value)
     }
     pub fn get(&self, txid: &Txid) -> Option<TxDBValue> {
-        self.db.get(&TxDBKey { txid: (*txid).clone() })
+        self.db.get(&TxDBKey { txid: *txid })
     }
     pub fn get_as_rest(&self, txid: &Txid, config: &Config) -> Option<RestTx> {
         //let begin_get = std::time::Instant::now();
-        let buf = self.db.get_raw(&TxDBKey { txid: (*txid).clone() });
+        let buf = self.db.get_raw(&TxDBKey { txid: *txid });
         //println!("Transaction got in {}us.", begin_get.elapsed().as_micros());
         buf.map_or_else(|| None, |buf| {
             //let begin_convert = std::time::Instant::now();
@@ -168,7 +168,7 @@ impl TxDB {
         let txids: Vec<TxDBKey> = txids.into_iter().map(|txid| TxDBKey { txid }).collect();
         self.db.multi_get(txids)
     }
-    pub fn process_block(&self, confirmed_height: u32, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+    pub fn process_block(&self, confirmed_height: u32, block: &Block, previous_utxos: &[UtxoEntry]) {
         let mut previous_utxo_index = 0;
         for tx in block.txdata.iter() {
             // Process vins.

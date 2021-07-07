@@ -19,10 +19,10 @@ impl<K, V> RocksDBMulti<K, V>
         }
     }
     pub fn get(&self, key: &K) -> Vec<V> {
-        self.db.get(key).unwrap_or(Vec::new())
+        self.db.get(key).unwrap_or_default()
     }
-    pub fn put(&self, key: &K, values: &Vec<V>) {
-        self.db.put(key, values);
+    pub fn put(&self, key: &K, values: &[V]) {
+        self.db.put(key, &values.to_vec());
     }
     pub fn push(&self, key: &K, value: V) {
         let mut values = self.get(key);

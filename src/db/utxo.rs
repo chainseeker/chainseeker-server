@@ -19,10 +19,7 @@ pub struct UtxoDBKey {
 
 impl Serialize for UtxoDBKey {
     fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.txid.to_vec());
-        buf.push(self.vout.to_le_bytes().to_vec());
-        buf.concat()
+        [self.txid.to_vec(), self.vout.to_le_bytes().to_vec()].concat()
     }
 }
 
@@ -45,10 +42,7 @@ pub struct UtxoDBValue {
 
 impl Serialize for UtxoDBValue {
     fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(consensus_encode(&self.script_pubkey));
-        buf.push(self.value.to_le_bytes().to_vec());
-        buf.concat()
+        [consensus_encode(&self.script_pubkey), self.value.to_le_bytes().to_vec()].concat()
     }
 }
 
@@ -177,7 +171,7 @@ impl UtxoDB {
         }
         previous_utxos
     }
-    pub fn reorg_block(&mut self, block: &Block, prev_txs: &Vec<Transaction>) {
+    pub fn reorg_block(&mut self, block: &Block, prev_txs: &[Transaction]) {
         // Process vins.
         let mut prev_tx_offset = 0;
         for tx in block.txdata.iter() {

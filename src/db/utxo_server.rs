@@ -14,11 +14,20 @@ pub struct UtxoServer {
     db: IndexMap<WScriptHash, Vec<UtxoServerValue>>,
 }
 
+impl Default for UtxoServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UtxoServer {
     pub fn new() -> Self {
         Self {
             db: IndexMap::new(),
         }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.db.is_empty()
     }
     pub fn len(&self) -> usize {
         self.db.len()
@@ -46,7 +55,7 @@ impl UtxoServer {
         let values = match self.db.get_mut(&wscript_hash) {
             Some(values) => values,
             None => {
-                self.db.insert(wscript_hash.clone(), Vec::with_capacity(1));
+                self.db.insert(wscript_hash, Vec::with_capacity(1));
                 self.db.get_mut(&wscript_hash).unwrap()
             },
         };
@@ -62,7 +71,7 @@ impl UtxoServer {
             !(utxo_value.txid == *txid && utxo_value.vout == vout)
         }).cloned().collect();
     }
-    pub fn process_block(&mut self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+    pub fn process_block(&mut self, block: &Block, previous_utxos: &[UtxoEntry]) {
         // Process vouts.
         for tx in block.txdata.iter() {
             let txid = tx.txid();

@@ -89,7 +89,7 @@ impl Syncer {
             //    break;
             //}
             let block_headers = self.rest.headers(1, &block_hash_me).await.unwrap();
-            if block_headers.len() > 0 {
+            if !block_headers.is_empty() {
                 break;
             }
             println!("Reorg detected at block height = {}.", to_locale_string(height));
@@ -126,7 +126,8 @@ impl Syncer {
         if initial {
             let block_queue = block_queue.clone();
             let start_block_hash = if start_height == 0 {
-                block_queue.write().await.push_back(self.rest.block(&self.config.genesis_block_hash).await.unwrap());
+                let block = self.rest.block(&self.config.genesis_block_hash).await.unwrap();
+                block_queue.write().await.push_back(block);
                 start_height = 1;
                 self.config.genesis_block_hash
             } else {
@@ -230,7 +231,7 @@ impl Syncer {
             print_stat(i, false);
             i += 1;
             // Ignore UTXO entries with zero value.
-            if utxo.value <= 0 {
+            if utxo.value == 0 {
                 continue;
             }
             /*

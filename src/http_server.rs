@@ -119,7 +119,7 @@ impl HttpServer {
         }
         match rpc.send_raw_transaction(hex.unwrap()) {
             Ok(txid) => Ok(Self::ok(format!("{{\"txid\":\"{}\"}}", txid), false)),
-            Err(_) => Ok(Self::bad_request(&format!("Failed to broadcast transaction."))),
+            Err(_) => Ok(Self::bad_request("Failed to broadcast transaction.")),
         }
     }
     /// `/block_summary/:offset/:limit` endpoint.
@@ -213,11 +213,7 @@ impl HttpServer {
                 println!("Failed to decode address: {}.", err);
             }
         }
-        let script = Script::from_hex(script_or_address);
-        if script.is_ok() {
-            return Some(script.unwrap());
-        }
-        None
+        Script::from_hex(script_or_address).ok()
     }
     /// `/txids/:script_or_address` endpoint.
     async fn txids_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -244,13 +240,13 @@ impl HttpServer {
             match tx_db.get_as_rest(txid, &server.config) {
                 Some(tx) => Some(tx),
                 None => {
-                    txids_not_found.push(txid);
+                    txids_not_found.push(txid.to_string());
                     None
                 },
             }
         }).collect::<Vec<Option<RestTx>>>();
-        if txids_not_found.len() > 0 {
-            return Ok(Self::internal_error(&format!("Failed to resolve transactions (one of these is {}).", txids_not_found[0])));
+        if !txids_not_found.is_empty() {
+            return Ok(Self::internal_error(&format!("Failed to resolve transactions: {}.", txids_not_found.join(", "))));
         }
         let txs: Vec<RestTx> = txs.into_iter().map(|x| x.unwrap()).collect();
         Ok(Self::json(&txs, false))

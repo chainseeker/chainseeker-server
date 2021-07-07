@@ -66,18 +66,14 @@ impl RestScriptPubKey {
         Self {
             asm: script_pubkey.asm(),
             hex: hex::encode(script_pubkey.as_bytes()),
-            r#type: match address.clone() {
-                Some(address) => match address.address_type() {
-                    Some(address_type) => match address_type {
-                        AddressType::P2pkh  => "pubkeyhash",
-                        AddressType::P2sh   => "scripthash",
-                        AddressType::P2wpkh => "witnesspubkeyhash",
-                        AddressType::P2wsh  => "witnessscripthash",
-                    },
-                    None => "unknown",
+            r#type: address.map_or("unknown", |address| address.address_type().map_or("unknown", |address_type| {
+                match address_type {
+                    AddressType::P2pkh  => "pubkeyhash",
+                    AddressType::P2sh   => "scripthash",
+                    AddressType::P2wpkh => "witnesspubkeyhash",
+                    AddressType::P2wsh  => "witnessscripthash",
                 }
-                None => "unknown",
-            }.to_string(),
+            })).to_string(),
             address: address_str,
         }
     }

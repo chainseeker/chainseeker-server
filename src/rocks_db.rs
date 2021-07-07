@@ -67,6 +67,7 @@ impl<D> Deserialize for Vec<D>
     }
 }
 
+#[derive(Debug, Clone, Default)]
 pub struct Empty {}
 
 impl ConstantSize for Empty {
@@ -255,7 +256,7 @@ impl<K, V> RocksDB<K, V>
     pub fn multi_get<I: IntoIterator<Item = K>>(&self, keys: I) -> Vec<Option<V>> {
         let keys: Vec<Vec<u8>> = keys.into_iter().map(|key| key.serialize()).collect();
         self.db.multi_get(keys).unwrap().iter().map(|value| {
-            if value.len() <= 0 {
+            if value.is_empty() {
                 None
             } else {
                 Some(V::deserialize(value))

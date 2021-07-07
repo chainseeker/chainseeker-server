@@ -10,10 +10,7 @@ pub struct AddressIndexDBKey {
 
 impl Serialize for AddressIndexDBKey {
     fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(consensus_encode(&self.script_pubkey));
-        buf.push(consensus_encode(&self.txid));
-        buf.concat()
+        [consensus_encode(&self.script_pubkey), consensus_encode(&self.txid)].concat()
     }
 }
 
@@ -28,27 +25,7 @@ impl Deserialize for AddressIndexDBKey {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct AddressIndexDBValue {
-}
-
-impl AddressIndexDBValue {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Serialize for AddressIndexDBValue {
-    fn serialize(&self) -> Vec<u8> {
-        Vec::new()
-    }
-}
-
-impl Deserialize for AddressIndexDBValue {
-    fn deserialize(_buf: &[u8]) -> Self {
-        Self {}
-    }
-}
+pub type AddressIndexDBValue = Empty;
 
 #[derive(Debug)]
 pub struct AddressIndexDB {
@@ -73,29 +50,25 @@ impl AddressIndexDB {
     pub fn put(&self, script_pubkey: &Script, txid: &Txid) {
         let key = AddressIndexDBKey {
             script_pubkey: (*script_pubkey).clone(),
-            txid: (*txid).clone(),
+            txid: *txid,
         };
-        self.db.put(&key, &AddressIndexDBValue::new());
+        self.db.put(&key, &Default::default());
     }
-    pub fn process_block(&self, block: &Block, previous_utxos: &Vec<UtxoEntry>) {
+    pub fn process_block(&self, block: &Block, previous_utxos: &[UtxoEntry]) {
         let mut previous_utxo_index = 0;
-        let txids: Vec<Txid> = block.txdata.iter().map(|tx| {
-            tx.txid()
-        }).collect();
-        for i in 0..block.txdata.len() {
-            let tx = &block.txdata[i];
-            let txid = &txids[i];
+        for tx in block.txdata.iter() {
+            let txid = tx.txid();
             // Process vins.
             for vin in tx.input.iter() {
                 if !vin.previous_output.is_null() {
                     // Fetch transaction from `previous_output`.
-                    self.put(&previous_utxos[previous_utxo_index].script_pubkey, txid);
+                    self.put(&previous_utxos[previous_utxo_index].script_pubkey, &txid);
                     previous_utxo_index += 1;
                 }
             }
             // Process vouts.
             for vout in tx.output.iter() {
-                self.put(&vout.script_pubkey, txid);
+                self.put(&vout.script_pubkey, &txid);
             }
         }
     }
