@@ -182,8 +182,8 @@ mod tests {
         for (height, block) in blocks.iter().enumerate() {
             block_db.put(height as u32, &block);
         }
-        for height in 0..blocks.len() {
-            assert_eq!(block_db.get(height as u32), Some(BlockContentDBValue::new(height as u32, &blocks[height])));
+        for (height, block) in blocks.iter().enumerate() {
+            assert_eq!(block_db.get(height as u32), Some(BlockContentDBValue::new(height as u32, &block)));
         }
         assert_eq!(block_db.get(blocks.len() as u32), None);
     }

@@ -310,7 +310,7 @@ mod test {
             vec![(key1.clone(), value1.clone()), (key2.clone(), value2.clone())]);
         assert_eq!(
             db.prefix_iter(key1.as_bytes().to_vec()).collect::<Vec<(String, Vec<u32>)>>(),
-            vec![(key1.clone(), value1.clone())]);
+            vec![(key1.clone(), value1)]);
         db.delete(&key1);
         assert_eq!(db.get(&key1), None);
         assert_eq!(db.multi_get(vec![key1, key2]), vec![None, Some(value2)]);

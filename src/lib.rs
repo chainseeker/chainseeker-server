@@ -350,6 +350,6 @@ mod test {
     }
     #[test]
     fn uint256_as_f64_12345() {
-        assert_eq!(uint256_as_f64(&Uint256::from_u64(12345).unwrap()), 12345f64);
+        assert!((uint256_as_f64(&Uint256::from_u64(12345).unwrap()) - 12345f64).abs() < f64::EPSILON);
     }
 }
