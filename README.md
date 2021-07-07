@@ -1,5 +1,4 @@
-chainseeker-server
-==================
+<img src="https://raw.githubusercontent.com/chainseeker/chainseeker-server/master/assets/img/logo-wide.png" alt="chainseeker-server" width="100%" />
 
 [![Rust](https://github.com/chainseeker/chainseeker-server/actions/workflows/rust.yml/badge.svg)](https://github.com/chainseeker/chainseeker-server/actions/workflows/rust.yml)
 [![Node.js CI](https://github.com/chainseeker/chainseeker-server/actions/workflows/node.js.yml/badge.svg)](https://github.com/chainseeker/chainseeker-server/actions/workflows/node.js.yml)
