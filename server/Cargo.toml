@@ -1,7 +1,12 @@
 [package]
 name = "chainseeker-server"
-version = "0.0.1"
+version = "3.0.1"
 authors = ["Masahiko Hyuga <mail@mhyuga.jp>"]
+license = "MIT"
+description = "chainseeker.info server-side implementation"
+repository = "https://github.com/chainseeker/chainseeker-server"
+categories = ["cryptography::cryptocurrencies", "web-programming::http-server", "web-programming::websocket"]
+keywords = ["cryptocurrency", "blockexplorer", "bitcoin", "monacoin"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

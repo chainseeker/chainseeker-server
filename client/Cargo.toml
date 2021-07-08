@@ -5,7 +5,7 @@ authors = ["Masahiko Hyuga <mail@mhyuga.jp>"]
 license = "MIT"
 description = "chainseeker.info client side library"
 repository = "https://github.com/chainseeker/chainseeker-server"
-categories = ["api-bindings"]
+categories = ["cryptography::cryptocurrencies", "api-bindings"]
 keywords = ["cryptocurrency", "blockexplorer", "bitcoin", "monacoin"]
 edition = "2018"
 

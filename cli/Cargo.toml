@@ -1,6 +1,12 @@
 [package]
 name = "cs-cli"
 version = "3.0.1"
+authors = ["Masahiko Hyuga <mail@mhyuga.jp>"]
+license = "MIT"
+description = "chainseeker.info command line utility"
+repository = "https://github.com/chainseeker/chainseeker-server"
+categories = ["cryptography::cryptocurrencies", "command-line-utilities"]
+keywords = ["cryptocurrency", "blockexplorer", "bitcoin", "monacoin"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
