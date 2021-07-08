@@ -155,17 +155,11 @@ impl HttpServer {
         let server = req.data::<HttpServer>().unwrap();
         let hash_or_height = req.param("hash_or_height").unwrap();
         let block_content = if hash_or_height.len() == 64 {
-            let block_hash = Vec::from_hex(hash_or_height);
+            let block_hash = BlockHash::from_hex(hash_or_height);
             if block_hash.is_err() {
                 return Err(Self::not_found("Failed to decode input block hash."));
             }
-            let mut block_hash = block_hash.unwrap();
-            if block_hash.len() != 32 {
-                return Err(Self::not_found("Block hash has an invalid length."));
-            }
-            block_hash.reverse();
-            let block_hash = consensus_decode(&block_hash[..]);
-            server.block_db.read().await.get_by_hash(&block_hash)
+            server.block_db.read().await.get_by_hash(&block_hash.unwrap())
         } else {
             let height = hash_or_height.parse();
             if height.is_err() {

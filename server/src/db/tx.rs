@@ -200,13 +200,11 @@ mod tests {
     const TXID: &str = "503e4e9824282eb06f1a328484e2b367b5f4f93a405d6e7b97261bafabfb53d5";
     #[test]
     fn key_deserialize() {
-        let mut txid = hex::decode(TXID).unwrap();
-        txid.reverse();
         assert_eq!(
             TxDBKey {
                 txid: Txid::from_str(TXID).unwrap(),
             },
-            TxDBKey::deserialize(&txid),
+            TxDBKey::deserialize(&Txid::from_hex(TXID).unwrap()),
         );
     }
     #[test]
