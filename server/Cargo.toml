@@ -26,10 +26,11 @@ tokio-tungstenite = "0.14"
 hyper = { version = "0.14", features = ["full"] }
 routerify = "2.1"
 rocksdb = "0.16"
-bitcoin-rest = { version = "0.0.12", default-features = false }
+bitcoin-rest = { version = "0.1", default-features = false }
 bitcoincore-rpc = "0.13"
 
 [dev-dependencies]
+chainseeker = { path = "../client" }
 criterion = { version = "0.3", features = [] }
 
 [[bench]]
