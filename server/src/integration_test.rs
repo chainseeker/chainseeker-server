@@ -133,7 +133,7 @@ async fn integration_test() {
     // Wait until sync finishes.
     let mut retry_count = 0;
     loop {
-        if retry_count > 5 {
+        if retry_count > 100 {
             panic!("Maximum retry count reached.");
         }
         if let Ok(status) = client.status().await {
