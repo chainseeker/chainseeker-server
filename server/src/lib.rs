@@ -216,7 +216,7 @@ pub fn load_config(coin: &str) -> Config {
 }
 
 pub fn config_example(coin: &str) -> Config {
-    let config_str = include_bytes!("../../config.example.toml");
+    let config_str = include_bytes!("../config.example.toml");
     load_config_from_str(std::str::from_utf8(config_str).unwrap(), coin)
 }
 

@@ -37,6 +37,7 @@ Cloning the repo
 
 ```bash
 $ git clone https://github.com/chainseeker/chainseeker-server.git
+$ cd chainseeker-server
 ```
 
 Prerequisite
@@ -84,10 +85,10 @@ Then, launch `bitcoind` or `bitcoin-qt` in your machine.
 Configuration
 -------------
 
-Copy [./config.example.toml](./config.example.toml) under the `$HOME/.chainseeker/` directory and edit them.
+Copy [./server/config.example.toml](./server/config.example.toml) under the `$HOME/.chainseeker/` directory and edit them.
 ```bash
 $ mkdir $HOME/.chainseeker
-$ cp ./config.example.toml $HOME/.chainseeker/config.toml
+$ cp ./server/config.example.toml $HOME/.chainseeker/config.toml
 ```
 
 Install
