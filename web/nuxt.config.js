@@ -8,7 +8,22 @@ export default {
 	
 	// Global page headers: https://go.nuxtjs.dev/config-head
 	head: {
+		htmlAttrs: {
+			lang: 'en',
+			prefix: 'og: http://ogp.me/ns#',
+		},
 		title: 'chainseeker - an open-source block explorer',
+		meta: [
+			{ charset: 'utf-8' },
+			{ hid: 'description', name: 'description', content: 'chainseeker - an open-source block explorer' },
+			{ hid: 'og:site_name', property: 'og:site_name', content: 'chainseeker.info' },
+			{ hid: 'og:type', property: 'og:type', content: 'website' },
+			{ hid: 'og:url', property: 'og:url', content: 'https://chainseeker.info/' },
+			{ hid: 'og:title', property: 'og:title', content: 'chainseeker.info' },
+			{ hid: 'og:description', property: 'og:description', content: 'open-source block explorer' },
+			{ hid: 'og:image', property: 'og:image', content: 'https://raw.githubusercontent.com/chainseeker/chainseeker-server/master/web/assets/img/logo-square.png' },
+			{ name: 'twitter:card', content: 'summary' },
+		],
 	},
 	
 	// Global CSS: https://go.nuxtjs.dev/config-css
