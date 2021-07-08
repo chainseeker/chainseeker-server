@@ -7,7 +7,8 @@
 					<v-col md=2>Final Balance</v-col>
 					<v-col md=4><Amount :value="utxos.reduce((acc, utxo) => acc + utxo.value, 0)" /></v-col>
 					<v-col md=2>Rank</v-col>
-					<v-col md=4>#{{ rank.toLocaleString() }}</v-col>
+					<v-col md=4 v-if="rank">#{{ rank.toLocaleString() }}</v-col>
+					<v-col md=4 v-else style="color: dark-grey">unknown</v-col>
 				</v-row>
 				<v-row>
 					<v-col md=2>#transactions</v-col>
