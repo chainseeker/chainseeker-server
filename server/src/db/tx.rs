@@ -164,10 +164,12 @@ impl TxDB {
             Some(tx)
         })
     }
+    /*
     pub fn multi_get<I: IntoIterator<Item = Txid>>(&self, txids: I) -> Vec<Option<TxDBValue>> {
         let txids: Vec<TxDBKey> = txids.into_iter().map(|txid| TxDBKey { txid }).collect();
         self.db.multi_get(txids)
     }
+    */
     pub fn process_block(&self, confirmed_height: u32, block: &Block, previous_utxos: &[UtxoEntry]) {
         let mut previous_utxo_index = 0;
         for tx in block.txdata.iter() {

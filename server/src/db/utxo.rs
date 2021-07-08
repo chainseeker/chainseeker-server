@@ -163,25 +163,24 @@ impl UtxoDB {
         let mut prev_tx_offset = 0;
         for tx in block.txdata.iter() {
             for vin in tx.input.iter() {
-                if vin.previous_output.is_null() {
-                    continue;
+                if !vin.previous_output.is_null() {
+                    let txid = &vin.previous_output.txid;
+                    let vout = vin.previous_output.vout;
+                    let key = UtxoDBKey {
+                        txid: *txid,
+                        vout,
+                    };
+                    let prev_tx = &prev_txs[prev_tx_offset];
+                    prev_tx_offset += 1;
+                    let prev_out = &prev_tx.output[vout as usize];
+                    let script_pubkey = &prev_out.script_pubkey;
+                    let value = prev_out.value;
+                    let value = UtxoDBValue {
+                        script_pubkey: (*script_pubkey).clone(),
+                        value,
+                    };
+                    self.db.put(&key, &value);
                 }
-                let txid = &vin.previous_output.txid;
-                let vout = vin.previous_output.vout;
-                let key = UtxoDBKey {
-                    txid: *txid,
-                    vout,
-                };
-                let prev_tx = &prev_txs[prev_tx_offset];
-                prev_tx_offset += 1;
-                let prev_out = &prev_tx.output[vout as usize];
-                let script_pubkey = &prev_out.script_pubkey;
-                let value = prev_out.value;
-                let value = UtxoDBValue {
-                    script_pubkey: (*script_pubkey).clone(),
-                    value,
-                };
-                self.db.put(&key, &value);
             }
         }
         // Process vouts.
