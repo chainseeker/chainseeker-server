@@ -358,12 +358,6 @@
 <span id="355">355</span>
 <span id="356">356</span>
 <span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
-<span id="362">362</span>
-<span id="363">363</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
@@ -522,17 +516,11 @@
         <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">data</span>::<span class="op">&lt;</span><span class="ident">HttpServer</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">hash_or_height</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">param</span>(<span class="string">&quot;hash_or_height&quot;</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">block_content</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">hash_or_height</span>.<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">64</span> {
-            <span class="kw">let</span> <span class="ident">block_hash</span> <span class="op">=</span> <span class="ident">Vec::from_hex</span>(<span class="ident">hash_or_height</span>);
+            <span class="kw">let</span> <span class="ident">block_hash</span> <span class="op">=</span> <span class="ident">BlockHash::from_hex</span>(<span class="ident">hash_or_height</span>);
             <span class="kw">if</span> <span class="ident">block_hash</span>.<span class="ident">is_err</span>() {
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="self">Self</span><span class="ident">::not_found</span>(<span class="string">&quot;Failed to decode input block hash.&quot;</span>));
             }
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">block_hash</span> <span class="op">=</span> <span class="ident">block_hash</span>.<span class="ident">unwrap</span>();
-            <span class="kw">if</span> <span class="ident">block_hash</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">32</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="self">Self</span><span class="ident">::not_found</span>(<span class="string">&quot;Block hash has an invalid length.&quot;</span>));
-            }
-            <span class="ident">block_hash</span>.<span class="ident">reverse</span>();
-            <span class="kw">let</span> <span class="ident">block_hash</span> <span class="op">=</span> <span class="ident">consensus_decode</span>(<span class="kw-2">&amp;</span><span class="ident">block_hash</span>[..]);
-            <span class="ident">server</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get_by_hash</span>(<span class="kw-2">&amp;</span><span class="ident">block_hash</span>)
+            <span class="ident">server</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get_by_hash</span>(<span class="kw-2">&amp;</span><span class="ident">block_hash</span>.<span class="ident">unwrap</span>())
         } <span class="kw">else</span> {
             <span class="kw">let</span> <span class="ident">height</span> <span class="op">=</span> <span class="ident">hash_or_height</span>.<span class="ident">parse</span>();
             <span class="kw">if</span> <span class="ident">height</span>.<span class="ident">is_err</span>() {
