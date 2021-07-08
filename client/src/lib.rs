@@ -282,9 +282,8 @@ mod tests {
                 witness: vec![],
             }
         }).collect();
-        let script_pubkey = Script::new_v0_wpkh(&pubkey.wpubkey_hash().unwrap());
         let output = TxOut {
-            script_pubkey: script_pubkey,
+            script_pubkey: Script::new_v0_wpkh(&pubkey.wpubkey_hash().unwrap()),
             value: value - 300 * (utxos.len() as u64),
         };
         let mut tx = bitcoin::Transaction {
@@ -354,17 +353,17 @@ mod tests {
     #[tokio::test]
     async fn txids() {
         let client = new(DEFAULT_ENDPOINT);
-        assert!(client.txids(ADDRESS).await.unwrap().len() > 0);
+        assert!(!client.txids(ADDRESS).await.unwrap().is_empty());
     }
     #[tokio::test]
     async fn txs() {
         let client = new(DEFAULT_ENDPOINT);
-        assert!(client.txs(ADDRESS).await.unwrap().len() > 0);
+        assert!(!client.txs(ADDRESS).await.unwrap().is_empty());
     }
     #[tokio::test]
     async fn utxos() {
         let client = new(DEFAULT_ENDPOINT);
-        assert!(client.utxos(ADDRESS).await.unwrap().len() > 0);
+        assert!(!client.utxos(ADDRESS).await.unwrap().is_empty());
     }
     #[tokio::test]
     async fn rich_list_count() {
