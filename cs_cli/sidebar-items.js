@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["execute",""],["main",""]]});
+initSidebarItems({"fn":[["execute",""],["main",""],["run",""]]});
