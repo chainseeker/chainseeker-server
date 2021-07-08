@@ -241,6 +241,9 @@ pub fn new(endpoint: &str) -> Client {
 
 #[cfg(test)]
 mod tests {
+    use bitcoin::*;
+    use bitcoin::consensus::Encodable;
+    use bitcoin::hashes::hex::FromHex;
     use super::*;
     #[tokio::test]
     async fn status() {
@@ -252,6 +255,62 @@ mod tests {
         const TXID: &str = "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098";
         let client = new(DEFAULT_ENDPOINT);
         assert_eq!(client.tx(TXID).await.unwrap().txid, TXID);
+    }
+    #[tokio::test]
+    async fn put_tx() {
+        let client = new("https://tbtc-v3.chainseeker.info/api");
+        // Compute address.
+        let secp256k1 = bitcoin::secp256k1::Secp256k1::new();
+        let privkey = std::env::var("CS_PRIVKEY").unwrap();
+        let privkey = PrivateKey::from_wif(&privkey).unwrap();
+        let pubkey = privkey.public_key(&secp256k1);
+        let address = Address::p2wpkh(&pubkey, Network::Testnet).unwrap();
+        // Get UTXOs.
+        let utxos = client.utxos(&address.to_string()).await.unwrap();
+        println!("UTXOs: {:#?}", utxos);
+        // Construct transaction.
+        let mut value: u64 = 0;
+        let input = utxos.iter().map(|utxo| {
+            value += utxo.value;
+            TxIn {
+                previous_output: OutPoint {
+                    txid: bitcoin::Txid::from_hex(&utxo.txid).unwrap(),
+                    vout: utxo.vout,
+                },
+                script_sig: Script::new(),
+                sequence: 0xFFFFFFFF,
+                witness: vec![],
+            }
+        }).collect();
+        let script_pubkey = Script::new_v0_wpkh(&pubkey.wpubkey_hash().unwrap());
+        let output = TxOut {
+            script_pubkey: script_pubkey,
+            value: value - 300 * (utxos.len() as u64),
+        };
+        let mut tx = bitcoin::Transaction {
+            version: 2,
+            lock_time: 0,
+            input,
+            output: vec![output],
+        };
+        // Sign transaction.
+        let mut sig_hasher = bitcoin::util::bip143::SigHashCache::new(&mut tx);
+        for (i, utxo) in utxos.iter().enumerate() {
+            let script_code = Script::new_p2pkh(&pubkey.pubkey_hash());
+            let sighash = sig_hasher.signature_hash(utxo.vout as usize, &script_code, utxo.value, SigHashType::All);
+            let signature = secp256k1.sign(&bitcoin::secp256k1::Message::from_slice(&sighash).unwrap(), &privkey.key);
+            let mut signature = signature.serialize_der().to_vec();
+            // Push SIGHASH_ALL.
+            signature.push(0x01);
+            sig_hasher.access_witness(i).push(signature);
+            sig_hasher.access_witness(i).push(pubkey.to_bytes());
+        }
+        println!("Txid: {}", tx.txid());
+        let mut tx_raw = Vec::new();
+        tx.consensus_encode(&mut tx_raw).unwrap();
+        let tx_hex = hex::encode(tx_raw);
+        println!("Raw tx: {}", tx_hex);
+        assert_eq!(client.put_tx(tx_hex).await.unwrap().txid, tx.txid().to_string());
     }
     #[tokio::test]
     async fn block_summary() {
