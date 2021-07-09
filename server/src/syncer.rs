@@ -94,7 +94,12 @@ impl Syncer {
             }
             println!("Reorg detected at block height = {}.", to_locale_string(height));
             // Fetch the reorged block.
-            let block = self.rest.block(&block_hash_me).await.expect("Failed to fetch the reorged block from REST.");
+            let block = self.http_server.block_db.read().await.get_by_hash(&block_hash_me).unwrap();
+            let tx_db = self.http_server.tx_db.read().await;
+            let block = bitcoin::Block {
+                header: block.block_header,
+                txdata: block.txids.iter().map(|txid| tx_db.get(txid).unwrap().tx).collect(),
+            };
             // Fetch previous transactions.
             let mut prev_txs = Vec::new();
             for tx in block.txdata.iter() {
@@ -102,8 +107,7 @@ impl Syncer {
                     if vin.previous_output.is_null() {
                         continue;
                     }
-                    let txid = &vin.previous_output.txid;
-                    let prev_tx = self.rest.tx(txid).await.expect("Failed to fetch the previous transaction.");
+                    let prev_tx = tx_db.get(&vin.previous_output.txid).unwrap().tx;
                     prev_txs.push(prev_tx);
                 }
             }
