@@ -317,7 +317,7 @@ impl Client {
             for (utxos, (public_key, private_key)) in utxos_list.iter().zip(public_keys.iter().zip(wallet.private_keys.iter())) {
                 let script_code = bitcoin::Script::new_p2pkh(&public_key.pubkey_hash());
                 for utxo in utxos.iter() {
-                    let sighash = sig_hasher.signature_hash(utxo.vout as usize, &script_code, utxo.value, bitcoin::SigHashType::All);
+                    let sighash = sig_hasher.signature_hash(input_index, &script_code, utxo.value, bitcoin::SigHashType::All);
                     let message = bitcoin::secp256k1::Message::from_slice(&sighash).unwrap();
                     let signature = secp256k1.sign(&message, &private_key.key);
                     let mut signature = signature.serialize_der().to_vec();
