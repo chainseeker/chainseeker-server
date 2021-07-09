@@ -343,7 +343,6 @@
 <span id="340">340</span>
 <span id="341">341</span>
 <span id="342">342</span>
-<span id="343">343</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
@@ -461,7 +460,7 @@
     }
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">sync</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">initial</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u32</span> {
         <span class="self">self</span>.<span class="ident">process_reorgs</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">start_height</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>() {
+        <span class="kw">let</span> <span class="ident">start_height</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>() {
             <span class="prelude-val">Some</span>(<span class="ident">h</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">h</span> <span class="op">+</span> <span class="number">1</span>,
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0</span>,
         };
@@ -472,14 +471,13 @@
         <span class="kw">let</span> <span class="ident">block_queue</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">std::collections::VecDeque::with_capacity</span>(<span class="ident">BLOCK_QUEUE_SIZE</span>)));
         <span class="kw">if</span> <span class="ident">initial</span> {
             <span class="kw">let</span> <span class="ident">block_queue</span> <span class="op">=</span> <span class="ident">block_queue</span>.<span class="ident">clone</span>();
-            <span class="kw">let</span> <span class="ident">start_block_hash</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">start_height</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="kw">let</span> (<span class="ident">start_height</span>, <span class="ident">start_block_hash</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">start_height</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
                 <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rest</span>.<span class="ident">block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">genesis_block_hash</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
                 <span class="ident">block_queue</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">push_back</span>(<span class="ident">block</span>);
-                <span class="ident">start_height</span> <span class="op">=</span> <span class="number">1</span>;
-                <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">genesis_block_hash</span>
+                (<span class="number">1</span>, <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">genesis_block_hash</span>)
             } <span class="kw">else</span> {
                 <span class="kw">let</span> <span class="ident">block_db_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>(<span class="ident">start_height</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">unwrap</span>();
-                <span class="ident">block_db_value</span>.<span class="ident">block_header</span>.<span class="ident">block_hash</span>()
+                (<span class="ident">start_height</span>, <span class="ident">block_db_value</span>.<span class="ident">block_header</span>.<span class="ident">block_hash</span>())
             };
             <span class="kw">let</span> <span class="ident">stop</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stop</span>.<span class="ident">clone</span>();
             <span class="kw">let</span> <span class="ident">rest</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rest</span>.<span class="ident">clone</span>();

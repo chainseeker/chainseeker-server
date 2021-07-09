@@ -158,7 +158,6 @@
 <span id="155">155</span>
 <span id="156">156</span>
 <span id="157">157</span>
-<span id="158">158</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">futures_util</span>::{<span class="ident">StreamExt</span>, <span class="ident">SinkExt</span>};
@@ -245,7 +244,6 @@
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="comment">//println!(&quot;WebSockerRelay: failed to receive a message from ZeroMq.&quot;);</span>
                     <span class="ident">tokio::time::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
-                    <span class="kw">continue</span>;
                 },
             }
         }
