@@ -366,16 +366,32 @@ pub fn to_locale_string<T>(num: T) -> String
 mod tests {
     use std::str::FromStr;
     use super::*;
-    #[test]
-    fn script_or_address_to_string() {
+    fn script_or_address_to_string(address: &str, script_pubkey: &str) {
         let config = config_example("btc");
+        assert_eq!(address_to_string(&Address::from_str(address).unwrap(), &config), address);
+        assert_eq!(script_to_address_string(&Script::from_str(script_pubkey).unwrap(), &config).unwrap(), address);
+    }
+    #[test]
+    fn script_or_address_to_string_p2pkh() {
+        script_or_address_to_string(
+            "1P5ZEDWTKTFGxQjZphgWPQUpe554WKDfHQ",
+            "76a914f22f5563839ba6ba5aa8d3726fcbc675cb3e4c9e88ac",
+        );
+    }
+    #[test]
+    fn script_or_address_to_string_p2sh() {
+        script_or_address_to_string(
+            "34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo",
+            "a91423e522dfc6656a8fda3d47b4fa53f7585ac758cd87",
+        );
+    }
+    #[test]
+    fn script_or_address_to_string_p2wpkh() {
         // Test vectors come from https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki.
-        let addr_str = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
-        let addr = Address::from_str(addr_str).unwrap();
-        assert_eq!(address_to_string(&addr, &config), addr_str);
-        let script_pubkey_str = "0014751e76e8199196d454941c45d1b3a323f1433bd6";
-        let script_pubkey = Script::from_str(script_pubkey_str).unwrap();
-        assert_eq!(script_to_address_string(&script_pubkey, &config).unwrap(), addr_str);
+        script_or_address_to_string(
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+            "0014751e76e8199196d454941c45d1b3a323f1433bd6",
+        );
     }
     #[test]
     fn uint256_as_f64_12345() {
