@@ -75,7 +75,7 @@ mod tests {
     const TXID: &str = "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098";
     const ADDRESS: &str = "1CounterpartyXXXXXXXXXXXXXXXUWLpVr";
     async fn test(argv: &[&str]) -> Result<(), String> {
-        run(&[vec![args().nth(0).unwrap()], argv.iter().map(|s| s.to_string()).collect()].concat()).await
+        run(&[vec![args().next().unwrap()], argv.iter().map(|s| s.to_string()).collect()].concat()).await
     }
     #[tokio::test]
     async fn no_args() {

@@ -366,7 +366,7 @@ mod tests {
     use super::*;
     #[test]
     fn parse_arguments() {
-        assert_eq!(super::parse_arguments(&[std::env::args().nth(0).unwrap()]).unwrap_err(), "Insufficient arguments.");
+        assert_eq!(super::parse_arguments(&[std::env::args().next().unwrap()]).unwrap_err(), "Insufficient arguments.");
     }
     fn script_or_address_to_string(address: &str, script_pubkey: &str) {
         let config = config_example("btc");

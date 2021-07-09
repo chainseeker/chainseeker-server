@@ -36,10 +36,10 @@ impl MockBitcoinCoreRest {
         }
     }
     async fn reorg(&mut self) {
-        std::mem::swap(
-            self.blocks.write().await.last_mut().unwrap(),
-            &mut *self.reorged_block.write().await,
-        );
+        let mut blocks = self.blocks.write().await;
+        let last_block = blocks.last_mut().unwrap();
+        let mut reorged_block = self.reorged_block.write().await;
+        std::mem::swap(last_block, &mut reorged_block);
     }
     /// `/rest/chaininfo.json` endpoint.
     async fn chaininfo_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
