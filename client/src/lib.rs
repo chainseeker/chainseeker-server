@@ -4,6 +4,10 @@
 pub use serde;
 pub use reqwest;
 use serde::{Serialize, Deserialize};
+#[cfg(feature = "bitcoin")]
+pub use bitcoin;
+#[cfg(feature = "bitcoin")]
+use bitcoin::hashes::hex::FromHex;
 
 pub const DEFAULT_ENDPOINT: &str = "https://btc-v3.chainseeker.info/api";
 
@@ -166,6 +170,17 @@ pub struct Client {
     reqwest_client: reqwest::Client,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddressType {
+    P2wpkh,
+}
+
+#[derive(Debug, Clone)]
+pub struct Wallet {
+    pub address_type: AddressType,
+    pub private_keys: Vec<bitcoin::PrivateKey>,
+}
+
 impl Client {
     pub fn new(endpoint: &str) -> Self {
         Self {
@@ -229,21 +244,110 @@ impl Client {
     pub async fn rich_list(&self, offset: u32, limit: u32) -> Result<Vec<Option<RichListEntry>>, reqwest::Error> {
         self.get(&["rich_list", &offset.to_string(), &limit.to_string()].join("/")).await
     }
+    /// Generate a new valid transaction from private keys and outputs.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `wallet` - The collection of private keys.
+    /// * `txouts` - The destinations.
+    /// * `change` - The change address in `bitcoin::Script` format.
+    /// * `fee_rate` - The fee rate in satoshi / weight.
+    /// * `network` - The network.
+    #[cfg(feature = "bitcoin")]
+    pub async fn generate_tx(
+        &self,
+        wallet: &Wallet,
+        txouts: &[bitcoin::TxOut],
+        change: &bitcoin::Script,
+        fee_rate: u64,
+        network: bitcoin::Network,
+    ) -> Result<bitcoin::Transaction, reqwest::Error> {
+        // Compute address.
+        let secp256k1 = bitcoin::secp256k1::Secp256k1::new();
+        let public_keys = wallet.private_keys.iter()
+            .map(|private_key| private_key.public_key(&secp256k1))
+            .collect::<Vec<bitcoin::PublicKey>>();
+        let addresses = match wallet.address_type {
+            AddressType::P2wpkh =>
+                public_keys.iter()
+                    .map(|public_key| bitcoin::Address::p2wpkh(&public_key, network).unwrap())
+                    .collect::<Vec<bitcoin::Address>>(),
+        };
+        // Get UTXOs.
+        let mut utxos_list = Vec::with_capacity(addresses.len());
+        for address in addresses.iter() {
+            utxos_list.push(self.utxos(&address.to_string()).await?);
+        }
+        // Compute inputs.
+        let mut input_value: u64 = 0;
+        let inputs_list = utxos_list.iter().map(|utxos| {
+            utxos.iter().map(|utxo| {
+                input_value += utxo.value;
+                bitcoin::TxIn {
+                    previous_output: bitcoin::OutPoint {
+                        txid: bitcoin::Txid::from_hex(&utxo.txid).unwrap(),
+                        vout: utxo.vout,
+                    },
+                    script_sig: bitcoin::Script::new(),
+                    sequence: 0xFFFFFFFF,
+                    witness: vec![],
+                }
+            }).collect::<Vec<bitcoin::TxIn>>()
+        }).collect::<Vec<Vec<bitcoin::TxIn>>>();
+        // Add change output.
+        let output_value = txouts.iter().map(|txout| txout.value).sum::<u64>();
+        let mut outputs = txouts.to_vec();
+        outputs.push(bitcoin::TxOut {
+            script_pubkey: (*change).clone(),
+            value: 0,
+        });
+        // Construct transaction.
+        let mut tx = bitcoin::Transaction {
+            version: 2,
+            lock_time: 0,
+            input: inputs_list.concat(),
+            output: outputs,
+        };
+        // Sign transaction.
+        let sign = |tx: &mut bitcoin::Transaction| {
+            let mut sig_hasher = bitcoin::util::bip143::SigHashCache::new(tx);
+            let mut input_index = 0;
+            for (utxos, (public_key, private_key)) in utxos_list.iter().zip(public_keys.iter().zip(wallet.private_keys.iter())) {
+                let script_code = bitcoin::Script::new_p2pkh(&public_key.pubkey_hash());
+                for utxo in utxos.iter() {
+                    let sighash = sig_hasher.signature_hash(utxo.vout as usize, &script_code, utxo.value, bitcoin::SigHashType::All);
+                    let message = bitcoin::secp256k1::Message::from_slice(&sighash).unwrap();
+                    let signature = secp256k1.sign(&message, &private_key.key);
+                    let mut signature = signature.serialize_der().to_vec();
+                    // Push SIGHASH_ALL.
+                    signature.push(0x01);
+                    let witness = sig_hasher.access_witness(input_index);
+                    witness.clear();
+                    witness.push(signature);
+                    witness.push(public_key.to_bytes());
+                    input_index += 1;
+                }
+            }
+        };
+        sign(&mut tx);
+        let weight = tx.get_weight() as u64;
+        let fee = fee_rate * weight;
+        tx.output.last_mut().unwrap().value = input_value - output_value - fee;
+        sign(&mut tx);
+        Ok(tx)
+    }
 }
 
 /// Create a new `chainseeker` client.
 ///
 /// The `endpoint` will be the string like "https://btc-v3.chainseeker.info/api"
-/// (Note: this string is available via `bitcoin_rest::DEFAULT_ENDPOINT`).
+/// (Note: this string is available via `chainseeker::DEFAULT_ENDPOINT`).
 pub fn new(endpoint: &str) -> Client {
     Client::new(endpoint)
 }
 
 #[cfg(test)]
 mod tests {
-    use bitcoin::*;
-    use bitcoin::consensus::Encodable;
-    use bitcoin::hashes::hex::FromHex;
     use super::*;
     #[tokio::test]
     async fn status() {
@@ -256,54 +360,21 @@ mod tests {
         let client = new(DEFAULT_ENDPOINT);
         assert_eq!(client.tx(TXID).await.unwrap().txid, TXID);
     }
+    #[cfg(feature = "bitcoin")]
+    use bitcoin::consensus::Encodable;
+    #[cfg(feature = "bitcoin")]
     #[tokio::test]
     async fn put_tx() {
-        let client = new("https://tbtc-v3.chainseeker.info/api");
-        // Compute address.
         let secp256k1 = bitcoin::secp256k1::Secp256k1::new();
-        let privkey = std::env::var("CS_PRIVKEY").unwrap();
-        let privkey = PrivateKey::from_wif(&privkey).unwrap();
+        let client = new("https://tbtc-v3.chainseeker.info/api");
+        let privkey = bitcoin::PrivateKey::from_wif(&std::env::var("CS_PRIVKEY").unwrap()).unwrap();
         let pubkey = privkey.public_key(&secp256k1);
-        let address = Address::p2wpkh(&pubkey, Network::Testnet).unwrap();
-        // Get UTXOs.
-        let utxos = client.utxos(&address.to_string()).await.unwrap();
-        println!("UTXOs: {:#?}", utxos);
-        // Construct transaction.
-        let mut value: u64 = 0;
-        let input = utxos.iter().map(|utxo| {
-            value += utxo.value;
-            TxIn {
-                previous_output: OutPoint {
-                    txid: bitcoin::Txid::from_hex(&utxo.txid).unwrap(),
-                    vout: utxo.vout,
-                },
-                script_sig: Script::new(),
-                sequence: 0xFFFFFFFF,
-                witness: vec![],
-            }
-        }).collect();
-        let output = TxOut {
-            script_pubkey: Script::new_v0_wpkh(&pubkey.wpubkey_hash().unwrap()),
-            value: value - 300 * (utxos.len() as u64),
+        let wallet = Wallet {
+            address_type: AddressType::P2wpkh,
+            private_keys: vec![privkey],
         };
-        let mut tx = bitcoin::Transaction {
-            version: 2,
-            lock_time: 0,
-            input,
-            output: vec![output],
-        };
-        // Sign transaction.
-        let mut sig_hasher = bitcoin::util::bip143::SigHashCache::new(&mut tx);
-        for (i, utxo) in utxos.iter().enumerate() {
-            let script_code = Script::new_p2pkh(&pubkey.pubkey_hash());
-            let sighash = sig_hasher.signature_hash(utxo.vout as usize, &script_code, utxo.value, SigHashType::All);
-            let signature = secp256k1.sign(&bitcoin::secp256k1::Message::from_slice(&sighash).unwrap(), &privkey.key);
-            let mut signature = signature.serialize_der().to_vec();
-            // Push SIGHASH_ALL.
-            signature.push(0x01);
-            sig_hasher.access_witness(i).push(signature);
-            sig_hasher.access_witness(i).push(pubkey.to_bytes());
-        }
+        let change = bitcoin::Script::new_v0_wpkh(&pubkey.wpubkey_hash().unwrap());
+        let tx = client.generate_tx(&wallet, &[], &change, 100, bitcoin::Network::Testnet).await.unwrap();
         println!("Txid: {}", tx.txid());
         let mut tx_raw = Vec::new();
         tx.consensus_encode(&mut tx_raw).unwrap();
