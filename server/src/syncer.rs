@@ -114,7 +114,7 @@ impl Syncer {
     }
     async fn sync(&mut self, initial: bool) -> u32 {
         self.process_reorgs().await;
-        let mut start_height = match self.http_server.synced_height_db.read().await.get() {
+        let start_height = match self.http_server.synced_height_db.read().await.get() {
             Some(h) => h + 1,
             None => 0,
         };
@@ -125,14 +125,13 @@ impl Syncer {
         let block_queue = Arc::new(RwLock::new(std::collections::VecDeque::with_capacity(BLOCK_QUEUE_SIZE)));
         if initial {
             let block_queue = block_queue.clone();
-            let start_block_hash = if start_height == 0 {
+            let (start_height, start_block_hash) = if start_height == 0 {
                 let block = self.rest.block(&self.config.genesis_block_hash).await.unwrap();
                 block_queue.write().await.push_back(block);
-                start_height = 1;
-                self.config.genesis_block_hash
+                (1, self.config.genesis_block_hash)
             } else {
                 let block_db_value = self.http_server.block_db.read().await.get(start_height - 1).unwrap();
-                block_db_value.block_header.block_hash()
+                (start_height, block_db_value.block_header.block_hash())
             };
             let stop = self.stop.clone();
             let rest = self.rest.clone();

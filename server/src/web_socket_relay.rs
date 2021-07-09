@@ -83,7 +83,6 @@ impl WebSocketRelay {
                 Err(_) => {
                     //println!("WebSockerRelay: failed to receive a message from ZeroMq.");
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                    continue;
                 },
             }
         }
