@@ -226,7 +226,7 @@ impl Client {
     pub async fn rich_list_addr_rank(&self, script_or_address: &str) -> Result<RichListRank, reqwest::Error> {
         self.get(&["rich_list_addr_rank", script_or_address].join("/")).await
     }
-    pub async fn rich_list(&self, offset: u32, limit: u32) -> Result<Vec<RichListEntry>, reqwest::Error> {
+    pub async fn rich_list(&self, offset: u32, limit: u32) -> Result<Vec<Option<RichListEntry>>, reqwest::Error> {
         self.get(&["rich_list", &offset.to_string(), &limit.to_string()].join("/")).await
     }
 }
