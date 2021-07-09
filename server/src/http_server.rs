@@ -1,3 +1,4 @@
+use crate::*;
 use std::str::FromStr;
 use std::time::Instant;
 use std::convert::Infallible;
@@ -12,9 +13,8 @@ use bitcoin::hashes::hex::{FromHex, ToHex};
 use bitcoin::{Script, Address};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainseeker::*;
-
 use crate::db::Database;
-use super::*;
+use crate::db::block::BlockContentDBValue;
 
 #[derive(Debug, Clone)]
 pub struct HttpServer {

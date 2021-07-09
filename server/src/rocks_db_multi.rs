@@ -1,5 +1,6 @@
 /// C++'s `multimap`-like DB implementation backed by RocksDB.
 use crate::*;
+use crate::rocks_db::{Serialize, Deserialize, ConstantSize};
 
 #[derive(Debug)]
 pub struct RocksDBMulti<K, V>

@@ -1,7 +1,7 @@
+use crate::*;
 use indexmap::IndexMap;
 use bitcoin::{Txid, Script, Block, WScriptHash};
-
-use crate::*;
+use crate::db::utxo::UtxoEntry;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UtxoServerValue {
@@ -93,6 +93,7 @@ impl UtxoServer {
 
 #[cfg(test)]
 mod tests {
+    use crate::db::utxo::UtxoDB;
     use super::*;
     #[allow(dead_code)]
     fn print_utxo_server(utxo_server: &UtxoServer) {

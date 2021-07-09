@@ -1,7 +1,8 @@
+use crate::*;
 use bitcoin::{Transaction, Txid, TxOut, Block};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
-
-use crate::*;
+use crate::db::utxo::UtxoEntry;
+use crate::rocks_db::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TxDBKey {
@@ -198,6 +199,7 @@ impl TxDB {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use crate::db::utxo::UtxoDB;
     use super::*;
     const TXID: &str = "503e4e9824282eb06f1a328484e2b367b5f4f93a405d6e7b97261bafabfb53d5";
     #[test]

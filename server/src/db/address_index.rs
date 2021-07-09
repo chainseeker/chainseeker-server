@@ -1,6 +1,7 @@
+use crate::*;
 use bitcoin::{Block, Txid, Script};
-
-use super::super::*;
+use crate::rocks_db::{Serialize, Deserialize, Empty};
+use crate::db::utxo::UtxoEntry;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AddressIndexDBKey {
@@ -76,6 +77,7 @@ impl AddressIndexDB {
 
 #[cfg(test)]
 mod tests {
+    use crate::db::utxo::UtxoDB;
     use super::*;
     #[allow(dead_code)]
     fn print_addr_index_db(addr_index_db: &AddressIndexDB) {

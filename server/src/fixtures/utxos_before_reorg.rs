@@ -1,5 +1,7 @@
-use hex::FromHex;
 use crate::*;
+use hex::FromHex;
+use crate::db::utxo::UtxoEntry;
+
 pub fn utxos_before_reorg() -> [UtxoEntry; 206] {
     [
         UtxoEntry { script_pubkey: consensus_decode(&Vec::from_hex("16001413bb0bcb776f3e15fa8800877552044d4db27b96").unwrap()), txid: consensus_decode(&Vec::from_hex("2d813aded53c0f2f5daa2f9f5d1dc9c7e6af5496afd82c22f3acbb9a044e7029").unwrap()), vout: 0, value: 4900000000u64, },

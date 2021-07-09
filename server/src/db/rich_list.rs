@@ -1,9 +1,9 @@
+use crate::*;
 use std::mem::size_of;
 use core::ops::Range;
 use indexmap::IndexMap;
 use bitcoin::{Block, Script};
-
-use crate::*;
+use crate::db::utxo::UtxoEntry;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RichListEntry {
@@ -109,6 +109,7 @@ impl RichList {
 
 #[cfg(test)]
 mod tests {
+    use crate::db::utxo::UtxoDB;
     use super::*;
     const JSON: &str = r#"[{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 97033ca70d45fe6d49310859e132a9df98f97625","hex":"001497033ca70d45fe6d49310859e132a9df98f97625","type":"witnesspubkeyhash","address":"bcrt1qjupnefcdghlx6jf3ppv7zv4fm7v0ja39dzzwvd"},"value":505000034900},{"scriptPubKey":{"asm":"OP_PUSHBYTES_65 04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f OP_CHECKSIG","hex":"4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac","type":"unknown","address":null},"value":5000000000},{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 13bb0bcb776f3e15fa8800877552044d4db27b96","hex":"001413bb0bcb776f3e15fa8800877552044d4db27b96","type":"witnesspubkeyhash","address":"bcrt1qzwashjmhdulpt75gqzrh25syf4xmy7uk6clm0p"},"value":4900000000},{"scriptPubKey":{"asm":"OP_0 OP_PUSHBYTES_20 261b6555a3cb5d3593c0275ff46f31c36e42a4c7","hex":"0014261b6555a3cb5d3593c0275ff46f31c36e42a4c7","type":"witnesspubkeyhash","address":"bcrt1qycdk24dredwnty7qya0lgme3cdhy9fx83qc9wd"},"value":99965100}]"#;
     #[allow(dead_code)]

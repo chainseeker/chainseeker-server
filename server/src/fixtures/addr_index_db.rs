@@ -1,4 +1,6 @@
 use crate::*;
+use crate::db::address_index::AddressIndexDBKey;
+
 pub fn addr_index_db() -> [AddressIndexDBKey; 212] {
     [
         AddressIndexDBKey { script_pubkey: consensus_decode(&hex::decode("16001413bb0bcb776f3e15fa8800877552044d4db27b96").unwrap()), txid: consensus_decode(&hex::decode("2d813aded53c0f2f5daa2f9f5d1dc9c7e6af5496afd82c22f3acbb9a044e7029").unwrap()), },

@@ -1,7 +1,9 @@
+use crate::*;
 use bitcoin::hashes::hex::ToHex;
 use chainseeker::*;
-
-use crate::*;
+use crate::db::tx::TxDB;
+use crate::db::block::BlockContentDBValue;
+use crate::db::utxo_server::UtxoServerValue;
 
 pub fn create_vin(txin: &bitcoin::TxIn, previous_txout: &Option<bitcoin::TxOut>, config: &Config) -> Vin {
     Vin {

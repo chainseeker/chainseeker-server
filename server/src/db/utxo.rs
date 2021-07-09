@@ -1,6 +1,6 @@
-use bitcoin::{Block, Txid, Script, Transaction};
-
 use crate::*;
+use bitcoin::{Block, Txid, Script, Transaction};
+use crate::rocks_db::{Serialize, Deserialize, RocksDBIterator};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UtxoEntry {

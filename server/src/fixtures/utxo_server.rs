@@ -1,5 +1,7 @@
-use bitcoin::WScriptHash;
 use crate::*;
+use bitcoin::WScriptHash;
+use crate::db::utxo_server::UtxoServerValue;
+
 pub fn utxo_server_entries() -> [(WScriptHash, Vec<UtxoServerValue>); 8] {
     [
         (WScriptHash::from_hex("3318537dfb3135df9f3d950dbdf8a7ae68dd7c7dfef61ed17963ff80f3850474").unwrap(), vec![

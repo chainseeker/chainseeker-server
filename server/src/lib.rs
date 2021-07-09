@@ -13,23 +13,23 @@ use bitcoin::bech32::ToBase32;
 use crate::db::Database;
 
 pub mod rocks_db;
-pub use rocks_db::*;
 pub mod rocks_db_multi;
-pub use rocks_db_multi::*;
 pub mod db;
-pub use db::*;
 pub mod syncer;
-pub use syncer::*;
 pub mod rest;
-pub use rest::*;
 pub mod http_server;
-pub use http_server::*;
 pub mod web_socket_relay;
-pub use web_socket_relay::*;
 #[cfg(test)]
 mod fixtures;
 #[cfg(test)]
 mod integration_test;
+
+pub use rocks_db::RocksDB;
+pub use rocks_db_multi::RocksDBMulti;
+pub use syncer::Syncer;
+pub use rest::*;
+pub use http_server::HttpServer;
+pub use web_socket_relay::WebSocketRelay;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 

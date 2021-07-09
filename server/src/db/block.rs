@@ -1,7 +1,7 @@
+use crate::*;
 use bitcoin::{Txid, Block, BlockHeader, BlockHash};
 use bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR;
-
-use crate::*;
+use crate::rocks_db::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockHashDBValue {

@@ -1,10 +1,9 @@
+use crate::*;
 use std::time::Instant;
 use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use tokio::sync::RwLock;
-
-use crate::db::Database;
-use super::*;
+use crate::db::{Database, UtxoDB};
 
 pub struct Syncer {
     stop: Arc<RwLock<bool>>,
