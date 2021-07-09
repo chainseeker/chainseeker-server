@@ -347,48 +347,52 @@
 <span id="344">344</span>
 <span id="345">345</span>
 <span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">tokio::sync::mpsc::channel</span>;
 <span class="kw">use</span> <span class="ident">tokio::sync::RwLock</span>;
 
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db::Database</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Syncer</span> {
-    <span class="ident">config</span>: <span class="ident">Config</span>,
-    <span class="ident">utxo_db</span>: <span class="ident">UtxoDB</span>,
-    <span class="ident">rest</span>: <span class="ident">bitcoin_rest::Context</span>,
     <span class="ident">stop</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">http_server</span>: <span class="ident">HttpServer</span>,
+    <span class="ident">rest</span>: <span class="ident">bitcoin_rest::Context</span>,
+    <span class="ident">db</span>: <span class="ident">Database</span>,
+    <span class="ident">utxo_db</span>: <span class="ident">UtxoDB</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Syncer</span> {
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">coin</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">rest</span> <span class="op">=</span> <span class="ident">get_rest</span>(<span class="ident">config</span>);
+    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">db</span>: <span class="ident">Database</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">stop</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="bool-val">false</span>));
+        <span class="kw">let</span> <span class="ident">rest</span> <span class="op">=</span> <span class="ident">get_rest</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>.<span class="ident">config</span>);
         <span class="comment">// Checks if we can access to Bitcoin Core&#39;s REST endpoint.</span>
         <span class="ident">rest</span>.<span class="ident">chaininfo</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Could not connect to Bitcoin Core&#39;s REST endpoint. Please check if the node is running, and listening on the correct IP address and port.&quot;</span>);
-        <span class="kw">let</span> <span class="ident">syncer</span> <span class="op">=</span> <span class="self">Self</span> {
-            <span class="ident">config</span>: (<span class="kw-2">*</span><span class="ident">config</span>).<span class="ident">clone</span>(),
-            <span class="ident">utxo_db</span>: <span class="ident">UtxoDB::new</span>(<span class="ident">coin</span>, <span class="bool-val">false</span>),
-            <span class="ident">rest</span>,
-            <span class="ident">stop</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="bool-val">false</span>)),
-            <span class="ident">http_server</span>: <span class="ident">HttpServer::new</span>(<span class="ident">coin</span>, <span class="ident">config</span>),
-        };
+        <span class="kw">let</span> <span class="ident">utxo_db</span> <span class="op">=</span> <span class="ident">UtxoDB::new</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>.<span class="ident">coin</span>, <span class="bool-val">false</span>);
         <span class="comment">// Install Ctrl-C watch.</span>
-        <span class="kw">let</span> <span class="ident">stop</span> <span class="op">=</span> <span class="ident">syncer</span>.<span class="ident">stop</span>.<span class="ident">clone</span>();
-        <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
-            <span class="ident">tokio::signal::ctrl_c</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Failed to install CTRL+C signal handler.&quot;</span>);
-            <span class="kw-2">*</span><span class="ident">stop</span>.<span class="ident">write</span>().<span class="kw">await</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        });
-        <span class="ident">syncer</span>
+        {
+            <span class="kw">let</span> <span class="ident">stop</span> <span class="op">=</span> <span class="ident">stop</span>.<span class="ident">clone</span>();
+            <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="ident">tokio::signal::ctrl_c</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Failed to install CTRL+C signal handler.&quot;</span>);
+                <span class="kw-2">*</span><span class="ident">stop</span>.<span class="ident">write</span>().<span class="kw">await</span> <span class="op">=</span> <span class="bool-val">true</span>;
+            });
+        }
+        <span class="self">Self</span> {
+            <span class="ident">stop</span>,
+            <span class="ident">rest</span>,
+            <span class="ident">db</span>,
+            <span class="ident">utxo_db</span>,
+        }
     }
     <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">is_stopped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">stop</span>.<span class="ident">read</span>().<span class="kw">await</span>
     }
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">shrink_to_fit</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">utxo_server</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">shrink_to_fit</span>();
-        <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">rich_list</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">shrink_to_fit</span>();
+        <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">utxo_server</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">shrink_to_fit</span>();
+        <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">rich_list</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">shrink_to_fit</span>();
     }
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">process_block</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">initial</span>: <span class="ident">bool</span>, <span class="ident">height</span>: <span class="ident">u32</span>, <span class="ident">block</span>: <span class="kw-2">&amp;</span><span class="ident">Block</span>) {
         <span class="kw">let</span> <span class="ident">begin</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
@@ -398,16 +402,16 @@
         <span class="kw">let</span> <span class="ident">utxo_elapsed</span> <span class="op">=</span> <span class="ident">begin_utxo</span>.<span class="ident">elapsed</span>();
         <span class="comment">// Process for TxDB.</span>
         <span class="kw">let</span> <span class="ident">begin_tx</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
-        <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">tx_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">process_block</span>(<span class="ident">height</span>, <span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">previous_utxos</span>);
+        <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">tx_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">process_block</span>(<span class="ident">height</span>, <span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">previous_utxos</span>);
         <span class="kw">let</span> <span class="ident">tx_elapsed</span> <span class="op">=</span> <span class="ident">begin_tx</span>.<span class="ident">elapsed</span>();
         <span class="comment">// Process for address index.</span>
         <span class="kw">let</span> <span class="ident">begin_addr_index</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
-        <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">addr_index_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">process_block</span>(<span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">previous_utxos</span>);
+        <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">addr_index_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">process_block</span>(<span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">previous_utxos</span>);
         <span class="kw">let</span> <span class="ident">addr_index_elapsed</span> <span class="op">=</span> <span class="ident">begin_addr_index</span>.<span class="ident">elapsed</span>();
         <span class="comment">// Process if non initial-sync.</span>
         <span class="kw">if</span> <span class="op">!</span><span class="ident">initial</span> {
-            <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">utxo_server</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">process_block</span>(<span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">previous_utxos</span>);
-            <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">rich_list</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">process_block</span>(<span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">previous_utxos</span>);
+            <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">utxo_server</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">process_block</span>(<span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">previous_utxos</span>);
+            <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">rich_list</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">process_block</span>(<span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">previous_utxos</span>);
         }
         <span class="comment">// Count vins/vouts.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vins</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
@@ -417,8 +421,8 @@
             <span class="ident">vouts</span> <span class="op">+</span><span class="op">=</span> <span class="ident">tx</span>.<span class="ident">output</span>.<span class="ident">len</span>();
         }
         <span class="comment">// Put best block information.</span>
-        <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">block_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put</span>(<span class="ident">height</span>, <span class="kw-2">&amp;</span><span class="ident">block</span>);
-        <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">synced_height_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put</span>(<span class="ident">height</span>);
+        <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">block_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put</span>(<span class="ident">height</span>, <span class="kw-2">&amp;</span><span class="ident">block</span>);
+        <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">synced_height_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put</span>(<span class="ident">height</span>);
         <span class="macro">println!</span>(
             <span class="string">&quot;Height={}, #tx={:4}, #vin={:5}, #vout={:5} (tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)&quot;</span>,
             <span class="ident">to_locale_string</span>(<span class="ident">height</span>), <span class="ident">block</span>.<span class="ident">txdata</span>.<span class="ident">len</span>(), <span class="ident">vins</span>, <span class="ident">vouts</span>,
@@ -426,14 +430,14 @@
             <span class="ident">addr_index_elapsed</span>.<span class="ident">as_millis</span>(), <span class="ident">begin</span>.<span class="ident">elapsed</span>().<span class="ident">as_millis</span>());
     }
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">process_reorgs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">height</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">height</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>() {
             <span class="prelude-val">Some</span>(<span class="ident">h</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">h</span>,
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span>,
         };
         <span class="kw">loop</span> {
             <span class="comment">//let block_hash_rest = self.rest.blockhashbyheight(height).await</span>
             <span class="comment">//    .expect(&amp;format!(&quot;Failed to fetch block at height = {}.&quot;, height));</span>
-            <span class="kw">let</span> <span class="ident">block_me</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>(<span class="ident">height</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">block_me</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>(<span class="ident">height</span>).<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">block_hash_me</span> <span class="op">=</span> <span class="ident">block_me</span>.<span class="ident">block_header</span>.<span class="ident">block_hash</span>();
             <span class="comment">//if block_hash_rest == block_hash_me {</span>
             <span class="comment">//    break;</span>
@@ -444,8 +448,8 @@
             }
             <span class="macro">println!</span>(<span class="string">&quot;Reorg detected at block height = {}.&quot;</span>, <span class="ident">to_locale_string</span>(<span class="ident">height</span>));
             <span class="comment">// Fetch the reorged block.</span>
-            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get_by_hash</span>(<span class="kw-2">&amp;</span><span class="ident">block_hash_me</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">tx_db</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">tx_db</span>.<span class="ident">read</span>().<span class="kw">await</span>;
+            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get_by_hash</span>(<span class="kw-2">&amp;</span><span class="ident">block_hash_me</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">tx_db</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">tx_db</span>.<span class="ident">read</span>().<span class="kw">await</span>;
             <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">bitcoin::Block</span> {
                 <span class="ident">header</span>: <span class="ident">block</span>.<span class="ident">block_header</span>,
                 <span class="ident">txdata</span>: <span class="ident">block</span>.<span class="ident">txids</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">txid</span><span class="op">|</span> <span class="ident">tx_db</span>.<span class="ident">get</span>(<span class="ident">txid</span>).<span class="ident">unwrap</span>().<span class="ident">tx</span>).<span class="ident">collect</span>(),
@@ -463,12 +467,12 @@
             }
             <span class="self">self</span>.<span class="ident">utxo_db</span>.<span class="ident">reorg_block</span>(<span class="kw-2">&amp;</span><span class="ident">block</span>, <span class="kw-2">&amp;</span><span class="ident">prev_txs</span>);
             <span class="ident">height</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
-            <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">synced_height_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put</span>(<span class="ident">height</span>);
+            <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">synced_height_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put</span>(<span class="ident">height</span>);
         }
     }
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">sync</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">initial</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u32</span> {
         <span class="self">self</span>.<span class="ident">process_reorgs</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">start_height</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>() {
+        <span class="kw">let</span> <span class="ident">start_height</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>() {
             <span class="prelude-val">Some</span>(<span class="ident">h</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">h</span> <span class="op">+</span> <span class="number">1</span>,
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0</span>,
         };
@@ -480,11 +484,11 @@
         <span class="kw">if</span> <span class="ident">initial</span> {
             <span class="kw">let</span> <span class="ident">block_queue</span> <span class="op">=</span> <span class="ident">block_queue</span>.<span class="ident">clone</span>();
             <span class="kw">let</span> (<span class="ident">start_height</span>, <span class="ident">start_block_hash</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">start_height</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-                <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rest</span>.<span class="ident">block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">genesis_block_hash</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rest</span>.<span class="ident">block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">db</span>.<span class="ident">config</span>.<span class="ident">genesis_block_hash</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
                 <span class="ident">block_queue</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">push_back</span>(<span class="ident">block</span>);
-                (<span class="number">1</span>, <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">genesis_block_hash</span>)
+                (<span class="number">1</span>, <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">config</span>.<span class="ident">genesis_block_hash</span>)
             } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">block_db_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>(<span class="ident">start_height</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">block_db_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>(<span class="ident">start_height</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">unwrap</span>();
                 (<span class="ident">start_height</span>, <span class="ident">block_db_value</span>.<span class="ident">block_header</span>.<span class="ident">block_hash</span>())
             };
             <span class="kw">let</span> <span class="ident">stop</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stop</span>.<span class="ident">clone</span>();
@@ -539,7 +543,7 @@
                     }
                 }
             } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">block_db_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>(<span class="ident">height</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">block_db_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>(<span class="ident">height</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">block_hash</span> <span class="op">=</span> <span class="ident">block_db_value</span>.<span class="ident">block_header</span>.<span class="ident">block_hash</span>();
                 <span class="kw">let</span> <span class="ident">block_headers</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rest</span>.<span class="ident">headers</span>(<span class="number">2</span>, <span class="kw-2">&amp;</span><span class="ident">block_hash</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">block_hash</span> <span class="op">=</span> <span class="ident">block_headers</span>[<span class="number">1</span>].<span class="ident">block_hash</span>();
@@ -561,14 +565,14 @@
         };
         <span class="kw">let</span> (<span class="ident">utxo_server_tx</span>, <span class="kw-2">mut</span> <span class="ident">utxo_server_rx</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>);
         <span class="kw">let</span> (<span class="ident">rich_list_tx</span>, <span class="kw-2">mut</span> <span class="ident">rich_list_rx</span>) <span class="op">=</span> <span class="ident">channel</span>(<span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>);
-        <span class="kw">let</span> <span class="ident">utxo_server</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">utxo_server</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">utxo_server</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">utxo_server</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">utxo_server_join</span> <span class="op">=</span> <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">utxo_server</span> <span class="op">=</span> <span class="ident">utxo_server</span>.<span class="ident">write</span>().<span class="kw">await</span>;
             <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">utxo</span>) <span class="op">=</span> <span class="ident">utxo_server_rx</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
                 <span class="ident">utxo_server</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="ident">utxo</span>);
             }
         });
-        <span class="kw">let</span> <span class="ident">rich_list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">rich_list</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">rich_list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">rich_list</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">rich_list_join</span> <span class="op">=</span> <span class="ident">tokio::spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rich_list</span> <span class="op">=</span> <span class="ident">rich_list</span>.<span class="ident">write</span>().<span class="kw">await</span>;
             <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">utxo</span>) <span class="op">=</span> <span class="ident">rich_list_rx</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
@@ -630,15 +634,15 @@
             <span class="self">self</span>.<span class="ident">load_utxo</span>().<span class="kw">await</span>;
             <span class="comment">// Report the capacity / actual size.</span>
             <span class="macro">println!</span>(<span class="string">&quot;(len, cap) = UtxoServer: ({}, {}), RichList: ({}, {})&quot;</span>,
-                <span class="ident">to_locale_string</span>(<span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">utxo_server</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">len</span>()),
-                <span class="ident">to_locale_string</span>(<span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">utxo_server</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">capacity</span>()),
-                <span class="ident">to_locale_string</span>(<span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">rich_list</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">len</span>()),
-                <span class="ident">to_locale_string</span>(<span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">rich_list</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">capacity</span>()),
+                <span class="ident">to_locale_string</span>(<span class="self">self</span>.<span class="ident">db</span>.<span class="ident">utxo_server</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">len</span>()),
+                <span class="ident">to_locale_string</span>(<span class="self">self</span>.<span class="ident">db</span>.<span class="ident">utxo_server</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">capacity</span>()),
+                <span class="ident">to_locale_string</span>(<span class="self">self</span>.<span class="ident">db</span>.<span class="ident">rich_list</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">len</span>()),
+                <span class="ident">to_locale_string</span>(<span class="self">self</span>.<span class="ident">db</span>.<span class="ident">rich_list</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">capacity</span>()),
             );
             <span class="comment">// Report the memory usage.</span>
             <span class="macro">println!</span>(<span class="string">&quot;UtxoServer: {}MiB, RichList: {}MiB&quot;</span>,
-                <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">utxo_server</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">size</span>() <span class="op">/</span> <span class="number">1024</span> <span class="op">/</span> <span class="number">1024</span>,
-                <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">rich_list</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">size</span>() <span class="op">/</span> <span class="number">1024</span> <span class="op">/</span> <span class="number">1024</span>,
+                <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">utxo_server</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">size</span>() <span class="op">/</span> <span class="number">1024</span> <span class="op">/</span> <span class="number">1024</span>,
+                <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">rich_list</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">size</span>() <span class="op">/</span> <span class="number">1024</span> <span class="op">/</span> <span class="number">1024</span>,
             );
         }
         <span class="ident">synced_blocks</span>
@@ -647,7 +651,7 @@
         <span class="comment">// Subscribe to ZeroMQ.</span>
         <span class="kw">let</span> <span class="ident">zmq_ctx</span> <span class="op">=</span> <span class="ident">zmq::Context::new</span>();
         <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">zmq_ctx</span>.<span class="ident">socket</span>(<span class="ident">zmq::SocketType::SUB</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to open a ZeroMQ socket.&quot;</span>);
-        <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">zmq_endpoint</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to connect to a ZeroMQ endpoint.&quot;</span>);
+        <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">db</span>.<span class="ident">config</span>.<span class="ident">zmq_endpoint</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to connect to a ZeroMQ endpoint.&quot;</span>);
         <span class="ident">socket</span>.<span class="ident">set_subscribe</span>(<span class="string">b&quot;hashblock&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to subscribe to a ZeroMQ topic.&quot;</span>);
         <span class="ident">socket</span>.<span class="ident">set_subscribe</span>(<span class="string">b&quot;rawtx&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to subscribe to a ZeroMQ topic.&quot;</span>);
         <span class="macro">println!</span>(<span class="string">&quot;Waiting for a ZeroMQ message...&quot;</span>);
@@ -682,7 +686,7 @@
                     <span class="kw">let</span> <span class="ident">tx</span>: <span class="ident">bitcoin::Transaction</span> <span class="op">=</span> <span class="ident">consensus_decode</span>(<span class="ident">bin</span>);
                     <span class="kw">let</span> <span class="ident">txid</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">txid</span>();
                     <span class="macro">println!</span>(<span class="string">&quot;Syncer: received a new tx: {}.&quot;</span>, <span class="ident">txid</span>);
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">previous_txid</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">tx_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put_tx</span>(<span class="kw-2">&amp;</span><span class="ident">tx</span>, <span class="prelude-val">None</span>) {
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">previous_txid</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">tx_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put_tx</span>(<span class="kw-2">&amp;</span><span class="ident">tx</span>, <span class="prelude-val">None</span>) {
                         <span class="macro">println!</span>(<span class="string">&quot;Syncer: failed to put transaction: {} (reason: tx {} not found).&quot;</span>, <span class="ident">txid</span>, <span class="ident">previous_txid</span>);
                     }
                 },

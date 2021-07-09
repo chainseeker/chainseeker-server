@@ -15,7 +15,42 @@
 <span id="12">12</span>
 <span id="13">13</span>
 <span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">use</span> <span class="ident">tokio::sync::RwLock</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::Config</span>;
+
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">synced_height</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">synced_height</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">block</span>;
@@ -30,6 +65,33 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">utxo_server</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">rich_list</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">rich_list</span>::<span class="kw-2">*</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Database</span> {
+    <span class="kw">pub</span> <span class="ident">coin</span>: <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">config</span>: <span class="ident">Config</span>,
+    <span class="kw">pub</span> <span class="ident">synced_height_db</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">SyncedHeightDB</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">block_db</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">BlockDB</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">tx_db</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">TxDB</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">addr_index_db</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">AddressIndexDB</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">utxo_server</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">UtxoServer</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">rich_list</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">RichList</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">Database</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">coin</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">Self</span> {
+            <span class="ident">coin</span>: <span class="ident">coin</span>.<span class="ident">to_string</span>(),
+            <span class="ident">config</span>: (<span class="kw-2">*</span><span class="ident">config</span>).<span class="ident">clone</span>(),
+            <span class="ident">synced_height_db</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">SyncedHeightDB::new</span>(<span class="ident">coin</span>))),
+            <span class="ident">block_db</span>        : <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">BlockDB::new</span>(<span class="ident">coin</span>, <span class="bool-val">false</span>))),
+            <span class="ident">tx_db</span>           : <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">TxDB::new</span>(<span class="ident">coin</span>, <span class="bool-val">false</span>))),
+            <span class="ident">addr_index_db</span>   : <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">AddressIndexDB::new</span>(<span class="ident">coin</span>, <span class="bool-val">false</span>))),
+            <span class="ident">utxo_server</span>     : <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">UtxoServer::new</span>())),
+            <span class="ident">rich_list</span>       : <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">RichList::new</span>())),
+        }
+    }
+}
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="chainseeker_server" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
     <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
