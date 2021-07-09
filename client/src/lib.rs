@@ -164,21 +164,23 @@ pub struct BlockSummary {
     pub txcount     : usize,
 }
 
-#[derive(Debug, Clone)]
-pub struct Client {
-    endpoint: String,
-    reqwest_client: reqwest::Client,
-}
-
+#[cfg(feature = "bitcoin")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddressType {
     P2wpkh,
 }
 
+#[cfg(feature = "bitcoin")]
 #[derive(Debug, Clone)]
 pub struct Wallet {
     pub address_type: AddressType,
     pub private_keys: Vec<bitcoin::PrivateKey>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Client {
+    endpoint: String,
+    reqwest_client: reqwest::Client,
 }
 
 impl Client {
@@ -340,7 +342,7 @@ impl Client {
 
 /// Create a new `chainseeker` client.
 ///
-/// The `endpoint` will be the string like "https://btc-v3.chainseeker.info/api"
+/// The `endpoint` will be the string like <https://btc-v3.chainseeker.info/api>
 /// (Note: this string is available via `chainseeker::DEFAULT_ENDPOINT`).
 pub fn new(endpoint: &str) -> Client {
     Client::new(endpoint)
