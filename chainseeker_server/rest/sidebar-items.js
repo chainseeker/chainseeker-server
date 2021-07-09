@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["RestBlockHeader",""],["RestBlockSummary",""],["RestBlockWithTxids",""],["RestBlockWithTxs",""],["RestRichListEntry",""],["RestScriptPubKey",""],["RestScriptSig",""],["RestStatus",""],["RestTx",""],["RestUtxo",""],["RestVin",""],["RestVout",""]]});
+initSidebarItems({"fn":[["create_block_header",""],["create_block_summary",""],["create_block_with_txids",""],["create_block_with_txs",""],["create_script_pub_key",""],["create_utxo",""],["create_vin",""],["create_vout",""]]});

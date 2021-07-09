@@ -358,6 +358,7 @@
 <span id="355">355</span>
 <span id="356">356</span>
 <span id="357">357</span>
+<span id="358">358</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
@@ -372,6 +373,7 @@
 <span class="kw">use</span> <span class="ident">bitcoin::hashes::hex</span>::{<span class="ident">FromHex</span>, <span class="ident">ToHex</span>};
 <span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Script</span>, <span class="ident">Address</span>};
 <span class="kw">use</span> <span class="ident">bitcoincore_rpc</span>::{<span class="ident">Auth</span>, <span class="ident">Client</span>, <span class="ident">RpcApi</span>};
+<span class="kw">use</span> <span class="ident">chainseeker</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
@@ -379,8 +381,8 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HttpServer</span> {
     <span class="ident">coin</span>: <span class="ident">String</span>,
     <span class="ident">config</span>: <span class="ident">Config</span>,
-    <span class="comment">// (height, RestBlockSummary)</span>
-    <span class="ident">block_summary_cache</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u32</span>, <span class="ident">RestBlockSummary</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="comment">// (height, BlockSummary)</span>
+    <span class="ident">block_summary_cache</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u32</span>, <span class="ident">BlockSummary</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">synced_height_db</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">SyncedHeightDB</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">block_db</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">BlockDB</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">tx_db</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">TxDB</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -448,7 +450,7 @@
     <span class="doccomment">/// `/status` endpoint.</span>
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">status_handler</span>(<span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">Infallible</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">data</span>::<span class="op">&lt;</span><span class="ident">HttpServer</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="ident">RestStatus</span> { <span class="ident">blocks</span>: <span class="ident">server</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>().<span class="ident">map_or</span>(<span class="op">-</span><span class="number">1</span>, <span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span> <span class="kw">as</span> <span class="ident">i32</span>) }, <span class="bool-val">false</span>))
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="ident">Status</span> { <span class="ident">blocks</span>: <span class="ident">server</span>.<span class="ident">synced_height_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>().<span class="ident">map_or</span>(<span class="op">-</span><span class="number">1</span>, <span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span> <span class="kw">as</span> <span class="ident">i32</span>) }, <span class="bool-val">false</span>))
     }
     <span class="doccomment">/// `/tx/:txid` endpoint.</span>
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">tx_handler</span>(<span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">Infallible</span><span class="op">&gt;</span> {
@@ -505,7 +507,7 @@
             <span class="kw">if</span> <span class="ident">block</span>.<span class="ident">is_none</span>() {
                 <span class="kw">break</span>;
             }
-            <span class="kw">let</span> <span class="ident">summary</span> <span class="op">=</span> <span class="ident">RestBlockSummary::new</span>(<span class="kw-2">&amp;</span><span class="ident">block</span>.<span class="ident">unwrap</span>());
+            <span class="kw">let</span> <span class="ident">summary</span> <span class="op">=</span> <span class="ident">create_block_summary</span>(<span class="kw-2">&amp;</span><span class="ident">block</span>.<span class="ident">unwrap</span>());
             <span class="ident">server</span>.<span class="ident">block_summary_cache</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">insert</span>(<span class="ident">height</span>, <span class="ident">summary</span>.<span class="ident">clone</span>());
             <span class="ident">ret</span>.<span class="ident">push</span>(<span class="ident">summary</span>);
         }
@@ -537,7 +539,7 @@
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">block_with_txids_handler</span>(<span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">Infallible</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">data</span>::<span class="op">&lt;</span><span class="ident">HttpServer</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
         <span class="kw">match</span> <span class="self">Self</span><span class="ident">::block_content</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>).<span class="kw">await</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">block_content</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="ident">RestBlockWithTxids::from_block_content</span>(<span class="kw-2">&amp;</span><span class="ident">block_content</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">config</span>), <span class="bool-val">true</span>)),
+            <span class="prelude-val">Ok</span>(<span class="ident">block_content</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="ident">create_block_with_txids</span>(<span class="kw-2">&amp;</span><span class="ident">block_content</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">config</span>), <span class="bool-val">true</span>)),
             <span class="prelude-val">Err</span>(<span class="ident">res</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">res</span>),
         }
     }
@@ -546,7 +548,7 @@
         <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">data</span>::<span class="op">&lt;</span><span class="ident">HttpServer</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">tx_db</span> <span class="op">=</span> <span class="ident">server</span>.<span class="ident">tx_db</span>.<span class="ident">read</span>().<span class="kw">await</span>;
         <span class="kw">match</span> <span class="self">Self</span><span class="ident">::block_content</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>).<span class="kw">await</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">block_content</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="ident">RestBlockWithTxs::from_block_content</span>(<span class="kw-2">&amp;</span><span class="ident">tx_db</span>, <span class="kw-2">&amp;</span><span class="ident">block_content</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">config</span>), <span class="bool-val">true</span>)),
+            <span class="prelude-val">Ok</span>(<span class="ident">block_content</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="ident">create_block_with_txs</span>(<span class="kw-2">&amp;</span><span class="ident">tx_db</span>, <span class="kw-2">&amp;</span><span class="ident">block_content</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">config</span>), <span class="bool-val">true</span>)),
             <span class="prelude-val">Err</span>(<span class="ident">res</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">res</span>),
         }
     }
@@ -554,7 +556,7 @@
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">block_handler</span>(<span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">Infallible</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">data</span>::<span class="op">&lt;</span><span class="ident">HttpServer</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
         <span class="kw">match</span> <span class="self">Self</span><span class="ident">::block_content</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>).<span class="kw">await</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">block_content</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="ident">RestBlockHeader::from_block_content</span>(<span class="kw-2">&amp;</span><span class="ident">block_content</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">config</span>), <span class="bool-val">true</span>)),
+            <span class="prelude-val">Ok</span>(<span class="ident">block_content</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="ident">create_block_header</span>(<span class="kw-2">&amp;</span><span class="ident">block_content</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">config</span>), <span class="bool-val">true</span>)),
             <span class="prelude-val">Err</span>(<span class="ident">res</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">res</span>),
         }
     }
@@ -596,11 +598,11 @@
                     <span class="prelude-val">None</span>
                 },
             }
-        }).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RestTx</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        }).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">chainseeker::Transaction</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>();
         <span class="kw">if</span> <span class="op">!</span><span class="ident">txids_not_found</span>.<span class="ident">is_empty</span>() {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::internal_error</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;Failed to resolve transactions: {}.&quot;</span>, <span class="ident">txids_not_found</span>.<span class="ident">join</span>(<span class="string">&quot;, &quot;</span>))));
         }
-        <span class="kw">let</span> <span class="ident">txs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RestTx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">txs</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">unwrap</span>()).<span class="ident">collect</span>();
+        <span class="kw">let</span> <span class="ident">txs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">chainseeker::Transaction</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">txs</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">unwrap</span>()).<span class="ident">collect</span>();
         <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::json</span>(<span class="kw-2">&amp;</span><span class="ident">txs</span>, <span class="bool-val">false</span>))
     }
     <span class="doccomment">/// `/utxos/:script_or_address` endpoint.</span>
@@ -612,10 +614,10 @@
         }
         <span class="kw">let</span> <span class="ident">tx_db</span> <span class="op">=</span> <span class="ident">server</span>.<span class="ident">tx_db</span>.<span class="ident">read</span>().<span class="kw">await</span>;
         <span class="kw">let</span> <span class="ident">values</span> <span class="op">=</span> <span class="ident">server</span>.<span class="ident">utxo_server</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">script</span>.<span class="ident">unwrap</span>());
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">utxos</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RestUtxo</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">utxos</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Utxo</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
         <span class="kw">for</span> <span class="ident">utxo</span> <span class="kw">in</span> <span class="ident">values</span>.<span class="ident">iter</span>() {
             <span class="kw">match</span> <span class="ident">tx_db</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">utxo</span>.<span class="ident">txid</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">tx_db_value</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">utxos</span>.<span class="ident">push</span>(<span class="ident">RestUtxo::new</span>(<span class="kw-2">&amp;</span><span class="ident">utxo</span>, <span class="kw-2">&amp;</span><span class="ident">tx_db_value</span>.<span class="ident">tx</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">config</span>)),
+                <span class="prelude-val">Some</span>(<span class="ident">tx_db_value</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">utxos</span>.<span class="ident">push</span>(<span class="ident">create_utxo</span>(<span class="kw-2">&amp;</span><span class="ident">utxo</span>, <span class="kw-2">&amp;</span><span class="ident">tx_db_value</span>.<span class="ident">tx</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">config</span>)),
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::internal_error</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;Failed to resolve previous txid: {}&quot;</span>, <span class="ident">utxo</span>.<span class="ident">txid</span>))),
             }
         };
@@ -702,7 +704,7 @@
             if block.is_none() {
                 break;
             }
-            let summary = RestBlockSummary::new(&amp;block.unwrap());
+            let summary = create_block_summary(&amp;block.unwrap());
             self.block_summary_cache.write().await.insert(height, summary);
             height += 1;
         }
