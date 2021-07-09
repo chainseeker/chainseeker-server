@@ -4,6 +4,8 @@ use std::net::SocketAddr;
 use hyper::{Body, Request, Response, Server};
 use routerify::prelude::*;
 use routerify::{Router, RouterService};
+use jsonrpc_http_server::{ServerBuilder};
+use jsonrpc_http_server::jsonrpc_core::{Value, IoHandler, Params};
 use bitcoin::Address;
 
 use crate::*;
@@ -11,25 +13,25 @@ use crate::*;
 const COIN: &str = "integration";
 
 #[derive(Debug, Clone)]
-struct MockBitcoinCore {
+struct MockBitcoinCoreRest {
     blocks: Vec<Block>,
 }
 
-impl Default for MockBitcoinCore {
+impl Default for MockBitcoinCoreRest {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MockBitcoinCore {
-    pub fn new() -> Self {
+impl MockBitcoinCoreRest {
+    fn new() -> Self {
         Self {
             blocks: fixtures::regtest_blocks().to_vec(),
         }
     }
     /// `/rest/chaininfo.json` endpoint.
     async fn chaininfo_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let mock = req.data::<MockBitcoinCore>().unwrap();
+        let mock = req.data::<MockBitcoinCoreRest>().unwrap();
         let last_block = &mock.blocks.last().unwrap();
         Ok(HttpServer::json(bitcoin_rest::ChainInfo {
             chain: "regtest".to_string(),
@@ -47,7 +49,7 @@ impl MockBitcoinCore {
     }
     /// `/rest/headers/:count/:block_hash.bin` endpoint.
     async fn headers_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let mock = req.data::<MockBitcoinCore>().unwrap();
+        let mock = req.data::<MockBitcoinCoreRest>().unwrap();
         let count: usize = req.param("count").unwrap().parse().unwrap();
         let mut block_hash = req.param("block_hash.bin").unwrap().clone();
         block_hash.truncate(64);
@@ -63,7 +65,7 @@ impl MockBitcoinCore {
     }
     /// `/rest/block/:block_hash.bin` endpoint.
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-        let mock = req.data::<MockBitcoinCore>().unwrap();
+        let mock = req.data::<MockBitcoinCoreRest>().unwrap();
         let mut block_hash = req.param("block_hash.bin").unwrap().clone();
         block_hash.truncate(64);
         let block_hash = BlockHash::from_hex(&block_hash).unwrap();
@@ -74,7 +76,7 @@ impl MockBitcoinCore {
         }
         panic!("Block not found.");
     }
-    pub async fn run(&self) {
+    async fn run(&self) {
         let addr = SocketAddr::from((
             "127.0.0.1".parse::<std::net::IpAddr>().expect("Failed to parse HTTP IP address."),
             18443));
@@ -96,8 +98,34 @@ impl MockBitcoinCore {
         let service = RouterService::new(router).unwrap();
         let server = Server::bind(&addr).serve(service);
         if let Err(e) = server.await {
-            panic!("MockBitcoinCore failed: {}", e);
+            panic!("MockBitcoinCoreRest failed: {}", e);
         }
+    }
+}
+
+struct MockBitcoinCoreRpc {
+}
+
+impl MockBitcoinCoreRpc {
+    fn new() -> Self {
+        Self {
+        }
+    }
+    fn run(&self) {
+        let mut io = IoHandler::default();
+        io.add_sync_method("sendrawtransaction", |params: Params| {
+            println!("MockBitcoinCoreRpc: {:?}", params);
+            let values: Vec<String> = params.parse().unwrap();
+            let tx: bitcoin::Transaction = consensus_decode(&hex::decode(&values[0]).unwrap());
+            Ok(Value::String(tx.txid().to_string()))
+        });
+        ServerBuilder::new(io).start_http(&"127.0.0.1:18444".parse().unwrap()).unwrap().wait();
+    }
+}
+
+impl Default for MockBitcoinCoreRpc {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -114,14 +142,21 @@ async fn integration_test() {
     cleanup();
     // Load config.
     let mut config = config_example("rbtc");
-    // Launch MockBitcoinCore.
-    let mock: MockBitcoinCore = Default::default();
-    let blocks = mock.blocks.clone();
+    config.rpc_endpoint = "http://127.0.0.1:18444".to_string();
+    // Launch MockBitcoinCoreRest.
+    let rest = MockBitcoinCoreRest::default();
+    let blocks = rest.blocks.clone();
     config.genesis_block_hash = blocks[0].block_hash();
     let mock_block_height = (blocks.len() - 1) as i32;
     {
         tokio::spawn(async move {
-            mock.run().await;
+            rest.run().await;
+        });
+    }
+    // Launch MockBitcoinCoreRpc.
+    {
+        std::thread::spawn(|| {
+            MockBitcoinCoreRpc::default().run();
         });
     }
     // Launch main.
@@ -221,4 +256,19 @@ async fn integration_test() {
     assert!(client.get::<Vec<Option<chainseeker::RichListEntry>>>("rich_list/invalid/3").await.is_err());
     // Fetch rich list (invalid limit).
     assert!(client.get::<Vec<Option<chainseeker::RichListEntry>>>("rich_list/0/invalid").await.is_err());
+    //
+    // Put transaction.
+    let secp256k1 = bitcoin::secp256k1::Secp256k1::new();
+    let privkey = bitcoin::PrivateKey::from_wif("cUVAkHac2bPhiJRm77nxFPj4TSejT3JzE8fhjmbtUfNUeA4Sfq2v").unwrap();
+    let pubkey = privkey.public_key(&secp256k1);
+    let wallet = chainseeker::Wallet {
+        address_type: chainseeker::AddressType::P2wpkh,
+        private_keys: vec![privkey],
+    };
+    let change = bitcoin::Script::new_v0_wpkh(&pubkey.wpubkey_hash().unwrap());
+    let tx = client.generate_tx(&wallet, &[], &change, 100, bitcoin::Network::Regtest).await.unwrap();
+    println!("Txid: {}", tx.txid());
+    let tx_hex = hex::encode(consensus_encode(&tx));
+    println!("Tx: {}", tx_hex);
+    assert_eq!(client.put_tx(tx_hex).await.unwrap().txid, tx.txid().to_string());
 }

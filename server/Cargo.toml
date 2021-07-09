@@ -28,10 +28,12 @@ routerify = "2.1"
 rocksdb = "0.16"
 bitcoin-rest = { version = "0.1", default-features = false }
 bitcoincore-rpc = "0.13"
-chainseeker = "3.0.1"
+chainseeker = "3.0.2"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = [] }
+jsonrpc-http-server = "17.1"
+chainseeker = { version = "3.0.2", features = ["bitcoin"] }
 
 [[bench]]
 name = "db"
