@@ -1,4 +1,6 @@
 use std::io::{Read, Write};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use num_format::{Locale, ToFormattedStr, ToFormattedString};
 pub use bitcoin_rest::bitcoin;
 use bitcoin::hashes::hex::FromHex;
@@ -45,35 +47,58 @@ pub fn parse_arguments(args: &[String]) -> Result<(String, Config), String> {
     Ok((coin.to_string(), config))
 }
 
-pub async fn main(coin: &str, config: &Config) {
-    let db = Database::new(coin, config);
-    // Create Syncer instance.
-    let mut syncer = Syncer::new(db.clone()).await;
-    let mut handles = Vec::new();
-    // Run HTTP server.
-    {
-        let server = HttpServer::new(db.clone());
-        let http_ip = config.http_ip.clone();
-        let http_port = config.http_port;
-        handles.push(tokio::spawn(async move {
-            server.run(&http_ip, http_port).await;
-        }));
-    }
-    // Run WebSocketRelay.
-    {
+pub struct Server {
+    pub db: Database,
+    pub syncer: Syncer,
+    pub http: Arc<RwLock<HttpServer>>,
+    pub ws: Arc<RwLock<WebSocketRelay>>,
+}
+
+impl Server {
+    pub async fn new(coin: &str, config: &Config) -> Self {
+        let db = Database::new(coin, config);
+        let syncer = Syncer::new(db.clone()).await;
+        let http = HttpServer::new(db.clone());
         let ws = WebSocketRelay::new(&config.zmq_endpoint, &config.ws_endpoint);
-        handles.push(tokio::spawn(async move {
-            ws.run().await;
-        }));
+        Self {
+            db,
+            syncer,
+            http: Arc::new(RwLock::new(http)),
+            ws: Arc::new(RwLock::new(ws)),
+        }
     }
-    // Do initial sync.
-    syncer.initial_sync().await;
-    // Run syncer.
-    syncer.run().await;
-    // Join for the threads.
-    for handle in handles.iter_mut() {
-        handle.await.expect("Failed to await a tokio JoinHandle.");
+    pub async fn run(&mut self) {
+        let mut handles = Vec::new();
+        // Run HTTP server.
+        {
+            let http_ip = self.db.config.http_ip.clone();
+            let http_port = self.db.config.http_port;
+            let http = self.http.clone();
+            handles.push(tokio::spawn(async move {
+                http.read().await.run(&http_ip, http_port).await;
+            }));
+        }
+        // Run WebSocketRelay.
+        {
+            let ws = self.ws.clone();
+            handles.push(tokio::spawn(async move {
+                ws.read().await.run().await;
+            }));
+        }
+        // Do initial sync.
+        self.syncer.initial_sync().await;
+        // Run syncer.
+        self.syncer.run().await;
+        // Join for the threads.
+        for handle in handles.iter_mut() {
+            handle.await.expect("Failed to await a tokio JoinHandle.");
+        }
     }
+}
+
+pub async fn main(coin: &str, config: &Config) {
+    let mut server = Server::new(coin, config).await;
+    server.run().await;
 }
 
 pub fn flush_stdout() {
