@@ -305,7 +305,7 @@ async fn integration_test() {
         private_keys: vec![privkey],
     };
     let change = bitcoin::Script::new_v0_wpkh(&pubkey.wpubkey_hash().unwrap());
-    let tx = client.generate_tx(&wallet, &[], &change, 100, bitcoin::Network::Regtest).await.unwrap();
+    let tx = client.generate_tx(&wallet, &[], &change, 10, bitcoin::Network::Regtest).await.unwrap();
     println!("Txid: {}", tx.txid());
     let tx_hex = hex::encode(consensus_encode(&tx));
     println!("Tx: {}", tx_hex);

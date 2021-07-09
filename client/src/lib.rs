@@ -376,7 +376,7 @@ mod tests {
             private_keys: vec![privkey],
         };
         let change = bitcoin::Script::new_v0_wpkh(&pubkey.wpubkey_hash().unwrap());
-        let tx = client.generate_tx(&wallet, &[], &change, 100, bitcoin::Network::Testnet).await.unwrap();
+        let tx = client.generate_tx(&wallet, &[], &change, 10, bitcoin::Network::Testnet).await.unwrap();
         println!("Txid: {}", tx.txid());
         let mut tx_raw = Vec::new();
         tx.consensus_encode(&mut tx_raw).unwrap();
