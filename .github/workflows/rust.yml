@@ -39,6 +39,8 @@ jobs:
       uses: actions-rs/tarpaulin@v0.1
       env:
         CS_PRIVKEY: ${{ secrets.CS_PRIVKEY }}
+      with:
+        args: --all-features
 
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v1
