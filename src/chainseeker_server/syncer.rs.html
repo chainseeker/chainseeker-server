@@ -343,6 +343,10 @@
 <span id="340">340</span>
 <span id="341">341</span>
 <span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
@@ -440,7 +444,12 @@
             }
             <span class="macro">println!</span>(<span class="string">&quot;Reorg detected at block height = {}.&quot;</span>, <span class="ident">to_locale_string</span>(<span class="ident">height</span>));
             <span class="comment">// Fetch the reorged block.</span>
-            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rest</span>.<span class="ident">block</span>(<span class="kw-2">&amp;</span><span class="ident">block_hash_me</span>).<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Failed to fetch the reorged block from REST.&quot;</span>);
+            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">block_db</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">get_by_hash</span>(<span class="kw-2">&amp;</span><span class="ident">block_hash_me</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">tx_db</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">http_server</span>.<span class="ident">tx_db</span>.<span class="ident">read</span>().<span class="kw">await</span>;
+            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">bitcoin::Block</span> {
+                <span class="ident">header</span>: <span class="ident">block</span>.<span class="ident">block_header</span>,
+                <span class="ident">txdata</span>: <span class="ident">block</span>.<span class="ident">txids</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">txid</span><span class="op">|</span> <span class="ident">tx_db</span>.<span class="ident">get</span>(<span class="ident">txid</span>).<span class="ident">unwrap</span>().<span class="ident">tx</span>).<span class="ident">collect</span>(),
+            };
             <span class="comment">// Fetch previous transactions.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">prev_txs</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
             <span class="kw">for</span> <span class="ident">tx</span> <span class="kw">in</span> <span class="ident">block</span>.<span class="ident">txdata</span>.<span class="ident">iter</span>() {
@@ -448,8 +457,7 @@
                     <span class="kw">if</span> <span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">is_null</span>() {
                         <span class="kw">continue</span>;
                     }
-                    <span class="kw">let</span> <span class="ident">txid</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">txid</span>;
-                    <span class="kw">let</span> <span class="ident">prev_tx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rest</span>.<span class="ident">tx</span>(<span class="ident">txid</span>).<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Failed to fetch the previous transaction.&quot;</span>);
+                    <span class="kw">let</span> <span class="ident">prev_tx</span> <span class="op">=</span> <span class="ident">tx_db</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">txid</span>).<span class="ident">unwrap</span>().<span class="ident">tx</span>;
                     <span class="ident">prev_txs</span>.<span class="ident">push</span>(<span class="ident">prev_tx</span>);
                 }
             }
