@@ -431,6 +431,8 @@
 <span id="428">428</span>
 <span id="429">429</span>
 <span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
@@ -451,6 +453,7 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">rocks_db</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">rocks_db_multi</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">db</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">zeromq</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">syncer</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">rest</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">http_server</span>;
@@ -462,6 +465,7 @@
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">rocks_db::RocksDB</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">rocks_db_multi::RocksDBMulti</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">zeromq::ZeroMQClient</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">syncer::Syncer</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">rest</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">http_server::HttpServer</span>;
