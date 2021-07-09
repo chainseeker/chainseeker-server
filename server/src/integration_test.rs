@@ -1,6 +1,8 @@
 use std::convert::Infallible;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use hyper::{Body, Request, Response, Server};
 use routerify::prelude::*;
 use routerify::{Router, RouterService};
@@ -14,7 +16,8 @@ const COIN: &str = "integration";
 
 #[derive(Debug, Clone)]
 struct MockBitcoinCoreRest {
-    blocks: Vec<Block>,
+    blocks: Arc<RwLock<Vec<Block>>>,
+    reorged_block: Arc<RwLock<Block>>,
 }
 
 impl Default for MockBitcoinCoreRest {
@@ -25,18 +28,28 @@ impl Default for MockBitcoinCoreRest {
 
 impl MockBitcoinCoreRest {
     fn new() -> Self {
+        let blocks = fixtures::regtest_blocks().to_vec();
+        let reorged_block = fixtures::regtest_reorged_block();
         Self {
-            blocks: fixtures::regtest_blocks().to_vec(),
+            blocks: Arc::new(RwLock::new(blocks)),
+            reorged_block: Arc::new(RwLock::new(reorged_block)),
         }
+    }
+    async fn reorg(&mut self) {
+        std::mem::swap(
+            self.blocks.write().await.last_mut().unwrap(),
+            &mut *self.reorged_block.write().await,
+        );
     }
     /// `/rest/chaininfo.json` endpoint.
     async fn chaininfo_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let mock = req.data::<MockBitcoinCoreRest>().unwrap();
-        let last_block = &mock.blocks.last().unwrap();
+        let blocks = mock.blocks.read().await;
+        let last_block = &blocks.last().unwrap();
         Ok(HttpServer::json(bitcoin_rest::ChainInfo {
             chain: "regtest".to_string(),
-            blocks: mock.blocks.len() as u32 - 1,
-            headers: mock.blocks.len() as u32 - 1,
+            blocks: blocks.len() as u32 - 1,
+            headers: blocks.len() as u32 - 1,
             bestblockhash: last_block.block_hash().to_string(),
             difficulty: last_block.header.difficulty(Network::Regtest) as f64,
             mediantime: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as u32,
@@ -50,29 +63,35 @@ impl MockBitcoinCoreRest {
     /// `/rest/headers/:count/:block_hash.bin` endpoint.
     async fn headers_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let mock = req.data::<MockBitcoinCoreRest>().unwrap();
+        let blocks = mock.blocks.read().await;
         let count: usize = req.param("count").unwrap().parse().unwrap();
         let mut block_hash = req.param("block_hash.bin").unwrap().clone();
         block_hash.truncate(64);
         let block_hash = BlockHash::from_hex(&block_hash).unwrap();
-        for (height, block) in mock.blocks.iter().enumerate() {
+        for (height, block) in blocks.iter().enumerate() {
             if block.block_hash() == block_hash {
-                let blocks = &mock.blocks[height..height+count];
+                let blocks = &blocks[height..height+count];
                 let blocks = blocks.iter().map(|block| consensus_encode(&block.header)).collect::<Vec<Vec<u8>>>().concat();
                 return Ok(Response::builder().body(blocks.into()).unwrap());
             }
         }
-        panic!("Block not found.");
+        Ok(Response::builder().body(vec![].into()).unwrap())
     }
     /// `/rest/block/:block_hash.bin` endpoint.
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let mock = req.data::<MockBitcoinCoreRest>().unwrap();
+        let blocks = mock.blocks.read().await;
         let mut block_hash = req.param("block_hash.bin").unwrap().clone();
         block_hash.truncate(64);
         let block_hash = BlockHash::from_hex(&block_hash).unwrap();
-        for block in mock.blocks.iter() {
+        for block in blocks.iter() {
             if block.block_hash() == block_hash {
                 return Ok(Response::builder().body(consensus_encode(block).into()).unwrap());
             }
+        }
+        let reorged_block = mock.reorged_block.read().await;
+        if reorged_block.block_hash() == block_hash {
+            return Ok(Response::builder().body(consensus_encode(&*reorged_block).into()).unwrap());
         }
         panic!("Block not found.");
     }
@@ -106,6 +125,12 @@ impl MockBitcoinCoreRest {
 struct MockBitcoinCoreRpc {
 }
 
+impl Default for MockBitcoinCoreRpc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockBitcoinCoreRpc {
     fn new() -> Self {
         Self {
@@ -123,12 +148,6 @@ impl MockBitcoinCoreRpc {
     }
 }
 
-impl Default for MockBitcoinCoreRpc {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Remove `~/.chainseeker/integration` directory
 fn cleanup() {
     let path = format!("{}/{}", data_dir(), COIN);
@@ -140,25 +159,29 @@ fn cleanup() {
 #[tokio::test]
 async fn integration_test() {
     cleanup();
+    let blocks = fixtures::regtest_blocks().to_vec();
+    let reorged_block = fixtures::regtest_reorged_block();
     // Load config.
     let mut config = config_example("rbtc");
-    config.rpc_endpoint = "http://127.0.0.1:18444".to_string();
-    // Launch MockBitcoinCoreRest.
-    let rest = MockBitcoinCoreRest::default();
-    let blocks = rest.blocks.clone();
     config.genesis_block_hash = blocks[0].block_hash();
-    let mock_block_height = (blocks.len() - 1) as i32;
+    config.rpc_endpoint = "http://127.0.0.1:18444".to_string();
+    config.zmq_endpoint = "tcp://localhost:4444".to_string();
+    // Launch MockBitcoinCoreRest.
+    let mut rest = MockBitcoinCoreRest::default();
     {
+        let rest = rest.clone();
         tokio::spawn(async move {
             rest.run().await;
         });
     }
     // Launch MockBitcoinCoreRpc.
-    {
-        std::thread::spawn(|| {
-            MockBitcoinCoreRpc::default().run();
-        });
-    }
+    std::thread::spawn(|| {
+        MockBitcoinCoreRpc::default().run();
+    });
+    // Create ZeroMQ.
+    let zmq_ctx = zmq::Context::new();
+    let socket = zmq_ctx.socket(zmq::SocketType::PUB).unwrap();
+    socket.bind("tcp://lo:4444").unwrap();
     // Launch main.
     {
         let config = config.clone();
@@ -175,16 +198,32 @@ async fn integration_test() {
         }
         if let Ok(status) = client.status().await {
             println!("Synced blocks: {}", status.blocks);
-            if status.blocks >= mock_block_height {
+            if status.blocks >= (blocks.len() - 1) as i32 {
                 break;
             }
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         retry_count += 1;
     }
+    // Reorg.
+    println!("Reorging...");
+    rest.reorg().await;
+    println!("Sending ZeroMQ message...");
+    loop {
+        if client.block_header(blocks.len() - 1).await.unwrap().hash == reorged_block.block_hash().to_string() {
+            break;
+        }
+        socket.send_multipart(&[
+            "hashblock".as_bytes(),
+            &reorged_block.block_hash(),
+            &0u32.to_le_bytes(),
+        ], zmq::DONTWAIT).unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    println!("ZeroMQ message sent.");
     // Call APIs.
     let txid = blocks[0].txdata[0].txid();
-    let best_block_hash = blocks.last().unwrap().block_hash().to_string();
+    let best_block_hash = reorged_block.block_hash().to_string();
     let address = Address::from_script(
         &blocks.last().unwrap().txdata[0].output[0].script_pubkey, Network::Regtest).unwrap().to_string();
     const NOT_FOUND_ADDRESS: &str = "bcrt1qe2g3cvljrgky86djautz8u3wvjzm90023atvyf";
