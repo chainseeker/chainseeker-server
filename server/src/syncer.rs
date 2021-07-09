@@ -3,42 +3,44 @@ use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use tokio::sync::RwLock;
 
+use crate::db::Database;
 use super::*;
 
 pub struct Syncer {
-    config: Config,
-    utxo_db: UtxoDB,
-    rest: bitcoin_rest::Context,
     stop: Arc<RwLock<bool>>,
-    pub http_server: HttpServer,
+    rest: bitcoin_rest::Context,
+    db: Database,
+    utxo_db: UtxoDB,
 }
 
 impl Syncer {
-    pub async fn new(coin: &str, config: &Config) -> Self {
-        let rest = get_rest(config);
+    pub async fn new(db: Database) -> Self {
+        let stop = Arc::new(RwLock::new(false));
+        let rest = get_rest(&db.config);
         // Checks if we can access to Bitcoin Core's REST endpoint.
         rest.chaininfo().await.expect("Could not connect to Bitcoin Core's REST endpoint. Please check if the node is running, and listening on the correct IP address and port.");
-        let syncer = Self {
-            config: (*config).clone(),
-            utxo_db: UtxoDB::new(coin, false),
-            rest,
-            stop: Arc::new(RwLock::new(false)),
-            http_server: HttpServer::new(coin, config),
-        };
+        let utxo_db = UtxoDB::new(&db.coin, false);
         // Install Ctrl-C watch.
-        let stop = syncer.stop.clone();
-        tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
-            *stop.write().await = true;
-        });
-        syncer
+        {
+            let stop = stop.clone();
+            tokio::spawn(async move {
+                tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
+                *stop.write().await = true;
+            });
+        }
+        Self {
+            stop,
+            rest,
+            db,
+            utxo_db,
+        }
     }
     pub async fn is_stopped(&self) -> bool {
         *self.stop.read().await
     }
     async fn shrink_to_fit(&mut self) {
-        self.http_server.utxo_server.write().await.shrink_to_fit();
-        self.http_server.rich_list.write().await.shrink_to_fit();
+        self.db.utxo_server.write().await.shrink_to_fit();
+        self.db.rich_list.write().await.shrink_to_fit();
     }
     async fn process_block(&mut self, initial: bool, height: u32, block: &Block) {
         let begin = Instant::now();
@@ -48,16 +50,16 @@ impl Syncer {
         let utxo_elapsed = begin_utxo.elapsed();
         // Process for TxDB.
         let begin_tx = Instant::now();
-        self.http_server.tx_db.write().await.process_block(height, block, &previous_utxos);
+        self.db.tx_db.write().await.process_block(height, block, &previous_utxos);
         let tx_elapsed = begin_tx.elapsed();
         // Process for address index.
         let begin_addr_index = Instant::now();
-        self.http_server.addr_index_db.write().await.process_block(block, &previous_utxos);
+        self.db.addr_index_db.write().await.process_block(block, &previous_utxos);
         let addr_index_elapsed = begin_addr_index.elapsed();
         // Process if non initial-sync.
         if !initial {
-            self.http_server.utxo_server.write().await.process_block(block, &previous_utxos);
-            self.http_server.rich_list.write().await.process_block(block, &previous_utxos);
+            self.db.utxo_server.write().await.process_block(block, &previous_utxos);
+            self.db.rich_list.write().await.process_block(block, &previous_utxos);
         }
         // Count vins/vouts.
         let mut vins: usize = 0;
@@ -67,8 +69,8 @@ impl Syncer {
             vouts += tx.output.len();
         }
         // Put best block information.
-        self.http_server.block_db.write().await.put(height, &block);
-        self.http_server.synced_height_db.write().await.put(height);
+        self.db.block_db.write().await.put(height, &block);
+        self.db.synced_height_db.write().await.put(height);
         println!(
             "Height={}, #tx={:4}, #vin={:5}, #vout={:5} (tx:{:3}ms, utxo:{:3}ms, addr:{:3}ms, total:{:4}ms)",
             to_locale_string(height), block.txdata.len(), vins, vouts,
@@ -76,14 +78,14 @@ impl Syncer {
             addr_index_elapsed.as_millis(), begin.elapsed().as_millis());
     }
     async fn process_reorgs(&mut self) {
-        let mut height = match self.http_server.synced_height_db.read().await.get() {
+        let mut height = match self.db.synced_height_db.read().await.get() {
             Some(h) => h,
             None => return,
         };
         loop {
             //let block_hash_rest = self.rest.blockhashbyheight(height).await
             //    .expect(&format!("Failed to fetch block at height = {}.", height));
-            let block_me = self.http_server.block_db.read().await.get(height).unwrap();
+            let block_me = self.db.block_db.read().await.get(height).unwrap();
             let block_hash_me = block_me.block_header.block_hash();
             //if block_hash_rest == block_hash_me {
             //    break;
@@ -94,8 +96,8 @@ impl Syncer {
             }
             println!("Reorg detected at block height = {}.", to_locale_string(height));
             // Fetch the reorged block.
-            let block = self.http_server.block_db.read().await.get_by_hash(&block_hash_me).unwrap();
-            let tx_db = self.http_server.tx_db.read().await;
+            let block = self.db.block_db.read().await.get_by_hash(&block_hash_me).unwrap();
+            let tx_db = self.db.tx_db.read().await;
             let block = bitcoin::Block {
                 header: block.block_header,
                 txdata: block.txids.iter().map(|txid| tx_db.get(txid).unwrap().tx).collect(),
@@ -113,12 +115,12 @@ impl Syncer {
             }
             self.utxo_db.reorg_block(&block, &prev_txs);
             height -= 1;
-            self.http_server.synced_height_db.write().await.put(height);
+            self.db.synced_height_db.write().await.put(height);
         }
     }
     async fn sync(&mut self, initial: bool) -> u32 {
         self.process_reorgs().await;
-        let start_height = match self.http_server.synced_height_db.read().await.get() {
+        let start_height = match self.db.synced_height_db.read().await.get() {
             Some(h) => h + 1,
             None => 0,
         };
@@ -130,11 +132,11 @@ impl Syncer {
         if initial {
             let block_queue = block_queue.clone();
             let (start_height, start_block_hash) = if start_height == 0 {
-                let block = self.rest.block(&self.config.genesis_block_hash).await.unwrap();
+                let block = self.rest.block(&self.db.config.genesis_block_hash).await.unwrap();
                 block_queue.write().await.push_back(block);
-                (1, self.config.genesis_block_hash)
+                (1, self.db.config.genesis_block_hash)
             } else {
-                let block_db_value = self.http_server.block_db.read().await.get(start_height - 1).unwrap();
+                let block_db_value = self.db.block_db.read().await.get(start_height - 1).unwrap();
                 (start_height, block_db_value.block_header.block_hash())
             };
             let stop = self.stop.clone();
@@ -189,7 +191,7 @@ impl Syncer {
                     }
                 }
             } else {
-                let block_db_value = self.http_server.block_db.read().await.get(height - 1).unwrap();
+                let block_db_value = self.db.block_db.read().await.get(height - 1).unwrap();
                 let block_hash = block_db_value.block_header.block_hash();
                 let block_headers = self.rest.headers(2, &block_hash).await.unwrap();
                 let block_hash = block_headers[1].block_hash();
@@ -211,14 +213,14 @@ impl Syncer {
         };
         let (utxo_server_tx, mut utxo_server_rx) = channel(1024 * 1024);
         let (rich_list_tx, mut rich_list_rx) = channel(1024 * 1024);
-        let utxo_server = self.http_server.utxo_server.clone();
+        let utxo_server = self.db.utxo_server.clone();
         let utxo_server_join = tokio::spawn(async move {
             let mut utxo_server = utxo_server.write().await;
             while let Some(utxo) = utxo_server_rx.recv().await {
                 utxo_server.push(&utxo);
             }
         });
-        let rich_list = self.http_server.rich_list.clone();
+        let rich_list = self.db.rich_list.clone();
         let rich_list_join = tokio::spawn(async move {
             let mut rich_list = rich_list.write().await;
             while let Some(utxo) = rich_list_rx.recv().await {
@@ -280,15 +282,15 @@ impl Syncer {
             self.load_utxo().await;
             // Report the capacity / actual size.
             println!("(len, cap) = UtxoServer: ({}, {}), RichList: ({}, {})",
-                to_locale_string(self.http_server.utxo_server.read().await.len()),
-                to_locale_string(self.http_server.utxo_server.read().await.capacity()),
-                to_locale_string(self.http_server.rich_list.read().await.len()),
-                to_locale_string(self.http_server.rich_list.read().await.capacity()),
+                to_locale_string(self.db.utxo_server.read().await.len()),
+                to_locale_string(self.db.utxo_server.read().await.capacity()),
+                to_locale_string(self.db.rich_list.read().await.len()),
+                to_locale_string(self.db.rich_list.read().await.capacity()),
             );
             // Report the memory usage.
             println!("UtxoServer: {}MiB, RichList: {}MiB",
-                self.http_server.utxo_server.read().await.size() / 1024 / 1024,
-                self.http_server.rich_list.read().await.size() / 1024 / 1024,
+                self.db.utxo_server.read().await.size() / 1024 / 1024,
+                self.db.rich_list.read().await.size() / 1024 / 1024,
             );
         }
         synced_blocks
@@ -297,7 +299,7 @@ impl Syncer {
         // Subscribe to ZeroMQ.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
-        socket.connect(&self.config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
+        socket.connect(&self.db.config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
         println!("Waiting for a ZeroMQ message...");
@@ -332,7 +334,7 @@ impl Syncer {
                     let tx: bitcoin::Transaction = consensus_decode(bin);
                     let txid = tx.txid();
                     println!("Syncer: received a new tx: {}.", txid);
-                    if let Err(previous_txid) = self.http_server.tx_db.write().await.put_tx(&tx, None) {
+                    if let Err(previous_txid) = self.db.tx_db.write().await.put_tx(&tx, None) {
                         println!("Syncer: failed to put transaction: {} (reason: tx {} not found).", txid, previous_txid);
                     }
                 },

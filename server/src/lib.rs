@@ -10,6 +10,8 @@ use bitcoin::util::base58;
 use bitcoin::bech32;
 use bitcoin::bech32::ToBase32;
 
+use crate::db::Database;
+
 pub mod rocks_db;
 pub use rocks_db::*;
 pub mod rocks_db_multi;
@@ -44,12 +46,13 @@ pub fn parse_arguments(args: &[String]) -> Result<(String, Config), String> {
 }
 
 pub async fn main(coin: &str, config: &Config) {
+    let db = Database::new(coin, config);
     // Create Syncer instance.
-    let mut syncer = Syncer::new(&coin, &config).await;
+    let mut syncer = Syncer::new(db.clone()).await;
     let mut handles = Vec::new();
     // Run HTTP server.
     {
-        let server = syncer.http_server.clone();
+        let server = HttpServer::new(db.clone());
         let http_ip = config.http_ip.clone();
         let http_port = config.http_port;
         handles.push(tokio::spawn(async move {
