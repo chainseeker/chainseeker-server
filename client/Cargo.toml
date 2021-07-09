@@ -1,6 +1,6 @@
 [package]
 name = "chainseeker"
-version = "3.0.1"
+version = "3.0.2"
 authors = ["Masahiko Hyuga <mail@mhyuga.jp>"]
 license = "MIT"
 description = "chainseeker.info client side library"
