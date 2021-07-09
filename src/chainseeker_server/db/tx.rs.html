@@ -264,11 +264,14 @@
 <span id="261">261</span>
 <span id="262">262</span>
 <span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Transaction</span>, <span class="ident">Txid</span>, <span class="ident">TxOut</span>, <span class="ident">Block</span>};
 <span class="kw">use</span> <span class="ident">bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR</span>;
-
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db::utxo::UtxoEntry</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::rocks_db</span>::{<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>};
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TxDBKey</span> {
@@ -465,6 +468,7 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db::utxo::UtxoDB</span>;
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
     <span class="kw">const</span> <span class="ident">TXID</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;503e4e9824282eb06f1a328484e2b367b5f4f93a405d6e7b97261bafabfb53d5&quot;</span>;
     <span class="attribute">#[<span class="ident">test</span>]</span>

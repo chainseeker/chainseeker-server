@@ -116,10 +116,13 @@
 <span id="113">113</span>
 <span id="114">114</span>
 <span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Block</span>, <span class="ident">Txid</span>, <span class="ident">Script</span>};
-
-<span class="kw">use</span> <span class="kw">super</span>::<span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::rocks_db</span>::{<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Empty</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db::utxo::UtxoEntry</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AddressIndexDBKey</span> {
@@ -195,6 +198,7 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db::utxo::UtxoDB</span>;
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
     <span class="kw">fn</span> <span class="ident">print_addr_index_db</span>(<span class="ident">addr_index_db</span>: <span class="kw-2">&amp;</span><span class="ident">AddressIndexDB</span>) {

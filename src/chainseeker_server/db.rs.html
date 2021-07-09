@@ -46,25 +46,27 @@
 <span id="43">43</span>
 <span id="44">44</span>
 <span id="45">45</span>
+<span id="46">46</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">tokio::sync::RwLock</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::Config</span>;
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">synced_height</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">synced_height</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">block</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">block</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">tx</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tx</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">address_index</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">address_index</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">utxo</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">utxo</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">utxo_server</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">utxo_server</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">rich_list</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">rich_list</span>::<span class="kw-2">*</span>;
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">synced_height::SyncedHeightDB</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">block::BlockDB</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tx::TxDB</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">address_index::AddressIndexDB</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">utxo::UtxoDB</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">utxo_server::UtxoServer</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">rich_list::RichList</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Database</span> {

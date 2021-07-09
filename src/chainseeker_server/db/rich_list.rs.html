@@ -143,13 +143,14 @@
 <span id="140">140</span>
 <span id="141">141</span>
 <span id="142">142</span>
+<span id="143">143</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::mem::size_of</span>;
 <span class="kw">use</span> <span class="ident">core::ops::Range</span>;
 <span class="kw">use</span> <span class="ident">indexmap::IndexMap</span>;
 <span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Block</span>, <span class="ident">Script</span>};
-
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db::utxo::UtxoEntry</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RichListEntry</span> {
@@ -255,6 +256,7 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db::utxo::UtxoDB</span>;
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
     <span class="kw">const</span> <span class="ident">JSON</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">r#&quot;[{&quot;scriptPubKey&quot;:{&quot;asm&quot;:&quot;OP_0 OP_PUSHBYTES_20 97033ca70d45fe6d49310859e132a9df98f97625&quot;,&quot;hex&quot;:&quot;001497033ca70d45fe6d49310859e132a9df98f97625&quot;,&quot;type&quot;:&quot;witnesspubkeyhash&quot;,&quot;address&quot;:&quot;bcrt1qjupnefcdghlx6jf3ppv7zv4fm7v0ja39dzzwvd&quot;},&quot;value&quot;:505000034900},{&quot;scriptPubKey&quot;:{&quot;asm&quot;:&quot;OP_PUSHBYTES_65 04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f OP_CHECKSIG&quot;,&quot;hex&quot;:&quot;4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac&quot;,&quot;type&quot;:&quot;unknown&quot;,&quot;address&quot;:null},&quot;value&quot;:5000000000},{&quot;scriptPubKey&quot;:{&quot;asm&quot;:&quot;OP_0 OP_PUSHBYTES_20 13bb0bcb776f3e15fa8800877552044d4db27b96&quot;,&quot;hex&quot;:&quot;001413bb0bcb776f3e15fa8800877552044d4db27b96&quot;,&quot;type&quot;:&quot;witnesspubkeyhash&quot;,&quot;address&quot;:&quot;bcrt1qzwashjmhdulpt75gqzrh25syf4xmy7uk6clm0p&quot;},&quot;value&quot;:4900000000},{&quot;scriptPubKey&quot;:{&quot;asm&quot;:&quot;OP_0 OP_PUSHBYTES_20 261b6555a3cb5d3593c0275ff46f31c36e42a4c7&quot;,&quot;hex&quot;:&quot;0014261b6555a3cb5d3593c0275ff46f31c36e42a4c7&quot;,&quot;type&quot;:&quot;witnesspubkeyhash&quot;,&quot;address&quot;:&quot;bcrt1qycdk24dredwnty7qya0lgme3cdhy9fx83qc9wd&quot;},&quot;value&quot;:99965100}]&quot;#</span>;
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>

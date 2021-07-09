@@ -264,9 +264,9 @@
 <span id="261">261</span>
 <span id="262">262</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Block</span>, <span class="ident">Txid</span>, <span class="ident">Script</span>, <span class="ident">Transaction</span>};
-
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Block</span>, <span class="ident">Txid</span>, <span class="ident">Script</span>, <span class="ident">Transaction</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::rocks_db</span>::{<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">RocksDBIterator</span>};
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UtxoEntry</span> {

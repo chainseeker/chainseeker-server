@@ -348,15 +348,13 @@
 <span id="345">345</span>
 <span id="346">346</span>
 <span id="347">347</span>
-<span id="348">348</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">tokio::sync::mpsc::channel</span>;
 <span class="kw">use</span> <span class="ident">tokio::sync::RwLock</span>;
-
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db::Database</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db</span>::{<span class="ident">Database</span>, <span class="ident">UtxoDB</span>};
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Syncer</span> {
     <span class="ident">stop</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span><span class="op">&gt;</span>,
