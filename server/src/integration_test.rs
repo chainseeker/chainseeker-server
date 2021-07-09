@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use hyper::{Body, Request, Response, Server};
 use routerify::prelude::*;
 use routerify::{Router, RouterService};
+use bitcoin::Address;
 
 use crate::*;
 
@@ -115,8 +116,9 @@ async fn integration_test() {
     let mut config = config_example("rbtc");
     // Launch MockBitcoinCore.
     let mock: MockBitcoinCore = Default::default();
-    config.genesis_block_hash = mock.blocks[0].block_hash();
-    let mock_block_height = (mock.blocks.len() - 1) as i32;
+    let blocks = mock.blocks.clone();
+    config.genesis_block_hash = blocks[0].block_hash();
+    let mock_block_height = (blocks.len() - 1) as i32;
     {
         tokio::spawn(async move {
             mock.run().await;
@@ -145,5 +147,78 @@ async fn integration_test() {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         retry_count += 1;
     }
-    cleanup();
+    // Call APIs.
+    let txid = blocks[0].txdata[0].txid();
+    let best_block_hash = blocks.last().unwrap().block_hash().to_string();
+    let address = Address::from_script(
+        &blocks.last().unwrap().txdata[0].output[0].script_pubkey, Network::Regtest).unwrap().to_string();
+    const NOT_FOUND_ADDRESS: &str = "bcrt1qe2g3cvljrgky86djautz8u3wvjzm90023atvyf";
+    const INVALID_ADDRESS: &str = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    const NOT_FOUND_ID: &str = "012345678abcdef012345678abcdef012345678abcdef012345678abcdef0123";
+    const INVALID_ID: &str = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    //
+    // Fetch transaction (success).
+    assert_eq!(client.tx(&txid.to_string()).await.unwrap().txid, txid.to_string());
+    // Fetch transaction (fail).
+    assert!(client.tx(NOT_FOUND_ID).await.is_err());
+    //
+    // Fetch block with txs at height = 0.
+    assert_eq!(client.block_with_txs(0u32).await.unwrap().hash, blocks[0].block_hash().to_string());
+    // Fetch best block with txs by height.
+    assert_eq!(client.block_with_txs(blocks.len() - 1).await.unwrap().hash, best_block_hash);
+    // Fetch invalid block by height.
+    assert!(client.block_with_txs(blocks.len()).await.is_err());
+    //
+    // Fetch block with txids by hash (success).
+    assert_eq!(client.block_with_txids(&best_block_hash).await.unwrap().hash, best_block_hash);
+    // Fetch block with txids by hash (not found).
+    assert!(client.block_with_txids(NOT_FOUND_ID).await.is_err());
+    // Fetch block with txids by hash (invalid block hash).
+    assert!(client.block_with_txids(INVALID_ID).await.is_err());
+    //
+    // Fetch block header at height = 0.
+    assert_eq!(client.block_header(0u32).await.unwrap().hash, blocks[0].block_hash().to_string());
+    // Fetch invalid block header.
+    assert!(client.block_header(blocks.len()).await.is_err());
+    // Fetch invalid block header.
+    assert!(client.block_header("invalid").await.is_err());
+    //
+    // Fetch transactions (success).
+    assert!(!client.txs(&address).await.unwrap().is_empty());
+    // Fetch transactions (fail).
+    assert!(client.txs(INVALID_ADDRESS).await.is_err());
+    //
+    // Fetch txids (success).
+    assert!(!client.txids(&address).await.unwrap().is_empty());
+    // Fetch txids (fail).
+    assert!(client.txids(INVALID_ADDRESS).await.is_err());
+    //
+    // Fetch utxos (success).
+    assert!(!client.utxos(&address).await.unwrap().is_empty());
+    // Fetch txids (fail).
+    assert!(client.utxos(INVALID_ADDRESS).await.is_err());
+    //
+    // Fetch block summary (success).
+    assert_eq!(client.block_summary(0, blocks.len() as u32).await.unwrap().len(), blocks.len());
+    // Fetch block summary (success, again from cache).
+    assert_eq!(client.block_summary(0, blocks.len() as u32 + 100).await.unwrap().len(), blocks.len());
+    // Fetch block summary (invalid offset).
+    assert!(client.get::<Vec<chainseeker::BlockSummary>>("block_summary/invalid/3").await.is_err());
+    // Fetch block summary (invalid limit).
+    assert!(client.get::<Vec<chainseeker::BlockSummary>>("block_summary/0/invalid").await.is_err());
+    //
+    // Fetch rich list count.
+    assert!(client.rich_list_count().await.unwrap().count > 0);
+    // Fetch address rank (success).
+    assert!(client.rich_list_addr_rank(&address).await.unwrap().rank > 0);
+    // Fetch address rank (not found).
+    assert!(client.rich_list_addr_rank(NOT_FOUND_ADDRESS).await.is_err());
+    // Fetch address rank (invalid address).
+    assert!(client.rich_list_addr_rank(INVALID_ADDRESS).await.is_err());
+    // Fetch rich list (success).
+    assert!(!client.rich_list(0, 3).await.unwrap().is_empty());
+    // Fetch rich list (invalid offset).
+    assert!(client.get::<Vec<Option<chainseeker::RichListEntry>>>("rich_list/invalid/3").await.is_err());
+    // Fetch rich list (invalid limit).
+    assert!(client.get::<Vec<Option<chainseeker::RichListEntry>>>("rich_list/0/invalid").await.is_err());
 }
