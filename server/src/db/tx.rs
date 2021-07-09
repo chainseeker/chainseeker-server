@@ -122,7 +122,7 @@ impl TxDB {
     pub fn get(&self, txid: &Txid) -> Option<TxDBValue> {
         self.db.get(&TxDBKey { txid: *txid })
     }
-    pub fn get_as_rest(&self, txid: &Txid, config: &Config) -> Option<RestTx> {
+    pub fn get_as_rest(&self, txid: &Txid, config: &Config) -> Option<chainseeker::Transaction> {
         //let begin_get = std::time::Instant::now();
         let buf = self.db.get_raw(&TxDBKey { txid: *txid });
         //println!("Transaction got in {}us.", begin_get.elapsed().as_micros());
@@ -135,15 +135,15 @@ impl TxDB {
             let mut previous_txout_index = 0;
             for input in tx.input.iter() {
                 if input.previous_output.is_null() {
-                    vin.push(RestVin::new(input, &None, config));
+                    vin.push(create_vin(input, &None, config));
                 } else {
                     input_value += previous_txouts[previous_txout_index].value;
-                    vin.push(RestVin::new(input, &Some(previous_txouts[previous_txout_index].clone()), config));
+                    vin.push(create_vin(input, &Some(previous_txouts[previous_txout_index].clone()), config));
                     previous_txout_index += 1;
                 }
             }
             let output_value: u64 = tx.output.iter().map(|output| output.value).sum();
-            let tx = RestTx {
+            let tx = chainseeker::Transaction {
                 confirmed_height,
                 hex: hex::encode(&rawtx),
                 txid: tx.txid().to_string(),
@@ -156,7 +156,7 @@ impl TxDB {
                 version: tx.version,
                 locktime: tx.lock_time,
                 vin,
-                vout: tx.output.iter().enumerate().map(|(n, vout)| RestVout::new(vout, n, config)).collect(),
+                vout: tx.output.iter().enumerate().map(|(n, vout)| create_vout(vout, n, config)).collect(),
                 // TODO: compute for coinbase transactions!
                 fee: (input_value as i64) - (output_value as i64),
             };

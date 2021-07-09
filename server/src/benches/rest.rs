@@ -15,8 +15,8 @@ fn bench_rest(c: &mut Criterion) {
         let prev_utxos = utxo_db.process_block(&block, false);
         addr_index_db.process_block(&block, &prev_utxos);
     }
-    c.bench_function("RestUtxo", |b| b.iter(|| {
-        RestUtxo::new(utxo_db.get(blocks.last().txdata[0].vout[0].script_pubkey));
+    c.bench_function("Utxo", |b| b.iter(|| {
+        create_utxo(utxo_db.get(blocks.last().txdata[0].vout[0].script_pubkey));
     }));
 }
 

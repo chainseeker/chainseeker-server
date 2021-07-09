@@ -11,6 +11,7 @@ use routerify::{Middleware, Router, RouterService};
 use bitcoin::hashes::hex::{FromHex, ToHex};
 use bitcoin::{Script, Address};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
+use chainseeker::*;
 
 use super::*;
 
@@ -18,8 +19,8 @@ use super::*;
 pub struct HttpServer {
     coin: String,
     config: Config,
-    // (height, RestBlockSummary)
-    block_summary_cache: Arc<RwLock<HashMap<u32, RestBlockSummary>>>,
+    // (height, BlockSummary)
+    block_summary_cache: Arc<RwLock<HashMap<u32, BlockSummary>>>,
     pub synced_height_db: Arc<RwLock<SyncedHeightDB>>,
     pub block_db: Arc<RwLock<BlockDB>>,
     pub tx_db: Arc<RwLock<TxDB>>,
@@ -87,7 +88,7 @@ impl HttpServer {
     /// `/status` endpoint.
     async fn status_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
-        Ok(Self::json(RestStatus { blocks: server.synced_height_db.read().await.get().map_or(-1, |h| h as i32) }, false))
+        Ok(Self::json(Status { blocks: server.synced_height_db.read().await.get().map_or(-1, |h| h as i32) }, false))
     }
     /// `/tx/:txid` endpoint.
     async fn tx_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
@@ -144,7 +145,7 @@ impl HttpServer {
             if block.is_none() {
                 break;
             }
-            let summary = RestBlockSummary::new(&block.unwrap());
+            let summary = create_block_summary(&block.unwrap());
             server.block_summary_cache.write().await.insert(height, summary.clone());
             ret.push(summary);
         }
@@ -176,7 +177,7 @@ impl HttpServer {
     async fn block_with_txids_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockWithTxids::from_block_content(&block_content, &server.config), true)),
+            Ok(block_content) => Ok(Self::json(create_block_with_txids(&block_content, &server.config), true)),
             Err(res) => Ok(res),
         }
     }
@@ -185,7 +186,7 @@ impl HttpServer {
         let server = req.data::<HttpServer>().unwrap();
         let tx_db = server.tx_db.read().await;
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockWithTxs::from_block_content(&tx_db, &block_content, &server.config), true)),
+            Ok(block_content) => Ok(Self::json(create_block_with_txs(&tx_db, &block_content, &server.config), true)),
             Err(res) => Ok(res),
         }
     }
@@ -193,7 +194,7 @@ impl HttpServer {
     async fn block_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let server = req.data::<HttpServer>().unwrap();
         match Self::block_content(&req).await {
-            Ok(block_content) => Ok(Self::json(RestBlockHeader::from_block_content(&block_content, &server.config), true)),
+            Ok(block_content) => Ok(Self::json(create_block_header(&block_content, &server.config), true)),
             Err(res) => Ok(res),
         }
     }
@@ -235,11 +236,11 @@ impl HttpServer {
                     None
                 },
             }
-        }).collect::<Vec<Option<RestTx>>>();
+        }).collect::<Vec<Option<chainseeker::Transaction>>>();
         if !txids_not_found.is_empty() {
             return Ok(Self::internal_error(&format!("Failed to resolve transactions: {}.", txids_not_found.join(", "))));
         }
-        let txs: Vec<RestTx> = txs.into_iter().map(|x| x.unwrap()).collect();
+        let txs: Vec<chainseeker::Transaction> = txs.into_iter().map(|x| x.unwrap()).collect();
         Ok(Self::json(&txs, false))
     }
     /// `/utxos/:script_or_address` endpoint.
@@ -251,10 +252,10 @@ impl HttpServer {
         }
         let tx_db = server.tx_db.read().await;
         let values = server.utxo_server.read().await.get(&script.unwrap());
-        let mut utxos: Vec<RestUtxo> = Vec::new();
+        let mut utxos: Vec<Utxo> = Vec::new();
         for utxo in values.iter() {
             match tx_db.get(&utxo.txid) {
-                Some(tx_db_value) => utxos.push(RestUtxo::new(&utxo, &tx_db_value.tx, &server.config)),
+                Some(tx_db_value) => utxos.push(create_utxo(&utxo, &tx_db_value.tx, &server.config)),
                 None => return Ok(Self::internal_error(&format!("Failed to resolve previous txid: {}", utxo.txid))),
             }
         };
@@ -341,7 +342,7 @@ impl HttpServer {
             if block.is_none() {
                 break;
             }
-            let summary = RestBlockSummary::new(&block.unwrap());
+            let summary = create_block_summary(&block.unwrap());
             self.block_summary_cache.write().await.insert(height, summary);
             height += 1;
         }

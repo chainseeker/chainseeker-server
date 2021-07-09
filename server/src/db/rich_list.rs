@@ -60,11 +60,11 @@ impl RichList {
     pub fn get_index_of(&self, script_pubkey: &Script) -> Option<usize> {
         self.map.get_index_of(script_pubkey)
     }
-    pub fn get_in_range_as_rest(&self, range: Range<usize>, config: &Config) -> Vec<Option<RestRichListEntry>> {
+    pub fn get_in_range_as_rest(&self, range: Range<usize>, config: &Config) -> Vec<Option<chainseeker::RichListEntry>> {
         range.map(|i| {
             self.map.get_index(i).map(|(script_pubkey, value)| {
-                RestRichListEntry {
-                    script_pub_key: RestScriptPubKey::new(script_pubkey, config),
+                chainseeker::RichListEntry {
+                    script_pub_key: create_script_pub_key(script_pubkey, config),
                     value: *value,
                 }
             })
@@ -128,7 +128,7 @@ mod tests {
         rich_list.finalize();
         rich_list.shrink_to_fit();
         print_rich_list(&rich_list);
-        let entries: Vec<Option<RestRichListEntry>> = serde_json::from_str(JSON).unwrap();
+        let entries: Vec<Option<chainseeker::RichListEntry>> = serde_json::from_str(JSON).unwrap();
         assert!(!rich_list.is_empty());
         assert_eq!(rich_list.len(), entries.len());
         assert_eq!(rich_list.capacity(), entries.len());
