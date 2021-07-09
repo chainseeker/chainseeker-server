@@ -31,9 +31,8 @@ mod integration_test;
 
 const DEFAULT_DATA_DIR: &str = ".chainseeker";
 
-pub fn parse_arguments() -> Result<(String, Config), String> {
+pub fn parse_arguments(args: &[String]) -> Result<(String, Config), String> {
     // Read arguments.
-    let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         println!("usage: {} COIN", args[0]);
         return Err("Insufficient arguments.".to_string());
@@ -218,8 +217,7 @@ pub fn load_config(coin: &str) -> Config {
 }
 
 pub fn config_example(coin: &str) -> Config {
-    let config_str = include_bytes!("../config.example.toml");
-    load_config_from_str(std::str::from_utf8(config_str).unwrap(), coin)
+    load_config_from_str(std::str::from_utf8(include_bytes!("../config.example.toml")).unwrap(), coin)
 }
 
 pub fn consensus_encode<E>(enc: &E) -> Vec<u8>
@@ -366,6 +364,10 @@ pub fn to_locale_string<T>(num: T) -> String
 mod tests {
     use std::str::FromStr;
     use super::*;
+    #[test]
+    fn parse_arguments() {
+        assert_eq!(super::parse_arguments(&[std::env::args().nth(0).unwrap()]).unwrap_err(), "Insufficient arguments.");
+    }
     fn script_or_address_to_string(address: &str, script_pubkey: &str) {
         let config = config_example("btc");
         assert_eq!(address_to_string(&Address::from_str(address).unwrap(), &config), address);
