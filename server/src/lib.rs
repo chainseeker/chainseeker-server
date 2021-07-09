@@ -236,17 +236,17 @@ pub fn consensus_decode<D>(dec: &[u8]) -> D
     D::consensus_decode(dec).unwrap()
 }
 
-fn address_to_string_internal(addr: &Address, p2pkh_version: u8, p2sh_version: u8, segwit_hrp: &str) -> String {
+pub fn address_to_string(addr: &Address, config: &Config) -> String {
     match addr.payload {
         Payload::PubkeyHash(ref hash) => {
             let mut prefixed = [0; 21];
-            prefixed[0] = p2pkh_version;
+            prefixed[0] = config.p2pkh_version;
             prefixed[1..].copy_from_slice(&hash[..]);
             base58::check_encode_slice(&prefixed[..])
         }
         Payload::ScriptHash(ref hash) => {
             let mut prefixed = [0; 21];
-            prefixed[0] = p2sh_version;
+            prefixed[0] = config.p2sh_version;
             prefixed[1..].copy_from_slice(&hash[..]);
             base58::check_encode_slice(&prefixed[..])
         }
@@ -255,22 +255,13 @@ fn address_to_string_internal(addr: &Address, p2pkh_version: u8, p2sh_version: u
             program: ref prog,
         } => {
             let vec = vec![vec![ver], prog.to_base32()].concat();
-            bech32::encode(&segwit_hrp, &vec).unwrap()
+            bech32::encode(&config.segwit_hrp, &vec).unwrap()
         }
     }
 }
 
-pub fn address_to_string(addr: &Address, config: &Config) -> String {
-    address_to_string_internal(addr, config.p2pkh_version, config.p2sh_version, &config.segwit_hrp)
-}
-
-fn script_to_address_string_internal(script: &Script, p2pkh_version: u8, p2sh_version: u8, segwit_hrp: &str) -> Option<String> {
-    let addr = Address::from_script(script, Network::Bitcoin /* any */);
-    addr.map(|addr| address_to_string_internal(&addr, p2pkh_version, p2sh_version, segwit_hrp))
-}
-
 pub fn script_to_address_string(script: &Script, config: &Config) -> Option<String> {
-    script_to_address_string_internal(script, config.p2pkh_version, config.p2sh_version, &config.segwit_hrp)
+    Address::from_script(script, Network::Bitcoin /* any */).map(|addr| address_to_string(&addr, config))
 }
 
 pub fn uint256_as_f64(num: &Uint256) -> f64 {
@@ -285,13 +276,6 @@ pub fn uint256_as_f64(num: &Uint256) -> f64 {
 pub fn get_difficulty(block_header: &BlockHeader, _config: &Config) -> f64 {
     let max_target = Uint256::from_u64(0xFFFF).unwrap() << 208;
     uint256_as_f64(&max_target) / uint256_as_f64(&block_header.target())
-}
-
-pub fn bytes_to_u16(buf: &[u8]) -> u16 {
-    assert_eq!(buf.len(), 2);
-    let mut tmp: [u8; 2] = [0; 2];
-    tmp.copy_from_slice(&buf);
-    u16::from_le_bytes(tmp)
 }
 
 pub fn bytes_to_u32(buf: &[u8]) -> u32 {
@@ -384,13 +368,14 @@ mod tests {
     use super::*;
     #[test]
     fn script_or_address_to_string() {
+        let config = config_example("btc");
         // Test vectors come from https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki.
         let addr_str = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
         let addr = Address::from_str(addr_str).unwrap();
-        assert_eq!(address_to_string_internal(&addr, 0, 5, "bc"), addr_str);
+        assert_eq!(address_to_string(&addr, &config), addr_str);
         let script_pubkey_str = "0014751e76e8199196d454941c45d1b3a323f1433bd6";
         let script_pubkey = Script::from_str(script_pubkey_str).unwrap();
-        assert_eq!(script_to_address_string_internal(&script_pubkey, 0, 5, "bc").unwrap(), addr_str);
+        assert_eq!(script_to_address_string(&script_pubkey, &config).unwrap(), addr_str);
     }
     #[test]
     fn uint256_as_f64_12345() {
