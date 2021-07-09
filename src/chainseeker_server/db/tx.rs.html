@@ -262,6 +262,8 @@
 <span id="259">259</span>
 <span id="260">260</span>
 <span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Transaction</span>, <span class="ident">Txid</span>, <span class="ident">TxOut</span>, <span class="ident">Block</span>};
 <span class="kw">use</span> <span class="ident">bitcoin::blockdata::constants::WITNESS_SCALE_FACTOR</span>;
@@ -429,10 +431,12 @@
             <span class="prelude-val">Some</span>(<span class="ident">tx</span>)
         })
     }
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">multi_get</span><span class="op">&lt;</span><span class="ident">I</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">Txid</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">txids</span>: <span class="ident">I</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TxDBValue</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">txids</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">TxDBKey</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">txids</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">txid</span><span class="op">|</span> <span class="ident">TxDBKey</span> { <span class="ident">txid</span> }).<span class="ident">collect</span>();
-        <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">multi_get</span>(<span class="ident">txids</span>)
+    <span class="comment">/*
+    pub fn multi_get&lt;I: IntoIterator&lt;Item = Txid&gt;&gt;(&amp;self, txids: I) -&gt; Vec&lt;Option&lt;TxDBValue&gt;&gt; {
+        let txids: Vec&lt;TxDBKey&gt; = txids.into_iter().map(|txid| TxDBKey { txid }).collect();
+        self.db.multi_get(txids)
     }
+    */</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">process_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">confirmed_height</span>: <span class="ident">u32</span>, <span class="ident">block</span>: <span class="kw-2">&amp;</span><span class="ident">Block</span>, <span class="ident">previous_utxos</span>: <span class="kw-2">&amp;</span>[<span class="ident">UtxoEntry</span>]) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">previous_utxo_index</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> <span class="ident">tx</span> <span class="kw">in</span> <span class="ident">block</span>.<span class="ident">txdata</span>.<span class="ident">iter</span>() {

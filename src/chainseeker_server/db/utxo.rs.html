@@ -263,7 +263,6 @@
 <span id="260">260</span>
 <span id="261">261</span>
 <span id="262">262</span>
-<span id="263">263</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">bitcoin</span>::{<span class="ident">Block</span>, <span class="ident">Txid</span>, <span class="ident">Script</span>, <span class="ident">Transaction</span>};
 
@@ -430,25 +429,24 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">prev_tx_offset</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> <span class="ident">tx</span> <span class="kw">in</span> <span class="ident">block</span>.<span class="ident">txdata</span>.<span class="ident">iter</span>() {
             <span class="kw">for</span> <span class="ident">vin</span> <span class="kw">in</span> <span class="ident">tx</span>.<span class="ident">input</span>.<span class="ident">iter</span>() {
-                <span class="kw">if</span> <span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">is_null</span>() {
-                    <span class="kw">continue</span>;
+                <span class="kw">if</span> <span class="op">!</span><span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">is_null</span>() {
+                    <span class="kw">let</span> <span class="ident">txid</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">txid</span>;
+                    <span class="kw">let</span> <span class="ident">vout</span> <span class="op">=</span> <span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">vout</span>;
+                    <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">UtxoDBKey</span> {
+                        <span class="ident">txid</span>: <span class="kw-2">*</span><span class="ident">txid</span>,
+                        <span class="ident">vout</span>,
+                    };
+                    <span class="kw">let</span> <span class="ident">prev_tx</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">prev_txs</span>[<span class="ident">prev_tx_offset</span>];
+                    <span class="ident">prev_tx_offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                    <span class="kw">let</span> <span class="ident">prev_out</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">prev_tx</span>.<span class="ident">output</span>[<span class="ident">vout</span> <span class="kw">as</span> <span class="ident">usize</span>];
+                    <span class="kw">let</span> <span class="ident">script_pubkey</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">prev_out</span>.<span class="ident">script_pubkey</span>;
+                    <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">prev_out</span>.<span class="ident">value</span>;
+                    <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">UtxoDBValue</span> {
+                        <span class="ident">script_pubkey</span>: (<span class="kw-2">*</span><span class="ident">script_pubkey</span>).<span class="ident">clone</span>(),
+                        <span class="ident">value</span>,
+                    };
+                    <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">put</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">value</span>);
                 }
-                <span class="kw">let</span> <span class="ident">txid</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">txid</span>;
-                <span class="kw">let</span> <span class="ident">vout</span> <span class="op">=</span> <span class="ident">vin</span>.<span class="ident">previous_output</span>.<span class="ident">vout</span>;
-                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">UtxoDBKey</span> {
-                    <span class="ident">txid</span>: <span class="kw-2">*</span><span class="ident">txid</span>,
-                    <span class="ident">vout</span>,
-                };
-                <span class="kw">let</span> <span class="ident">prev_tx</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">prev_txs</span>[<span class="ident">prev_tx_offset</span>];
-                <span class="ident">prev_tx_offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                <span class="kw">let</span> <span class="ident">prev_out</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">prev_tx</span>.<span class="ident">output</span>[<span class="ident">vout</span> <span class="kw">as</span> <span class="ident">usize</span>];
-                <span class="kw">let</span> <span class="ident">script_pubkey</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">prev_out</span>.<span class="ident">script_pubkey</span>;
-                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">prev_out</span>.<span class="ident">value</span>;
-                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">UtxoDBValue</span> {
-                    <span class="ident">script_pubkey</span>: (<span class="kw-2">*</span><span class="ident">script_pubkey</span>).<span class="ident">clone</span>(),
-                    <span class="ident">value</span>,
-                };
-                <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">put</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">value</span>);
             }
         }
         <span class="comment">// Process vouts.</span>
