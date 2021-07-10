@@ -106,19 +106,19 @@ impl TxDB {
         let mut previous_utxos = Vec::new();
         for vin in tx.input.iter() {
             if !vin.previous_output.is_null() {
-                let previous_txid = &vin.previous_output.txid;
-                match self.get(previous_txid) {
+                let previous_txid = vin.previous_output.txid;
+                match self.get(&previous_txid) {
                     Some(previous_tx) => {
                         let previous_txout = previous_tx.tx.output[vin.previous_output.vout as usize].clone();
                         previous_utxos.push(UtxoEntry {
                             script_pubkey: previous_txout.script_pubkey.clone(),
-                            txid: previous_txid.clone(),
+                            txid: previous_txid,
                             vout: vin.previous_output.vout,
                             value: previous_txout.value,
                         });
                         previous_txouts.push(previous_txout);
                     },
-                    None => return Err(*previous_txid),
+                    None => return Err(previous_txid),
                 }
             }
         }
