@@ -215,14 +215,51 @@ impl<'a, K, V> RocksDBColumnFamily<'a, K, V>
     }
 }
 
+pub struct WriteBatch<K, V>
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
+{
+    inner: rocksdb::WriteBatch,
+    _k: PhantomData<fn() -> K>,
+    _v: PhantomData<fn() -> V>,
+}
+
+impl<K, V> WriteBatch<K, V>
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
+{
+    pub fn new() -> Self {
+        Self {
+            inner: rocksdb::WriteBatch::default(),
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+    pub fn put(&mut self, key: &K, value: &V) {
+        self.inner.put(key.serialize(), value.serialize());
+    }
+    pub fn delete(&mut self, key: &K) {
+        self.inner.delete(key.serialize());
+    }
+}
+
+impl<K, V> Default for WriteBatch<K, V>
+    where K: Serialize + Deserialize + 'static,
+          V: Serialize + Deserialize + 'static,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 pub struct RocksDB<K, V>
     where K: Serialize + Deserialize + 'static,
           V: Serialize + Deserialize + 'static,
 {
-    pub temporary: bool,
-    pub path: String,
-    pub db: Rocks,
+    temporary: bool,
+    path: String,
+    db: Rocks,
     _k: PhantomData<fn() -> K>,
     _v: PhantomData<fn() -> V>,
 }
@@ -268,6 +305,9 @@ impl<K, V> RocksDB<K, V>
     }
     pub fn delete(&self, key: &K) {
         self.db.delete(key.serialize()).unwrap();
+    }
+    pub fn write(&self, batch: WriteBatch<K, V>) -> Result<(), rocksdb::Error> {
+        self.db.write(batch.inner)
     }
     pub fn iter(&self) -> RocksDBIterator<'_, K, V> {
         RocksDBIterator::new(self.db.iterator(rocksdb::IteratorMode::Start))
