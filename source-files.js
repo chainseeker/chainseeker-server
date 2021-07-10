@@ -20,7 +20,6 @@ sourcesIndex["crossbeam_channel"] = {"name":"","dirs":[{"name":"flavors","files"
 sourcesIndex["crossbeam_deque"] = {"name":"","files":["deque.rs","lib.rs"]};
 sourcesIndex["crossbeam_epoch"] = {"name":"","dirs":[{"name":"sync","files":["list.rs","mod.rs","queue.rs"]}],"files":["atomic.rs","collector.rs","default.rs","deferred.rs","epoch.rs","guard.rs","internal.rs","lib.rs"]};
 sourcesIndex["crossbeam_utils"] = {"name":"","dirs":[{"name":"atomic","files":["atomic_cell.rs","consume.rs","mod.rs","seq_lock.rs"]},{"name":"sync","files":["mod.rs","parker.rs","sharded_lock.rs","wait_group.rs"]}],"files":["backoff.rs","cache_padded.rs","lib.rs","thread.rs"]};
-sourcesIndex["cs_cli"] = {"name":"","files":["main.rs"]};
 sourcesIndex["digest"] = {"name":"","files":["digest.rs","dyn_digest.rs","errors.rs","fixed.rs","lib.rs","variable.rs","xof.rs"]};
 sourcesIndex["either"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["encoding_rs"] = {"name":"","files":["ascii.rs","big5.rs","data.rs","euc_jp.rs","euc_kr.rs","gb18030.rs","handles.rs","iso_2022_jp.rs","lib.rs","macros.rs","mem.rs","replacement.rs","shift_jis.rs","single_byte.rs","utf_16.rs","utf_8.rs","variant.rs","x_user_defined.rs"]};
