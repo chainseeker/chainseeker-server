@@ -339,15 +339,6 @@
 <span id="336">336</span>
 <span id="337">337</span>
 <span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
@@ -355,6 +346,7 @@
 <span class="kw">use</span> <span class="ident">tokio::sync::mpsc::channel</span>;
 <span class="kw">use</span> <span class="ident">tokio::sync::RwLock</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::db</span>::{<span class="ident">Database</span>, <span class="ident">UtxoDB</span>};
+<span class="kw">use</span> <span class="ident">ZeroMQMessage</span>::<span class="kw-2">*</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Syncer</span> {
     <span class="ident">stop</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -645,15 +637,10 @@
         }
         <span class="ident">synced_blocks</span>
     }
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="comment">// Subscribe to ZeroMQ.</span>
-        <span class="kw">let</span> <span class="ident">zmq_ctx</span> <span class="op">=</span> <span class="ident">zmq::Context::new</span>();
-        <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">zmq_ctx</span>.<span class="ident">socket</span>(<span class="ident">zmq::SocketType::SUB</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to open a ZeroMQ socket.&quot;</span>);
-        <span class="ident">socket</span>.<span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">db</span>.<span class="ident">config</span>.<span class="ident">zmq_endpoint</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to connect to a ZeroMQ endpoint.&quot;</span>);
-        <span class="ident">socket</span>.<span class="ident">set_subscribe</span>(<span class="string">b&quot;hashblock&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to subscribe to a ZeroMQ topic.&quot;</span>);
-        <span class="ident">socket</span>.<span class="ident">set_subscribe</span>(<span class="string">b&quot;rawtx&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Failed to subscribe to a ZeroMQ topic.&quot;</span>);
-        <span class="macro">println!</span>(<span class="string">&quot;Waiting for a ZeroMQ message...&quot;</span>);
+    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rx</span>: <span class="ident">tokio::sync::watch::Receiver</span><span class="op">&lt;</span><span class="ident">ZeroMQMessage</span><span class="op">&gt;</span>) {
+        <span class="macro">println!</span>(<span class="string">&quot;Syncer: waiting for a ZeroMQ message...&quot;</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last_sync</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last_message</span> <span class="op">=</span> <span class="ident">Init</span>;
         <span class="kw">loop</span> {
             <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">stop</span>.<span class="ident">read</span>().<span class="kw">await</span> {
                 <span class="kw">break</span>;
@@ -666,32 +653,27 @@
                 <span class="ident">last_sync</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
                 <span class="kw">continue</span>;
             }
-            <span class="kw">let</span> <span class="ident">multipart</span> <span class="op">=</span> <span class="ident">socket</span>.<span class="ident">recv_multipart</span>(<span class="number">1</span>);
-            <span class="kw">if</span> <span class="ident">multipart</span>.<span class="ident">is_err</span>() {
-                <span class="ident">tokio::time::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
-                <span class="kw">continue</span>;
+            <span class="kw">let</span> <span class="ident">message</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">rx</span>.<span class="ident">borrow</span>()).<span class="ident">clone</span>();
+            <span class="kw">if</span> <span class="ident">message</span> <span class="op">!</span><span class="op">=</span> <span class="ident">last_message</span> {
+                <span class="ident">last_message</span> <span class="op">=</span> <span class="ident">message</span>.<span class="ident">clone</span>();
+                <span class="kw">match</span> <span class="ident">message</span> {
+                    <span class="ident">HashBlock</span>(<span class="ident">block_hash</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="macro">println!</span>(<span class="string">&quot;Syncer: received a new block: {}.&quot;</span>, <span class="ident">block_hash</span>);
+                        <span class="self">self</span>.<span class="ident">sync</span>(<span class="bool-val">false</span>).<span class="kw">await</span>;
+                        <span class="kw">continue</span>;
+                    },
+                    <span class="ident">RawTx</span>(<span class="ident">tx</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="kw">let</span> <span class="ident">txid</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">txid</span>();
+                        <span class="macro">println!</span>(<span class="string">&quot;Syncer: received a new tx: {}.&quot;</span>, <span class="ident">txid</span>);
+                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">previous_txid</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">tx_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put_tx</span>(<span class="kw-2">&amp;</span><span class="ident">tx</span>, <span class="prelude-val">None</span>) {
+                            <span class="macro">println!</span>(<span class="string">&quot;Syncer: failed to put transaction: {} (reason: tx {} not found).&quot;</span>, <span class="ident">txid</span>, <span class="ident">previous_txid</span>);
+                        }
+                        <span class="kw">continue</span>;
+                    },
+                    <span class="ident">Init</span> <span class="op">=</span><span class="op">&gt;</span> {},
+                }
             }
-            <span class="kw">let</span> <span class="ident">multipart</span> <span class="op">=</span> <span class="ident">multipart</span>.<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">multipart</span>.<span class="ident">len</span>(), <span class="number">3</span>);
-            <span class="kw">let</span> <span class="ident">topic</span> <span class="op">=</span> <span class="ident">std::str::from_utf8</span>(<span class="kw-2">&amp;</span><span class="ident">multipart</span>[<span class="number">0</span>]).<span class="ident">expect</span>(<span class="string">&quot;Failed to decode ZeroMQ topic.&quot;</span>);
-            <span class="kw">let</span> <span class="ident">bin</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">multipart</span>[<span class="number">1</span>];
-            <span class="kw">match</span> <span class="ident">topic</span> {
-                <span class="string">&quot;hashblock&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">println!</span>(<span class="string">&quot;Syncer: received a new block: {}.&quot;</span>, <span class="ident">hex::encode</span>(<span class="ident">bin</span>));
-                    <span class="self">self</span>.<span class="ident">sync</span>(<span class="bool-val">false</span>).<span class="kw">await</span>;
-                },
-                <span class="string">&quot;rawtx&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">let</span> <span class="ident">tx</span>: <span class="ident">bitcoin::Transaction</span> <span class="op">=</span> <span class="ident">consensus_decode</span>(<span class="ident">bin</span>);
-                    <span class="kw">let</span> <span class="ident">txid</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">txid</span>();
-                    <span class="macro">println!</span>(<span class="string">&quot;Syncer: received a new tx: {}.&quot;</span>, <span class="ident">txid</span>);
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">previous_txid</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">tx_db</span>.<span class="ident">write</span>().<span class="kw">await</span>.<span class="ident">put_tx</span>(<span class="kw-2">&amp;</span><span class="ident">tx</span>, <span class="prelude-val">None</span>) {
-                        <span class="macro">println!</span>(<span class="string">&quot;Syncer: failed to put transaction: {} (reason: tx {} not found).&quot;</span>, <span class="ident">txid</span>, <span class="ident">previous_txid</span>);
-                    }
-                },
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">println!</span>(<span class="string">&quot;Syncer: invalid topic received.&quot;</span>);
-                },
-            }
+            <span class="ident">tokio::time::sleep</span>(<span class="ident">std::time::Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
         }
         <span class="macro">println!</span>(<span class="string">&quot;Syncer stopped.&quot;</span>);
     }
