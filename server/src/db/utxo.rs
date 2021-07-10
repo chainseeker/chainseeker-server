@@ -155,13 +155,7 @@ impl UtxoDB {
                             },
                         }
                     });
-                    let utxo = UtxoEntry {
-                        script_pubkey: value.script_pubkey,
-                        txid: key.txid,
-                        vout: key.vout,
-                        value: value.value,
-                    };
-                    previous_utxos.push(utxo);
+                    previous_utxos.push((key, value).into());
                 }
             }
         }
