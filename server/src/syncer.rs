@@ -318,6 +318,7 @@ impl Syncer {
                     HashBlock(block_hash) => {
                         println!("Syncer: received a new block: {}.", block_hash);
                         self.sync(false).await;
+                        last_sync = Instant::now();
                     },
                     RawTx(tx) => {
                         let txid = tx.txid();
