@@ -295,7 +295,7 @@ impl Syncer {
         }
         synced_blocks
     }
-    pub async fn run(&mut self, rx: tokio::sync::watch::Receiver<ZeroMQMessage>) {
+    pub async fn run(&mut self, rx: tokio::sync::watch::Receiver<ZeroMQMessage>, tx: tokio::sync::watch::Sender<ZeroMQMessage>) {
         println!("Syncer: waiting for a ZeroMQ message...");
         let mut last_sync = Instant::now();
         let mut last_message = Init;
@@ -318,7 +318,6 @@ impl Syncer {
                     HashBlock(block_hash) => {
                         println!("Syncer: received a new block: {}.", block_hash);
                         self.sync(false).await;
-                        continue;
                     },
                     RawTx(tx) => {
                         let txid = tx.txid();
@@ -326,12 +325,13 @@ impl Syncer {
                         if let Err(previous_txid) = self.db.tx_db.write().await.put_tx(&tx, None) {
                             println!("Syncer: failed to put transaction: {} (reason: tx {} not found).", txid, previous_txid);
                         }
-                        continue;
                     },
                     Init => {},
                 }
+                tx.send(last_message.clone()).unwrap();
+            } else {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         println!("Syncer stopped.");
     }

@@ -81,7 +81,8 @@ impl Server {
             }));
         }
         let zmq = ZeroMQClient::new(&self.db.config.zmq_endpoint);
-        let rx = zmq.start().await;
+        let rx_zmq = zmq.start().await;
+        let (tx, rx) = tokio::sync::watch::channel(ZeroMQMessage::Init);
         // Run WebSocketRelay.
         {
             let rx = rx.clone();
@@ -93,7 +94,7 @@ impl Server {
         // Do initial sync.
         self.syncer.initial_sync().await;
         // Run syncer.
-        self.syncer.run(rx).await;
+        self.syncer.run(rx_zmq, tx).await;
         // Join for the threads.
         for handle in handles.iter_mut() {
             handle.await.expect("Failed to await a tokio JoinHandle.");
