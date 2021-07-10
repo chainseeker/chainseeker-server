@@ -1,9 +1,10 @@
+use chainseeker_server::*;
 use criterion::{criterion_group, criterion_main, Criterion};
-use tokio::runtime::Runtime;
 use bitcoin::consensus::Decodable;
 use bitcoin::Block;
 
-use chainseeker_server::*;
+use crate::db::*;
+use crate::db::utxo::UtxoEntry;
 
 const COIN: &str = "bench";
 const BLOCK: &[u8] = include_bytes!("../fixtures/mainnet/block_500000.bin");
@@ -21,7 +22,6 @@ fn bench_synced_height_db(c: &mut Criterion) {
 }
 
 fn bench_db(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
     let block = Block::consensus_decode(BLOCK).expect("Failed to decode block.");
     let mut utxo_db = UtxoDB::new(COIN, true);
     c.bench_function("UtxoDB", |b| b.iter(|| {
@@ -29,12 +29,10 @@ fn bench_db(c: &mut Criterion) {
     }));
     let utxos = utxo_db.process_block(&block, true);
     c.bench_function("UtxoServer", |b| b.iter(|| {
-        rt.block_on(async {
-            let mut utxo_server = UtxoServer::new(COIN);
-            for utxo in utxos.iter() {
-                utxo_server.push(&utxo).await;
-            }
-        });
+        let mut utxo_server = UtxoServer::new();
+        for utxo in utxos.iter() {
+            utxo_server.push(&utxo);
+        }
     }));
     // Construct dummy data.
     let mut previous_utxos = Vec::new();
