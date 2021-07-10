@@ -155,8 +155,6 @@
 <span id="152">152</span>
 <span id="153">153</span>
 <span id="154">154</span>
-<span id="155">155</span>
-<span id="156">156</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::consensus_decode</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::bitcoin</span>::{<span class="ident">BlockHash</span>, <span class="ident">Transaction</span>};
@@ -270,21 +268,19 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">const</span> <span class="ident">ZMQ_DIR</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;/tmp/chainseeker/test&quot;</span>;
     <span class="kw">const</span> <span class="ident">BLOCK_HASH</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&quot;</span>;
     <span class="comment">// txid = caaacc4826fdf63ad0a4093400de5f1fd0c830be0724078ac039f9b29878b76f.</span>
     <span class="kw">const</span> <span class="ident">RAW_TX</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;0200000000010122f1294bc73da293dfe1a9088c6d26d71564bf538940c7ce9c4e6212f099c3b90000000000ffffffff011e272d0100000000160014af73f777fcd64ec6d9b22ac9e1a57e127ea169ee0247304402205fea552c7d5ed3330aa4a8b5c90a980c1d3bdc72abd13c2d7bccba91fbb978f5022027fac985cfb83339fc9227e1c653b8a824c63a49cda4f9f97d48d5c07e047608012102acc07439373cc2902d0ad6602ed6f5a1b7abdf7608d265c089160ac826a4600600000000&quot;</span>;
     <span class="attribute">#[<span class="ident">tokio::test</span>(<span class="ident">flavor</span> <span class="op">=</span> <span class="string">&quot;multi_thread&quot;</span>)]</span>
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">client</span>() {
-        <span class="ident">std::fs::create_dir_all</span>(<span class="ident">ZMQ_DIR</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">zmq_endpoint</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;ipc://{}/zeromq&quot;</span>, <span class="ident">ZMQ_DIR</span>);
+        <span class="kw">const</span> <span class="ident">ZMQ_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">8080</span>;
         <span class="comment">// Create a ZeroMQ server.</span>
         <span class="kw">let</span> <span class="ident">zmq_ctx</span> <span class="op">=</span> <span class="ident">zmq::Context::new</span>();
         <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">zmq_ctx</span>.<span class="ident">socket</span>(<span class="ident">zmq::SocketType::PUB</span>).<span class="ident">unwrap</span>();
-        <span class="ident">socket</span>.<span class="ident">bind</span>(<span class="kw-2">&amp;</span><span class="ident">zmq_endpoint</span>).<span class="ident">unwrap</span>();
+        <span class="ident">socket</span>.<span class="ident">bind</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;tcp://lo:{}&quot;</span>, <span class="ident">ZMQ_PORT</span>)).<span class="ident">unwrap</span>();
         <span class="macro">println!</span>(<span class="string">&quot;ZeroMQ server created.&quot;</span>);
         <span class="comment">// Run ZeroMQClient.</span>
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">ZeroMQClient::new</span>(<span class="kw-2">&amp;</span><span class="ident">zmq_endpoint</span>);
+        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">ZeroMQClient::new</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;tcp://127.0.0.1:{}&quot;</span>, <span class="ident">ZMQ_PORT</span>));
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">start</span>().<span class="kw">await</span>;
         <span class="comment">// Wait before ZeroMQClient is ready.</span>
         <span class="ident">client</span>.<span class="ident">wait_for_ready</span>().<span class="kw">await</span>;
