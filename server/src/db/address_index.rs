@@ -1,6 +1,6 @@
 use crate::*;
 use bitcoin::{Block, Txid, Script};
-use crate::rocks_db::{Serialize, Deserialize, Empty};
+use crate::rocks_db::{Serialize, Deserialize, ConstantSize};
 use crate::db::utxo::UtxoEntry;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -26,7 +26,36 @@ impl Deserialize for AddressIndexDBKey {
     }
 }
 
-pub type AddressIndexDBValue = Empty;
+#[derive(Debug, Clone, Copy)]
+pub struct AddressIndexDBValue {
+    confirmed_height: Option<u32>,
+}
+
+impl ConstantSize for AddressIndexDBValue {
+    const LEN: usize = 4;
+}
+
+impl From<Option<u32>> for AddressIndexDBValue {
+    fn from(confirmed_height: Option<u32>) -> Self {
+        Self { confirmed_height }
+    }
+}
+
+impl Serialize for AddressIndexDBValue {
+    fn serialize(&self) -> Vec<u8> {
+        let confirmed_height: i32 = self.confirmed_height.map_or(-1i32, |h| h as i32);
+        confirmed_height.to_le_bytes().to_vec()
+    }
+}
+
+impl Deserialize for AddressIndexDBValue {
+    fn deserialize(buf: &[u8]) -> Self {
+        let confirmed_height = bytes_to_i32(buf);
+        Self {
+            confirmed_height: if confirmed_height < 0 { None } else { Some(confirmed_height as u32) },
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct AddressIndexDB {
@@ -46,16 +75,35 @@ impl AddressIndexDB {
     }
     pub fn get(&self, script_pubkey: &Script) -> Vec<Txid> {
         let script_pubkey = consensus_encode(script_pubkey);
-        self.db.prefix_iter(script_pubkey).map(|(key, _value)| key.txid).collect()
+        let mut txids = self.db.prefix_iter(script_pubkey)
+            .map(|(key, value)| (key.txid, value.confirmed_height))
+            .collect::<Vec<(bitcoin::Txid, Option<u32>)>>();
+        txids.sort_by(|a, b| {
+            if a.1 == b.1 {
+                return std::cmp::Ordering::Equal;
+            }
+            if a.1.is_none() {
+                return std::cmp::Ordering::Less;
+            }
+            if b.1.is_none() {
+                return std::cmp::Ordering::Greater;
+            }
+            b.1.unwrap().cmp(&a.1.unwrap())
+        });
+        txids.iter().map(|d| d.0).collect()
     }
-    pub fn put(&self, script_pubkey: &Script, txid: &Txid) {
+    pub fn put(&self, script_pubkey: &Script, txid: &Txid, confirmed_height: Option<u32>) {
         let key = AddressIndexDBKey {
             script_pubkey: (*script_pubkey).clone(),
             txid: *txid,
         };
-        self.db.put(&key, &Default::default());
+        self.db.put(&key, &confirmed_height.into());
     }
-    pub fn process_block(&self, block: &Block, previous_utxos: &[UtxoEntry]) {
+    /*
+    pub fn process_tx(&self, tx: &bitcoin::Transaction, height: Option<u32>) {
+    }
+    */
+    pub fn process_block(&self, height: u32, block: &Block, previous_utxos: &[UtxoEntry]) {
         let mut previous_utxo_index = 0;
         for tx in block.txdata.iter() {
             let txid = tx.txid();
@@ -63,13 +111,13 @@ impl AddressIndexDB {
             for vin in tx.input.iter() {
                 if !vin.previous_output.is_null() {
                     // Fetch transaction from `previous_output`.
-                    self.put(&previous_utxos[previous_utxo_index].script_pubkey, &txid);
+                    self.put(&previous_utxos[previous_utxo_index].script_pubkey, &txid, Some(height));
                     previous_utxo_index += 1;
                 }
             }
             // Process vouts.
             for vout in tx.output.iter() {
-                self.put(&vout.script_pubkey, &txid);
+                self.put(&vout.script_pubkey, &txid, Some(height));
             }
         }
     }
@@ -93,9 +141,9 @@ mod tests {
     fn addr_index_db() {
         let addr_index_db = AddressIndexDB::new("test/address_index", true);
         let mut utxo_db = UtxoDB::new("test/address_index", true);
-        for block in fixtures::regtest_blocks().iter() {
+        for (height, block) in fixtures::regtest_blocks().iter().enumerate() {
             let prev_utxos = utxo_db.process_block(&block, false);
-            addr_index_db.process_block(&block, &prev_utxos);
+            addr_index_db.process_block(height as u32, &block, &prev_utxos);
         }
         print_addr_index_db(&addr_index_db);
         let mut entries_test = addr_index_db.db.iter().map(|(key, _value)| key).collect::<Vec<AddressIndexDBKey>>();

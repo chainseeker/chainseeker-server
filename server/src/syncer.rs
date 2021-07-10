@@ -54,7 +54,7 @@ impl Syncer {
         let tx_elapsed = begin_tx.elapsed();
         // Process for address index.
         let begin_addr_index = Instant::now();
-        self.db.addr_index_db.write().await.process_block(block, &previous_utxos);
+        self.db.addr_index_db.write().await.process_block(height, block, &previous_utxos);
         let addr_index_elapsed = begin_addr_index.elapsed();
         // Process if non initial-sync.
         if !initial {
@@ -323,6 +323,7 @@ impl Syncer {
                     RawTx(tx) => {
                         let txid = tx.txid();
                         println!("Syncer: received a new tx: {}.", txid);
+                        //self.db.addr_index_db.write().await.process_tx(&tx, None);
                         if let Err(previous_txid) = self.db.tx_db.write().await.put_tx(&tx, None) {
                             println!("Syncer: failed to put transaction: {} (reason: tx {} not found).", txid, previous_txid);
                         }
