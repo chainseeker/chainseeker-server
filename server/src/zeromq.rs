@@ -37,13 +37,13 @@ impl ZeroMQClient {
             tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
             *stop.write().await = true;
         });
-        println!("ZeroMQClient: waiting for a ZeroMQ message...");
         // Connect to ZMQ.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
         socket.connect(&self.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
         socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
         socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
+        println!("ZeroMQClient: waiting for a ZeroMQ message...");
         *self.ready.write().await = true;
         loop {
             if *self.stop.read().await {
@@ -119,13 +119,14 @@ mod tests {
         // Create a ZeroMQ server.
         let zmq_ctx = zmq::Context::new();
         let socket = zmq_ctx.socket(zmq::SocketType::PUB).unwrap();
-        socket.bind(&format!("tcp://lo:{}", ZMQ_PORT)).unwrap();
+        socket.bind(&format!("tcp://*:{}", ZMQ_PORT)).unwrap();
         println!("ZeroMQ server created.");
         // Run ZeroMQClient.
         let client = ZeroMQClient::new(&format!("tcp://127.0.0.1:{}", ZMQ_PORT));
         let mut rx = client.start().await;
         // Wait before ZeroMQClient is ready.
         client.wait_for_ready().await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         // Send hashblock.
         let block_hash = hex::decode(BLOCK_HASH).unwrap();
         println!("Sending \"hashblock\"...");
