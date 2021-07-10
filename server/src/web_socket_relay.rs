@@ -1,27 +1,27 @@
+use crate::*;
 use std::sync::Arc;
 use futures_util::{StreamExt, SinkExt};
 use tokio::sync::RwLock;
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Message;
+use ZeroMQMessage::*;
 
 #[derive(Debug, Clone)]
 pub struct WebSocketRelay {
-    zmq_endpoint: String,
     ws_endpoint: String,
     stop: Arc<RwLock<bool>>,
     ready: Arc<RwLock<bool>>,
 }
 
 impl WebSocketRelay {
-    pub fn new(zmq_endpoint: &str, ws_endpoint: &str) -> Self {
+    pub fn new(ws_endpoint: &str) -> Self {
         Self {
-            zmq_endpoint: zmq_endpoint.to_string(),
             ws_endpoint: ws_endpoint.to_string(),
             stop: Arc::new(RwLock::new(false)),
             ready: Arc::new(RwLock::new(false)),
         }
     }
-    pub async fn run(&self) {
+    pub async fn run(&self, receiver: tokio::sync::watch::Receiver<ZeroMQMessage>) {
         let stop = self.stop.clone();
         tokio::spawn(async move {
             tokio::signal::ctrl_c().await.expect("Failed to install CTRL+C signal handler.");
@@ -60,30 +60,28 @@ impl WebSocketRelay {
                 }
             }
         });
-        // Connect to ZMQ.
-        let zmq_ctx = zmq::Context::new();
-        let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
-        socket.connect(&self.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
-        socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
-        socket.set_subscribe(b"hashtx").expect("Failed to subscribe to a ZeroMQ topic.");
+        let mut last_message = Init;
         loop {
             if *self.stop.read().await {
                 break;
             }
-            let multipart = socket.recv_multipart(zmq::DONTWAIT);
-            match multipart {
-                Ok(multipart) => {
-                    assert_eq!(multipart.len(), 3);
-                    let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.").to_string();
-                    let hash = &multipart[1];
-                    //println!("WebSocketRelay: {} {} {}", topic, hex::encode(hash), hex::encode(&multipart[2]));
-                    let json = serde_json::to_string(&vec![topic, hex::encode(hash)]).unwrap();
-                    tx.send(json).unwrap();
-                },
-                Err(_) => {
-                    //println!("WebSockerRelay: failed to receive a message from ZeroMq.");
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                },
+            let message = (*receiver.borrow()).clone();
+            if message != last_message {
+                last_message = message.clone();
+                match message {
+                    HashBlock(block_hash) => {
+                        let json = serde_json::to_string(&vec!["hashblock", &hex::encode(&consensus_encode(&block_hash))]).unwrap();
+                        tx.send(json).unwrap();
+                    },
+                    RawTx(transaction) => {
+                        let txid = transaction.txid();
+                        let json = serde_json::to_string(&vec!["hashtx", &txid.to_string()]).unwrap();
+                        tx.send(json).unwrap();
+                    },
+                    Init => {},
+                }
+            } else {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
         }
         println!("WebSocketRelay stopped.");
@@ -103,26 +101,21 @@ impl WebSocketRelay {
 
 #[cfg(test)]
 mod tests {
+    use tokio::sync::watch::channel;
     use super::*;
+    const WS_PORT: u16 = 6666;
+    const BLOCK_HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    // txid = caaacc4826fdf63ad0a4093400de5f1fd0c830be0724078ac039f9b29878b76f.
+    const RAW_TX: &str = "0200000000010122f1294bc73da293dfe1a9088c6d26d71564bf538940c7ce9c4e6212f099c3b90000000000ffffffff011e272d0100000000160014af73f777fcd64ec6d9b22ac9e1a57e127ea169ee0247304402205fea552c7d5ed3330aa4a8b5c90a980c1d3bdc72abd13c2d7bccba91fbb978f5022027fac985cfb83339fc9227e1c653b8a824c63a49cda4f9f97d48d5c07e047608012102acc07439373cc2902d0ad6602ed6f5a1b7abdf7608d265c089160ac826a4600600000000";
     #[tokio::test(flavor = "multi_thread")]
     async fn web_socket_relay() {
-        //const ZMQ_ENDPOINT: &str = "inproc://web-socket-relay-zmq";
-        const ZMQ_PORT: u16 = 5555;
-        const WS_PORT: u16 = 6666;
-        const BLOCK_HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        const TXID: &str = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
-        // Create ZeroMQ server.
-        let zmq_ctx = zmq::Context::new();
-        let socket = zmq_ctx.socket(zmq::SocketType::PUB).unwrap();
-        //socket.bind(ZMQ_ENDPOINT).unwrap();
-        socket.bind("tcp://lo:5555").unwrap();
-        println!("ZeroMQ server created.");
+        let (tx, rx) = channel(Init);
         // Run relay.
-        let relay = WebSocketRelay::new(&format!("tcp://localhost:{}", ZMQ_PORT), &format!("localhost:{}", WS_PORT));
+        let relay = WebSocketRelay::new(&format!("localhost:{}", WS_PORT));
         let handle = {
             let relay = relay.clone();
             tokio::spawn(async move {
-                relay.run().await;
+                relay.run(rx).await;
             })
         };
         // Wait before WebSocketRelay is ready.
@@ -133,24 +126,18 @@ mod tests {
         let (_write, mut read) = ws_stream.split();
         // Send "hashblock" message.
         println!("Sending \"hashblock\"...");
-        socket.send_multipart(vec![
-            "hashblock".to_string().into_bytes(),
-            hex::decode(BLOCK_HASH).unwrap(),
-            0u32.to_le_bytes().to_vec(),
-        ], zmq::DONTWAIT).unwrap();
+        tx.send(HashBlock(consensus_decode(&hex::decode(BLOCK_HASH).unwrap()))).unwrap();
         println!("Reading a message from WebSocket...");
         let msg = read.next().await.unwrap().unwrap().into_data();
         assert_eq!(String::from_utf8(msg).unwrap(), format!("[\"hashblock\",\"{}\"]", BLOCK_HASH));
         // Send "hashtx" message.
         println!("Sending \"hashtx\"...");
-        socket.send_multipart(vec![
-            "hashtx".to_string().into_bytes(),
-            hex::decode(TXID).unwrap(),
-            1u32.to_le_bytes().to_vec(),
-        ], zmq::DONTWAIT).unwrap();
+        let transaction: bitcoin::Transaction = consensus_decode(&hex::decode(RAW_TX).unwrap());
+        let txid = transaction.txid();
+        tx.send(RawTx(transaction)).unwrap();
         println!("Reading a message from WebSocket...");
         let msg = read.next().await.unwrap().unwrap().into_data();
-        assert_eq!(String::from_utf8(msg).unwrap(), format!("[\"hashtx\",\"{}\"]", TXID));
+        assert_eq!(String::from_utf8(msg).unwrap(), format!("[\"hashtx\",\"{}\"]", txid));
         relay.stop().await;
         handle.await.unwrap();
     }

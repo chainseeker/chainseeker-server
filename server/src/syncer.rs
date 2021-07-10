@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use tokio::sync::RwLock;
 use crate::db::{Database, UtxoDB};
+use ZeroMQMessage::*;
 
 pub struct Syncer {
     stop: Arc<RwLock<bool>>,
@@ -294,15 +295,10 @@ impl Syncer {
         }
         synced_blocks
     }
-    pub async fn run(&mut self) {
-        // Subscribe to ZeroMQ.
-        let zmq_ctx = zmq::Context::new();
-        let socket = zmq_ctx.socket(zmq::SocketType::SUB).expect("Failed to open a ZeroMQ socket.");
-        socket.connect(&self.db.config.zmq_endpoint).expect("Failed to connect to a ZeroMQ endpoint.");
-        socket.set_subscribe(b"hashblock").expect("Failed to subscribe to a ZeroMQ topic.");
-        socket.set_subscribe(b"rawtx").expect("Failed to subscribe to a ZeroMQ topic.");
-        println!("Waiting for a ZeroMQ message...");
+    pub async fn run(&mut self, rx: tokio::sync::watch::Receiver<ZeroMQMessage>) {
+        println!("Syncer: waiting for a ZeroMQ message...");
         let mut last_sync = Instant::now();
+        let mut last_message = Init;
         loop {
             if *self.stop.read().await {
                 break;
@@ -315,32 +311,27 @@ impl Syncer {
                 last_sync = Instant::now();
                 continue;
             }
-            let multipart = socket.recv_multipart(1);
-            if multipart.is_err() {
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                continue;
+            let message = (*rx.borrow()).clone();
+            if message != last_message {
+                last_message = message.clone();
+                match message {
+                    HashBlock(block_hash) => {
+                        println!("Syncer: received a new block: {}.", block_hash);
+                        self.sync(false).await;
+                        continue;
+                    },
+                    RawTx(tx) => {
+                        let txid = tx.txid();
+                        println!("Syncer: received a new tx: {}.", txid);
+                        if let Err(previous_txid) = self.db.tx_db.write().await.put_tx(&tx, None) {
+                            println!("Syncer: failed to put transaction: {} (reason: tx {} not found).", txid, previous_txid);
+                        }
+                        continue;
+                    },
+                    Init => {},
+                }
             }
-            let multipart = multipart.unwrap();
-            assert_eq!(multipart.len(), 3);
-            let topic = std::str::from_utf8(&multipart[0]).expect("Failed to decode ZeroMQ topic.");
-            let bin = &multipart[1];
-            match topic {
-                "hashblock" => {
-                    println!("Syncer: received a new block: {}.", hex::encode(bin));
-                    self.sync(false).await;
-                },
-                "rawtx" => {
-                    let tx: bitcoin::Transaction = consensus_decode(bin);
-                    let txid = tx.txid();
-                    println!("Syncer: received a new tx: {}.", txid);
-                    if let Err(previous_txid) = self.db.tx_db.write().await.put_tx(&tx, None) {
-                        println!("Syncer: failed to put transaction: {} (reason: tx {} not found).", txid, previous_txid);
-                    }
-                },
-                _ => {
-                    println!("Syncer: invalid topic received.");
-                },
-            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         println!("Syncer stopped.");
     }

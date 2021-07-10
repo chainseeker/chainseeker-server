@@ -29,7 +29,7 @@ mod integration_test;
 
 pub use rocks_db::RocksDB;
 pub use rocks_db_multi::RocksDBMulti;
-pub use zeromq::ZeroMQClient;
+pub use zeromq::{ZeroMQMessage, ZeroMQClient};
 pub use syncer::Syncer;
 pub use rest::*;
 pub use http_server::HttpServer;
@@ -61,7 +61,7 @@ impl Server {
         let db = Database::new(coin, config);
         let syncer = Syncer::new(db.clone()).await;
         let http = HttpServer::new(db.clone());
-        let ws = WebSocketRelay::new(&config.zmq_endpoint, &config.ws_endpoint);
+        let ws = WebSocketRelay::new(&config.ws_endpoint);
         Self {
             db,
             syncer,
@@ -80,17 +80,20 @@ impl Server {
                 http.read().await.run(&http_ip, http_port).await;
             }));
         }
+        let zmq = ZeroMQClient::new(&self.db.config.zmq_endpoint);
+        let rx = zmq.start().await;
         // Run WebSocketRelay.
         {
+            let rx = rx.clone();
             let ws = self.ws.clone();
             handles.push(tokio::spawn(async move {
-                ws.read().await.run().await;
+                ws.read().await.run(rx).await;
             }));
         }
         // Do initial sync.
         self.syncer.initial_sync().await;
         // Run syncer.
-        self.syncer.run().await;
+        self.syncer.run(rx).await;
         // Join for the threads.
         for handle in handles.iter_mut() {
             handle.await.expect("Failed to await a tokio JoinHandle.");
