@@ -339,6 +339,7 @@
 <span id="336">336</span>
 <span id="337">337</span>
 <span id="338">338</span>
+<span id="339">339</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
@@ -660,6 +661,7 @@
                     <span class="ident">HashBlock</span>(<span class="ident">block_hash</span>) <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="macro">println!</span>(<span class="string">&quot;Syncer: received a new block: {}.&quot;</span>, <span class="ident">block_hash</span>);
                         <span class="self">self</span>.<span class="ident">sync</span>(<span class="bool-val">false</span>).<span class="kw">await</span>;
+                        <span class="ident">last_sync</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
                     },
                     <span class="ident">RawTx</span>(<span class="ident">tx</span>) <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="kw">let</span> <span class="ident">txid</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">txid</span>();
