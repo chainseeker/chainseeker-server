@@ -127,6 +127,7 @@ impl UtxoDB {
         }
         // Process vins.
         let mut previous_utxos = Vec::new();
+        let mut batch = rocks_db::WriteBatch::<UtxoDBKey, UtxoDBValue>::default();
         for tx in block.txdata.iter() {
             for vin in tx.input.iter() {
                 if !vin.previous_output.is_null() {
@@ -139,7 +140,7 @@ impl UtxoDB {
                     let value = inserts.remove(&key).unwrap_or_else(|| {
                         match self.db.get(&key) {
                             Some(value) => {
-                                self.db.delete(&key);
+                                batch.delete(&key);
                                 value
                             },
                             None => {
@@ -165,8 +166,9 @@ impl UtxoDB {
             }
         }
         for (key, value) in inserts.iter() {
-            self.db.put(key, value);
+            batch.put(&key, &value);
         }
+        self.db.write(batch).unwrap();
         previous_utxos
     }
     pub fn reorg_block(&mut self, block: &Block, prev_txs: &[Transaction]) {
