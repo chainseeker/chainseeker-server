@@ -1,26 +1,33 @@
 use crate::*;
-use bitcoin::{Block, Txid, Script};
+use bitcoin::hashes::Hash;
+use bitcoin::{Block, Txid, Script, WScriptHash};
 use crate::rocks_db::{Serialize, Deserialize, ConstantSize};
 use crate::db::utxo::UtxoEntry;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AddressIndexDBKey {
-    pub script_pubkey: Script,
-    pub txid: Txid,
+    pub wscript_hash: WScriptHash,  // +32 = 32.
+    pub txid: Txid,                 // +32 = 64.
+}
+
+impl ConstantSize for AddressIndexDBKey {
+    const LEN: usize = 64;
 }
 
 impl Serialize for AddressIndexDBKey {
     fn serialize(&self) -> Vec<u8> {
-        [consensus_encode(&self.script_pubkey), consensus_encode(&self.txid)].concat()
+        [self.wscript_hash.as_ref(), &consensus_encode(&self.txid)].concat()
     }
 }
 
 impl Deserialize for AddressIndexDBKey {
     fn deserialize(buf: &[u8]) -> Self {
-        let script_pubkey = consensus_decode(&buf[0..buf.len()-32]);
-        let txid = consensus_decode(&buf[buf.len()-32..]);
+        let mut wscript_hash = [0u8; 32];
+        wscript_hash.copy_from_slice(&buf[0..32]);
+        let wscript_hash = WScriptHash::from_inner(wscript_hash);
+        let txid = consensus_decode(&buf[32..64]);
         AddressIndexDBKey {
-            script_pubkey,
+            wscript_hash,
             txid,
         }
     }
@@ -62,7 +69,7 @@ pub struct AddressIndexDB {
     db: RocksDB<AddressIndexDBKey, AddressIndexDBValue>,
 }
 
-/// The database which stores (script_pubkey, txid) tuple.
+/// The database which stores (wscript_hash, txid) tuple.
 impl AddressIndexDB {
     pub fn get_path(coin: &str) -> String {
         format!("{}/{}/address_index", data_dir(), coin)
@@ -74,8 +81,8 @@ impl AddressIndexDB {
         }
     }
     pub fn get(&self, script_pubkey: &Script) -> Vec<Txid> {
-        let script_pubkey = consensus_encode(script_pubkey);
-        let mut txids = self.db.prefix_iter(script_pubkey)
+        let wscript_hash = script_pubkey.wscript_hash();
+        let mut txids = self.db.prefix_iter(wscript_hash.as_ref().to_vec())
             .map(|(key, value)| (key.txid, value.confirmed_height))
             .collect::<Vec<(bitcoin::Txid, Option<u32>)>>();
         txids.sort_by(|a, b| {
@@ -94,7 +101,7 @@ impl AddressIndexDB {
     }
     pub fn put(&self, script_pubkey: &Script, txid: &Txid, confirmed_height: Option<u32>) {
         let key = AddressIndexDBKey {
-            script_pubkey: (*script_pubkey).clone(),
+            wscript_hash: script_pubkey.wscript_hash(),
             txid: *txid,
         };
         self.db.put(&key, &confirmed_height.into());
@@ -133,8 +140,8 @@ mod tests {
         let mut entries = addr_index_db.db.iter().map(|(key, _value)| key).collect::<Vec<AddressIndexDBKey>>();
         entries.sort();
         for entry in entries.iter() {
-            println!("        AddressIndexDBKey {{ script_pubkey: consensus_decode(&hex::decode(\"{}\").unwrap()), txid: consensus_decode(&hex::decode(\"{}\").unwrap()), }},",
-                hex::encode(consensus_encode(&entry.script_pubkey)),
+            println!("        AddressIndexDBKey {{ wscript_hash: WScriptHash::from_inner([{}]), txid: consensus_decode(&hex::decode(\"{}\").unwrap()), }},",
+                entry.wscript_hash.as_ref().iter().map(|b| ["0x", &hex::encode([*b])].concat()).collect::<Vec<String>>().join(","),
                 hex::encode(consensus_encode(&entry.txid)));
         }
     }
@@ -152,15 +159,12 @@ mod tests {
         let mut entries = fixtures::addr_index_db();
         entries.sort();
         assert_eq!(entries_test, entries);
-        for entry in entries.iter() {
-            let mut found = false;
-            for txid in addr_index_db.get(&entry.script_pubkey).iter() {
-                if *txid == entry.txid {
-                    found = true;
-                    break;
+        for block in fixtures::regtest_blocks().iter() {
+            for tx in block.txdata.iter() {
+                for output in tx.output.iter() {
+                    assert!(!addr_index_db.get(&output.script_pubkey).is_empty());
                 }
             }
-            assert!(found);
         }
     }
 }
