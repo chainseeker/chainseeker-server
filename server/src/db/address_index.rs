@@ -99,26 +99,27 @@ impl AddressIndexDB {
         };
         self.db.put(&key, &confirmed_height.into());
     }
-    /*
-    pub fn process_tx(&self, tx: &bitcoin::Transaction, height: Option<u32>) {
+    pub fn process_tx(&self, tx: &bitcoin::Transaction, previous_utxos: &[UtxoEntry], height: Option<u32>) -> usize {
+        let mut previous_utxo_index = 0;
+        let txid = tx.txid();
+        // Process vins.
+        for vin in tx.input.iter() {
+            if !vin.previous_output.is_null() {
+                // Fetch transaction from `previous_output`.
+                self.put(&previous_utxos[previous_utxo_index].script_pubkey, &txid, height);
+                previous_utxo_index += 1;
+            }
+        }
+        // Process vouts.
+        for vout in tx.output.iter() {
+            self.put(&vout.script_pubkey, &txid, height);
+        }
+        previous_utxo_index
     }
-    */
     pub fn process_block(&self, height: u32, block: &Block, previous_utxos: &[UtxoEntry]) {
         let mut previous_utxo_index = 0;
         for tx in block.txdata.iter() {
-            let txid = tx.txid();
-            // Process vins.
-            for vin in tx.input.iter() {
-                if !vin.previous_output.is_null() {
-                    // Fetch transaction from `previous_output`.
-                    self.put(&previous_utxos[previous_utxo_index].script_pubkey, &txid, Some(height));
-                    previous_utxo_index += 1;
-                }
-            }
-            // Process vouts.
-            for vout in tx.output.iter() {
-                self.put(&vout.script_pubkey, &txid, Some(height));
-            }
+            previous_utxo_index += self.process_tx(&tx, &previous_utxos[previous_utxo_index..], Some(height));
         }
     }
 }

@@ -101,13 +101,23 @@ impl TxDB {
     pub fn put(&self, txid: &Txid, value: &TxDBValue) {
         self.db.put(&TxDBKey { txid: *txid }, value);
     }
-    pub fn put_tx(&self, tx: &Transaction, confirmed_height: Option<u32>) -> Result<TxDBValue, Txid> {
+    pub fn put_tx(&self, tx: &Transaction, confirmed_height: Option<u32>) -> Result<(TxDBValue, Vec<UtxoEntry>), Txid> {
         let mut previous_txouts = Vec::new();
+        let mut previous_utxos = Vec::new();
         for vin in tx.input.iter() {
             if !vin.previous_output.is_null() {
                 let previous_txid = &vin.previous_output.txid;
                 match self.get(previous_txid) {
-                    Some(previous_tx) => previous_txouts.push(previous_tx.tx.output[vin.previous_output.vout as usize].clone()),
+                    Some(previous_tx) => {
+                        let previous_txout = previous_tx.tx.output[vin.previous_output.vout as usize].clone();
+                        previous_utxos.push(UtxoEntry {
+                            script_pubkey: previous_txout.script_pubkey.clone(),
+                            txid: previous_txid.clone(),
+                            vout: vin.previous_output.vout,
+                            value: previous_txout.value,
+                        });
+                        previous_txouts.push(previous_txout);
+                    },
                     None => return Err(*previous_txid),
                 }
             }
@@ -118,7 +128,7 @@ impl TxDB {
             previous_txouts,
         };
         self.put(&tx.txid(), &value);
-        Ok(value)
+        Ok((value, previous_utxos))
     }
     pub fn get(&self, txid: &Txid) -> Option<TxDBValue> {
         self.db.get(&TxDBKey { txid: *txid })
@@ -238,8 +248,8 @@ mod tests {
         }
         // txid = fe6c48bbfdc025670f4db0340650ba5a50f9307b091d9aaa19aa44291961c69f.
         assert_eq!(
-            tx_db.put_tx(&consensus_decode(&hex::decode("01000000000101d553fbabaf1b26977b6e5d403af9f4b567b3e28484321a6fb02e2824984e3e5000000000171600142b2296c588ec413cebd19c3cbc04ea830ead6e78ffffffff01be1611020000000017a91487e4e5a7ff7bf78b8a8972a49381c8a673917f3e870247304402205f39ccbab38b644acea0776d18cb63ce3e37428cbac06dc23b59c61607aef69102206b8610827e9cb853ea0ba38983662034bd3575cc1ab118fb66d6a98066fa0bed01210304c01563d46e38264283b99bb352b46e69bf132431f102d4bd9a9d8dab075e7f00000000").unwrap()), Some(500_000)),
-            Result::<TxDBValue, Txid>::Err(Txid::from_str(TXID).unwrap()),
+            tx_db.put_tx(&consensus_decode(&hex::decode("01000000000101d553fbabaf1b26977b6e5d403af9f4b567b3e28484321a6fb02e2824984e3e5000000000171600142b2296c588ec413cebd19c3cbc04ea830ead6e78ffffffff01be1611020000000017a91487e4e5a7ff7bf78b8a8972a49381c8a673917f3e870247304402205f39ccbab38b644acea0776d18cb63ce3e37428cbac06dc23b59c61607aef69102206b8610827e9cb853ea0ba38983662034bd3575cc1ab118fb66d6a98066fa0bed01210304c01563d46e38264283b99bb352b46e69bf132431f102d4bd9a9d8dab075e7f00000000").unwrap()), Some(500_000)).unwrap_err(),
+            Txid::from_str(TXID).unwrap(),
         );
         for (height, block) in blocks.iter().enumerate() {
             let mut previous_utxo_index = 0;

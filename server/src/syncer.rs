@@ -323,9 +323,13 @@ impl Syncer {
                     RawTx(tx) => {
                         let txid = tx.txid();
                         println!("Syncer: received a new tx: {}.", txid);
-                        //self.db.addr_index_db.write().await.process_tx(&tx, None);
-                        if let Err(previous_txid) = self.db.tx_db.write().await.put_tx(&tx, None) {
-                            println!("Syncer: failed to put transaction: {} (reason: tx {} not found).", txid, previous_txid);
+                        match self.db.tx_db.write().await.put_tx(&tx, None) {
+                            Ok((_, previous_utxos)) => {
+                                self.db.addr_index_db.write().await.process_tx(&tx, &previous_utxos, None);
+                            },
+                            Err(previous_txid) => {
+                                println!("Syncer: failed to put transaction: {} (reason: tx {} not found).", txid, previous_txid);
+                            },
                         }
                     },
                     Init => {},
