@@ -10,7 +10,7 @@ pub struct UtxoEntry {
     pub value: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UtxoDBKey {
     txid: Txid,
     vout: u32,
@@ -109,20 +109,20 @@ impl UtxoDB {
         }
     }
     pub fn process_block(&mut self, block: &Block, no_panic: bool) -> Vec<UtxoEntry> {
+        let mut inserts = std::collections::HashMap::new();
         // Process vouts.
         for tx in block.txdata.iter() {
             let txid = tx.txid();
             for (vout, output) in tx.output.iter().enumerate() {
-                self.db.put(
-                    &UtxoDBKey {
-                        txid,
-                        vout: vout as u32,
-                    },
-                    &UtxoDBValue {
-                        script_pubkey: output.script_pubkey.clone(),
-                        value: output.value,
-                    },
-                );
+                let key = UtxoDBKey {
+                    txid,
+                    vout: vout as u32,
+                };
+                let value = UtxoDBValue {
+                    script_pubkey: output.script_pubkey.clone(),
+                    value: output.value,
+                };
+                inserts.insert(key, value);
             }
         }
         // Process vins.
@@ -136,25 +136,36 @@ impl UtxoDB {
                         txid,
                         vout,
                     };
-                    match self.db.get(&key) {
-                        Some(value) => {
-                            self.db.delete(&key);
-                            let utxo = UtxoEntry {
-                                script_pubkey: value.script_pubkey,
-                                txid: key.txid,
-                                vout: key.vout,
-                                value: value.value,
-                            };
-                            previous_utxos.push(utxo);
-                        },
-                        None => {
-                            if !no_panic {
-                                panic!("Failed to find UTXO entry.");
-                            }
-                        },
-                    }
+                    let value = inserts.remove(&key).unwrap_or_else(|| {
+                        match self.db.get(&key) {
+                            Some(value) => {
+                                self.db.delete(&key);
+                                value
+                            },
+                            None => {
+                                if !no_panic {
+                                    panic!("Failed to find UTXO entry.");
+                                }
+                                // Construct a dummy data.
+                                UtxoDBValue {
+                                    script_pubkey: Script::new(),
+                                    value: 0,
+                                }
+                            },
+                        }
+                    });
+                    let utxo = UtxoEntry {
+                        script_pubkey: value.script_pubkey,
+                        txid: key.txid,
+                        vout: key.vout,
+                        value: value.value,
+                    };
+                    previous_utxos.push(utxo);
                 }
             }
+        }
+        for (key, value) in inserts.iter() {
+            self.db.put(key, value);
         }
         previous_utxos
     }

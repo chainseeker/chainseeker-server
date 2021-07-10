@@ -220,9 +220,9 @@ pub struct RocksDB<K, V>
     where K: Serialize + Deserialize + 'static,
           V: Serialize + Deserialize + 'static,
 {
-    temporary: bool,
-    path: String,
-    db: Rocks,
+    pub temporary: bool,
+    pub path: String,
+    pub db: Rocks,
     _k: PhantomData<fn() -> K>,
     _v: PhantomData<fn() -> V>,
 }
