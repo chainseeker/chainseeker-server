@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AddressIndexDB",""],["AddressIndexDBKey",""]],"type":[["AddressIndexDBValue",""]]});
+initSidebarItems({"struct":[["AddressIndexDB",""],["AddressIndexDBKey",""],["AddressIndexDBValue",""]]});

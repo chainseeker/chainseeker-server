@@ -273,7 +273,7 @@
     <span class="kw">const</span> <span class="ident">RAW_TX</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;0200000000010122f1294bc73da293dfe1a9088c6d26d71564bf538940c7ce9c4e6212f099c3b90000000000ffffffff011e272d0100000000160014af73f777fcd64ec6d9b22ac9e1a57e127ea169ee0247304402205fea552c7d5ed3330aa4a8b5c90a980c1d3bdc72abd13c2d7bccba91fbb978f5022027fac985cfb83339fc9227e1c653b8a824c63a49cda4f9f97d48d5c07e047608012102acc07439373cc2902d0ad6602ed6f5a1b7abdf7608d265c089160ac826a4600600000000&quot;</span>;
     <span class="attribute">#[<span class="ident">tokio::test</span>(<span class="ident">flavor</span> <span class="op">=</span> <span class="string">&quot;multi_thread&quot;</span>)]</span>
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">client</span>() {
-        <span class="kw">const</span> <span class="ident">ZMQ_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">6666</span>;
+        <span class="kw">const</span> <span class="ident">ZMQ_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">6667</span>;
         <span class="comment">// Create a ZeroMQ server.</span>
         <span class="kw">let</span> <span class="ident">zmq_ctx</span> <span class="op">=</span> <span class="ident">zmq::Context::new</span>();
         <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">zmq_ctx</span>.<span class="ident">socket</span>(<span class="ident">zmq::SocketType::PUB</span>).<span class="ident">unwrap</span>();
